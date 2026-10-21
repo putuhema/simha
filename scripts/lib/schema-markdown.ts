@@ -1,0 +1,209 @@
+/**
+ * Turns raw information_schema rows into docs/schema.md.
+ * Pure functions only, so they can be tested without a database.
+ */
+import type { ExpectedTable } from "./khanza-tables.ts";
+
+export interface TableInfo {
+  readonly tableName: string;
+  readonly engine: string | null;
+  /** Estimate from information_schema.TABLES (exact for MyISAM, rough for InnoDB). */
+  readonly tableRows: number | null;
+  readonly tableComment: string | null;
+}
+
+export interface ColumnInfo {
+  readonly tableName: string;
+  readonly columnName: string;
+  readonly ordinalPosition: number;
+  /** Full type, e.g. varchar(17) or enum('Belum','Sudah'). */
+  readonly columnType: string;
+  readonly isNullable: string;
+  readonly columnKey: string;
+  readonly columnDefault: string | null;
+  readonly extra: string;
+  readonly columnComment: string;
+}
+
+export interface IndexInfo {
+  readonly tableName: string;
+  readonly indexName: string;
+  readonly nonUnique: number;
+  readonly seqInIndex: number;
+  readonly columnName: string;
+}
+
+export interface ForeignKeyInfo {
+  readonly tableName: string;
+  readonly constraintName: string;
+  readonly columnName: string;
+  readonly referencedTableName: string;
+  readonly referencedColumnName: string;
+}
+
+export interface SchemaSnapshot {
+  readonly database: string;
+  readonly serverVersion: string;
+  readonly generatedAt: Date;
+  readonly expected: ReadonlyArray<ExpectedTable>;
+  /** Extra table names requested with --tables. */
+  readonly requested: ReadonlyArray<string>;
+  readonly tables: ReadonlyArray<TableInfo>;
+  readonly columns: ReadonlyArray<ColumnInfo>;
+  readonly indexes: ReadonlyArray<IndexInfo>;
+  readonly foreignKeys: ReadonlyArray<ForeignKeyInfo>;
+  /** Every table in the database, only filled with --all. */
+  readonly allTables?: ReadonlyArray<TableInfo & { readonly columnCount: number }>;
+}
+
+export interface MissingReport {
+  readonly missingTables: ReadonlyArray<string>;
+  readonly missingColumns: ReadonlyArray<{ readonly table: string; readonly column: string }>;
+}
+
+const lower = (s: string) => s.toLowerCase();
+
+/** Compare the expected Khanza tables/columns with what the live DB has. */
+export const findMissing = (
+  expected: ReadonlyArray<ExpectedTable>,
+  tables: ReadonlyArray<TableInfo>,
+  columns: ReadonlyArray<ColumnInfo>,
+): MissingReport => {
+  const tableNames = new Set(tables.map((t) => lower(t.tableName)));
+  const columnsByTable = new Map<string, Set<string>>();
+  for (const c of columns) {
+    const key = lower(c.tableName);
+    const set = columnsByTable.get(key) ?? new Set<string>();
+    set.add(lower(c.columnName));
+    columnsByTable.set(key, set);
+  }
+
+  const missingTables: Array<string> = [];
+  const missingColumns: Array<{ table: string; column: string }> = [];
+  for (const t of expected) {
+    if (!tableNames.has(lower(t.name))) {
+      missingTables.push(t.name);
+      continue;
+    }
+    const present = columnsByTable.get(lower(t.name)) ?? new Set<string>();
+    for (const col of t.columns) {
+      if (!present.has(lower(col))) missingColumns.push({ table: t.name, column: col });
+    }
+  }
+  return { missingTables, missingColumns };
+};
+
+/** Escape text for a Markdown table cell. */
+export const cell = (value: string | number | null | undefined): string => {
+  if (value === null || value === undefined || value === "") return "";
+  return String(value).replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+};
+
+const groupBy = <A>(items: ReadonlyArray<A>, key: (a: A) => string): Map<string, Array<A>> => {
+  const map = new Map<string, Array<A>>();
+  for (const item of items) {
+    const k = lower(key(item));
+    const list = map.get(k) ?? [];
+    list.push(item);
+    map.set(k, list);
+  }
+  return map;
+};
+
+const renderIndexes = (indexes: ReadonlyArray<IndexInfo>): Array<string> => {
+  const byName = new Map<string, Array<IndexInfo>>();
+  for (const ix of indexes) {
+    const list = byName.get(ix.indexName) ?? [];
+    list.push(ix);
+    byName.set(ix.indexName, list);
+  }
+  return [...byName.entries()].map(([name, parts]) => {
+    const cols = parts
+      .toSorted((a, b) => a.seqInIndex - b.seqInIndex)
+      .map((p) => p.columnName)
+      .join(", ");
+    const unique = parts[0]?.nonUnique === 0 ? "unique " : "";
+    return `- ${unique}\`${name}\` (${cols})`;
+  });
+};
+
+export const renderSchemaMarkdown = (snap: SchemaSnapshot): string => {
+  const out: Array<string> = [];
+  const { missingTables, missingColumns } = findMissing(snap.expected, snap.tables, snap.columns);
+  const expectedByName = new Map(snap.expected.map((t) => [lower(t.name), t]));
+  const columnsByTable = groupBy(snap.columns, (c) => c.tableName);
+  const indexesByTable = groupBy(snap.indexes, (i) => i.tableName);
+  const fksByTable = groupBy(snap.foreignKeys, (f) => f.tableName);
+
+  out.push("# Khanza schema snapshot", "");
+  out.push("Generated by `scripts/inspect-schema.ts`. Do not edit by hand; re-run the script instead.", "");
+  out.push(`- Database: \`${snap.database}\``);
+  out.push(`- Server: ${snap.serverVersion}`);
+  out.push(`- Generated: ${snap.generatedAt.toISOString()}`);
+  out.push(`- Tables documented: ${snap.tables.length}`);
+  out.push("");
+
+  out.push("## Differences from standard Khanza", "");
+  if (missingTables.length === 0 && missingColumns.length === 0) {
+    out.push("All expected tables and columns were found.", "");
+  } else {
+    if (missingTables.length > 0) {
+      out.push("Missing tables (or not visible to the read user):", "");
+      for (const t of missingTables) out.push(`- \`${t}\``);
+      out.push("");
+    }
+    if (missingColumns.length > 0) {
+      out.push("Missing columns:", "");
+      for (const m of missingColumns) out.push(`- \`${m.table}.${m.column}\``);
+      out.push("");
+    }
+  }
+
+  const sortedTables = snap.tables.toSorted((a, b) => a.tableName.localeCompare(b.tableName));
+  for (const t of sortedTables) {
+    const key = lower(t.tableName);
+    const exp = expectedByName.get(key);
+    out.push(`## \`${t.tableName}\``, "");
+    if (exp) out.push(`Purpose: ${exp.purpose}${exp.extra ? " _(added, not in original brief)_" : ""}`, "");
+    const meta = [
+      t.engine ? `engine ${t.engine}` : null,
+      t.tableRows !== null ? `~${t.tableRows.toLocaleString("en-US")} rows` : null,
+      t.tableComment ? `comment: ${cell(t.tableComment)}` : null,
+    ].filter((x): x is string => x !== null);
+    if (meta.length > 0) out.push(meta.join(" · "), "");
+
+    out.push("| # | Column | Type | Null | Key | Default | Extra | Comment |");
+    out.push("|---|---|---|---|---|---|---|---|");
+    const cols = (columnsByTable.get(key) ?? []).toSorted((a, b) => a.ordinalPosition - b.ordinalPosition);
+    for (const c of cols) {
+      out.push(
+        `| ${c.ordinalPosition} | \`${c.columnName}\` | ${cell(c.columnType)} | ${c.isNullable === "YES" ? "yes" : "no"} | ${cell(c.columnKey)} | ${cell(c.columnDefault)} | ${cell(c.extra)} | ${cell(c.columnComment)} |`,
+      );
+    }
+    out.push("");
+
+    const ix = indexesByTable.get(key) ?? [];
+    if (ix.length > 0) out.push("Indexes:", "", ...renderIndexes(ix), "");
+
+    const fks = fksByTable.get(key) ?? [];
+    if (fks.length > 0) {
+      out.push("Foreign keys:", "");
+      for (const fk of fks) {
+        out.push(`- \`${fk.columnName}\` → \`${fk.referencedTableName}.${fk.referencedColumnName}\``);
+      }
+      out.push("");
+    }
+  }
+
+  if (snap.allTables && snap.allTables.length > 0) {
+    out.push("## All tables in the database", "");
+    out.push("| Table | Columns | ~Rows | Comment |");
+    out.push("|---|---|---|---|");
+    for (const t of snap.allTables.toSorted((a, b) => a.tableName.localeCompare(b.tableName))) {
+      out.push(`| \`${t.tableName}\` | ${t.columnCount} | ${t.tableRows ?? ""} | ${cell(t.tableComment)} |`);
+    }
+    out.push("");
+  }
+
+  return out.join("\n");
+};

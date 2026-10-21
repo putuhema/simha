@@ -1,0 +1,17 @@
+{
+  "name": "@simrs/scripts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "inspect-schema": "node --env-file-if-exists=../.env inspect-schema.ts",
+    "typecheck": "tsc -p .",
+    "dump-test-schema": "node --env-file-if-exists=../.env dump-test-schema.ts"
+  },
+  "dependencies": {
+    "@effect/platform-node": "catalog:",
+    "@effect/sql-mysql2": "catalog:",
+    "@simrs/tools": "workspace:*",
+    "effect": "catalog:"
+  }
+}

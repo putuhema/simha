@@ -1,0 +1,16 @@
+# Throwaway MariaDB for the test suite (synthetic data only), for machines with Docker.
+#
+#   docker compose up -d
+#   KHANZA_TEST_DB_HOST=127.0.0.1 KHANZA_TEST_DB_PORT=3307 KHANZA_TEST_DB_ADMIN_PASS=test pnpm test
+#
+# Without Docker the tests start a temporary MariaDB themselves if `mariadbd`
+# is installed (e.g. `brew install mariadb`).
+services:
+  khanza-test-db:
+    image: mariadb:11.4
+    environment:
+      MARIADB_ROOT_PASSWORD: test
+    ports:
+      - "127.0.0.1:3307:3306"
+    tmpfs:
+      - /var/lib/mysql
