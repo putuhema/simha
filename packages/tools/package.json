@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./testing": "./test/helpers.ts",
+    "./testing/global-setup": "./test/global-setup.ts"
   },
   "scripts": {
     "typecheck": "tsc -p ."

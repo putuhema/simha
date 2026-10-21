@@ -4,9 +4,22 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/main.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p ."
+    "typecheck": "tsc -p .",
+    "dev": "node --env-file-if-exists=../../.env --disable-warning=ExperimentalWarning --watch src/main.ts",
+    "start": "node --env-file-if-exists=../../.env --disable-warning=ExperimentalWarning src/main.ts"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "vitest": "catalog:"
+  },
+  "dependencies": {
+    "@effect/platform-node": "catalog:",
+    "@simrs/llm": "workspace:*",
+    "@simrs/shared": "workspace:*",
+    "@simrs/tools": "workspace:*",
+    "effect": "catalog:"
   }
 }

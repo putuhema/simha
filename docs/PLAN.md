@@ -1,6 +1,6 @@
 # Plan
 
-Status: **M1 done, waiting for your test.** Next: M2.
+Status: **M2 done, waiting for your test.** Next: M3.
 
 ## Packages and main modules
 
@@ -19,7 +19,7 @@ Status: **M1 done, waiting for your test.** Next: M2.
 Each one ends with tests passing and a stop for you to test.
 
 - **M1. Data layer. ✅ Done.** Config Layer, read and write pools, SQLite audit DB with migrations, the 8 read tools, `pnpm tool` to try them, tests on synthetic data (temporary MariaDB or `docker-compose.yml`).
-- **M2. Agent.** Tool registry, LLM service with `anthropic`, `openai-compat` and `fake` adapters, agent loop, `POST /ask` and `POST /tickets/:id/investigate` with SSE, PII masking. Demo with two providers (e.g. Claude + Ollama).
+- **M2. Agent. ✅ Done.** Tool registry, LLM service with `anthropic`, `openai-compat` and `fake` adapters, agent loop, `POST /ask` and `POST /tickets/:id/investigate` with SSE, PII masking. Demo with DeepSeek and Gemini (and Claude through a gateway).
 - **M3. Fixes.** `usulkanPerbaikan` → preview → approve → execute in a transaction → rollback. Tests prove a row-count mismatch rolls back and nothing is written without an approval row in the audit log.
 - **M4. Tanya Data tools.** `lihatSkema`, guarded `jalankanQueryBaca`, `tampilkan`. Tests prove non-SELECT, multiple statements and deny-listed columns are rejected.
 - **M5. Web UI.** Tiket, Tanya Data (charts, tables, favorites), Pengaturan (provider, audit log). Login. Playwright smoke tests.
@@ -33,6 +33,14 @@ Each one ends with tests passing and a stop for you to test.
 - The read layer refuses to start if the read user can write (checked with `SHOW GRANTS`). The write layer refuses a user with global privileges, PROXY or GRANT OPTION.
 - Dates and times are returned as stored strings (`"2026-10-21"`, `"0000-00-00"`) to avoid time-zone shifts.
 - `cariPasien`, `dataSep` and the other tools never select NIK, phone numbers or addresses, so there is nothing to mask in their output. General PII masking for AI-written queries comes in M2/M4.
+
+## M2 notes
+
+- Tickets, conversations and agent runs live in the audit SQLite DB (migration `0002_agent`). Each run records the question, provider, model, masking setting, steps, tokens and result; `tool_calls.session_id` is the run id.
+- The system prompt is `apps/server/src/agent/system-prompt.md` followed by `docs/khanza_notes.md`, so local notes reach the model without code changes.
+- The model gets the server date and time with every question, so "hari ini" and "minggu ini" resolve correctly.
+- Claude's own response content (including thinking blocks) is replayed unchanged on the next step. All tool results of a turn go back in one message.
+- No login yet (M5); the server listens on 127.0.0.1 by default.
 
 ## Decisions and questions
 

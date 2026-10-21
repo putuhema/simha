@@ -38,6 +38,65 @@ const init = Effect.gen(function* () {
   yield* sql`CREATE INDEX queries_tool_call ON queries (tool_call_id)`;
 });
 
+const agent = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  // Nurse complaints handled in Tiket mode.
+  yield* sql`
+    CREATE TABLE tickets (
+      id          TEXT PRIMARY KEY,
+      nurse_name  TEXT NOT NULL,
+      unit        TEXT NOT NULL,
+      complaint   TEXT NOT NULL,
+      status      TEXT NOT NULL CHECK (status IN ('open', 'investigating', 'diagnosed', 'closed')),
+      created_at  TEXT NOT NULL,
+      updated_at  TEXT NOT NULL
+    )`;
+  // A chat thread (Tanya Data) or the thread of one ticket. Follow-up questions continue it.
+  yield* sql`
+    CREATE TABLE conversations (
+      id          TEXT PRIMARY KEY,
+      kind        TEXT NOT NULL CHECK (kind IN ('ask', 'ticket')),
+      ticket_id   TEXT REFERENCES tickets (id),
+      created_at  TEXT NOT NULL
+    )`;
+  yield* sql`CREATE UNIQUE INDEX conversations_ticket ON conversations (ticket_id) WHERE ticket_id IS NOT NULL`;
+  // Messages exactly as kept for the AI model (user, assistant, tool results), in order.
+  yield* sql`
+    CREATE TABLE conversation_messages (
+      id               INTEGER PRIMARY KEY AUTOINCREMENT,
+      conversation_id  TEXT NOT NULL REFERENCES conversations (id),
+      run_id           TEXT NOT NULL,
+      role             TEXT NOT NULL,
+      message_json     TEXT NOT NULL,
+      created_at       TEXT NOT NULL
+    )`;
+  yield* sql`CREATE INDEX conversation_messages_conversation ON conversation_messages (conversation_id, id)`;
+  // One row per question: who asked what, which provider/model answered, and the outcome.
+  // tool_calls.session_id holds the run id.
+  yield* sql`
+    CREATE TABLE agent_runs (
+      id               TEXT PRIMARY KEY,
+      conversation_id  TEXT NOT NULL REFERENCES conversations (id),
+      ticket_id        TEXT REFERENCES tickets (id),
+      kind             TEXT NOT NULL CHECK (kind IN ('ask', 'ticket')),
+      question         TEXT NOT NULL,
+      provider         TEXT NOT NULL,
+      model            TEXT NOT NULL,
+      mask_pii         INTEGER NOT NULL,
+      status           TEXT NOT NULL CHECK (status IN ('running', 'ok', 'error', 'interrupted')),
+      final_text       TEXT,
+      stop_reason      TEXT,
+      steps            INTEGER NOT NULL DEFAULT 0,
+      input_tokens     INTEGER,
+      output_tokens    INTEGER,
+      error            TEXT,
+      started_at       TEXT NOT NULL,
+      finished_at      TEXT
+    )`;
+  yield* sql`CREATE INDEX agent_runs_started ON agent_runs (started_at)`;
+});
+
 export const auditMigrations = {
   "0001_init": init,
+  "0002_agent": agent,
 };

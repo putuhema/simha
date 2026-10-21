@@ -5,7 +5,7 @@ AI assistant for hospital IT staff working with **SIMRS Khanza**.
 - **Tiket mode:** paste a nurse's complaint. The agent reads the real patient data through safe, read-only tools, explains each check, gives a diagnosis and proposes a fix as SQL. The fix only runs after a person clicks **Approve**, and it can be rolled back.
 - **Tanya Data mode:** ask questions about hospital data in plain Indonesian ("10 obat paling banyak dipakai minggu ini"). The agent writes a guarded `SELECT` and shows the answer as a table, chart or number.
 
-> Status: **M1 done** (database layer, audit log, 8 read tools). No server or UI yet; try the tools from the terminal with `pnpm tool`. See [docs/PLAN.md](docs/PLAN.md).
+> Status: **M2 done** (database layer, audit log, read tools, AI agent with streaming HTTP API). No UI yet; use `pnpm tool` and `curl`. See [docs/PLAN.md](docs/PLAN.md).
 
 ## Safety model (short version)
 
@@ -102,6 +102,54 @@ pnpm tool suratKontrol '{"noSep":"0001R0010126V000123"}'
 
 Each run is recorded in the audit log (`data/audit.sqlite`): the tool call with its input and output, and every query with its parameters, row count and duration. Look at it with any SQLite viewer, e.g. `sqlite3 data/audit.sqlite "SELECT tool, status, started_at FROM tool_calls"`.
 
+### 4. Run the server and ask the agent
+
+```bash
+pnpm start       # http://127.0.0.1:8787
+```
+
+```bash
+# Tanya Data (answers stream back as Server-Sent Events)
+curl -N -X POST localhost:8787/ask -H 'content-type: application/json' \
+  -d '{"question":"Cek riwayat kamar pasien RM 012345"}'
+
+# Ticket: create, then investigate
+curl -X POST localhost:8787/tickets -H 'content-type: application/json' \
+  -d '{"nurseName":"Ns. Ayu","unit":"Mawar","complaint":"Pasien RM 012345 tidak bisa dipindah ke kamar Mawar"}'
+curl -N -X POST localhost:8787/tickets/<id>/investigate
+```
+
+Events: `run_started` (run and conversation id, provider, model), `text_delta` (answer text), `tool_started` / `tool_finished` (each check the agent makes, with the full result), then `done` or `error`. Send the `conversationId` from `run_started` with the next `/ask` to ask a follow-up in the same context.
+
+| Endpoint | |
+|---|---|
+| `GET /health` | Khanza server, read-only status, AI provider and model |
+| `POST /tickets` | `{ nurseName, unit, complaint }` |
+| `GET /tickets`, `GET /tickets/:id` | list / one ticket |
+| `POST /tickets/:id/investigate` | run the agent on a ticket; optional `{ question }` for a follow-up (SSE) |
+| `POST /ask` | `{ question, conversationId? }` (SSE) |
+
+Request and event Schemas are in `packages/shared/src/api.ts`.
+
+## AI providers
+
+Switching provider is a `.env` change, no code change:
+
+| Provider | `LLM_PROVIDER` | `LLM_MODEL` | `LLM_BASE_URL` | `LLM_API_KEY` |
+|---|---|---|---|---|
+| Claude (Anthropic API) | `anthropic` | `claude-opus-5-5` | empty | Anthropic key |
+| OpenAI | `openai` | e.g. `gpt-6-sol` | empty | OpenAI key |
+| Ollama (local) | `ollama` | e.g. `qwen3` | empty (`http://localhost:11434/v1`) | empty |
+| LM Studio (local) | `lmstudio` | model name | empty (`http://localhost:1234/v1`) | empty |
+| Any OpenAI-compatible server or gateway | any name, e.g. `vikey` | model id | its `/v1` URL | its key |
+| Test without AI | `fake` | empty | | |
+
+Notes:
+
+- For a local model you may set `LLM_MASK_PII=false`; keep it `true` for anything outside the hospital.
+- Patient names, RM and visit numbers are sent to the model (it needs them). NIK, phone numbers and addresses are masked.
+- The vikey gateway drops tool results when a **Claude** model calls several tools at once (on both its endpoints), so the agent repeats checks or reports missing results. DeepSeek and Gemini through the same gateway work correctly. For Claude, use an Anthropic API key directly.
+
 ## Read tools
 
 | Tool | Input | What it returns |
@@ -124,6 +172,7 @@ pnpm typecheck   # tsc in every workspace
 pnpm lint        # oxlint
 pnpm test        # vitest (all workspaces)
 pnpm knip        # unused files, exports and dependencies
+pnpm start       # start the HTTP server (apps/server)
 ```
 
 ### Test database

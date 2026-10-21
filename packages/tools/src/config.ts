@@ -2,6 +2,10 @@
  * Configuration read from the environment (.env) through Effect Config.
  */
 import { Config, Duration } from "effect";
+import * as NodePath from "node:path";
+
+/** Repository root (packages/tools/src -> ../../..). */
+const repoRoot = NodePath.resolve(import.meta.dirname, "..", "..", "..");
 
 /** Connection to the Khanza MySQL/MariaDB server for one database user. */
 export interface KhanzaConnectionOptions {
@@ -37,7 +41,11 @@ export const QueryTimeoutConfig: Config.Config<Duration.Duration> = Config.Durat
   Config.withDefault(Duration.seconds(10)),
 );
 
-/** SQLite file for the audit log. Relative paths are resolved from the working directory. */
+/**
+ * SQLite file for the audit log. Relative paths are resolved from the
+ * repository root, so the server, scripts and MCP server share one file.
+ */
 export const AuditDbPathConfig: Config.Config<string> = Config.String("AUDIT_DB_PATH").pipe(
   Config.withDefault("data/audit.sqlite"),
+  Config.map((path) => (path === ":memory:" ? path : NodePath.resolve(repoRoot, path))),
 );
