@@ -7,6 +7,7 @@ export interface TestDbInfo {
   readonly readPass: string;
   readonly writeUser: string;
   readonly writePass: string;
+  /** Test-only admin (all privileges on the test database only), for fixtures. */
   readonly adminUser: string;
   readonly adminPass: string;
   readonly version: string;
@@ -14,6 +15,9 @@ export interface TestDbInfo {
 
 /** Fixed name so the setup can never drop a real Khanza database. */
 export const TEST_DB_NAME = "simrs_harness_test";
+
+/** Admin for test fixtures: all privileges, but only on the test database. */
+export const TEST_ADMIN = { user: "harness_test_admin", password: "test-admin-pass" } as const;
 
 /** Users created with too many privileges, to test that the harness refuses them. */
 export const MISCONFIGURED = {

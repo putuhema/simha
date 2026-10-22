@@ -13,6 +13,7 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "mysql2": "^3.24.6",
     "vitest": "catalog:"
   },
   "dependencies": {

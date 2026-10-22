@@ -1,6 +1,6 @@
 # Plan
 
-Status: **M2 done, waiting for your test.** Next: M3.
+Status: **M3 done, waiting for your test.** Next: M4.
 
 ## Packages and main modules
 
@@ -20,7 +20,7 @@ Each one ends with tests passing and a stop for you to test.
 
 - **M1. Data layer. ✅ Done.** Config Layer, read and write pools, SQLite audit DB with migrations, the 8 read tools, `pnpm tool` to try them, tests on synthetic data (temporary MariaDB or `docker-compose.yml`).
 - **M2. Agent. ✅ Done.** Tool registry, LLM service with `anthropic`, `openai-compat` and `fake` adapters, agent loop, `POST /ask` and `POST /tickets/:id/investigate` with SSE, PII masking. Demo with DeepSeek and Gemini (and Claude through a gateway).
-- **M3. Fixes.** `usulkanPerbaikan` → preview → approve → execute in a transaction → rollback. Tests prove a row-count mismatch rolls back and nothing is written without an approval row in the audit log.
+- **M3. Fixes. ✅ Done.** `diagnosaPindahKamar`, `diagnosaTindakan`, `usulkanPerbaikan` → preview → approve → execute in a transaction → rollback. Tests prove a row-count mismatch rolls back and nothing is written without an approval row in the audit log.
 - **M4. Tanya Data tools.** `lihatSkema`, guarded `jalankanQueryBaca`, `tampilkan`. Tests prove non-SELECT, multiple statements and deny-listed columns are rejected.
 - **M5. Web UI.** Tiket, Tanya Data (charts, tables, favorites), Pengaturan (provider, audit log). Login. Playwright smoke tests.
 - **M6. Desktop.** Electron app wrapping the UI, can start the local server, Windows installer.
@@ -41,6 +41,35 @@ Each one ends with tests passing and a stop for you to test.
 - The model gets the server date and time with every question, so "hari ini" and "minggu ini" resolve correctly.
 - Claude's own response content (including thinking blocks) is replayed unchanged on the next step. All tool results of a turn go back in one message.
 - No login yet (M5); the server listens on 127.0.0.1 by default.
+
+## M3 notes
+
+- A fix goes through these statuses: `pending` → `approved` → `applied` → `rolled_back`, with `failed` and `rejected` as other endings. Fixes and their events (who did what, when) live in the audit DB (migration `0003_fixes`). Each write query in the audit log carries its `fix_id`.
+- **Proposal.** The AI (or an IT person through `POST /fixes`) gives one UPDATE, INSERT or DELETE with `?` params. The guard (`packages/tools/src/fixes/guard.ts`) checks the statement:
+  - Exactly one statement on one allow-listed table. SQL comments are rejected.
+  - UPDATE and DELETE need a WHERE and may not use ORDER BY or LIMIT.
+  - UPDATE may not change primary-key columns.
+  - INSERT needs explicit columns and literal key values.
+
+  The params are inlined (escaped by mysql2), so the stored SQL is exactly what a person reviews and what runs.
+- **Preview.** The server runs a SELECT with the same WHERE on the read user, stores the matching rows and their count, and refuses more than 20 rows.
+- **Approve.** The `approved` event is committed in SQLite before Khanza is touched. Approval can only move a fix from `pending`, so two people clicking at once can't apply it twice. The executor refuses to run a fix with no approval event.
+- **Execute.** One transaction on the write user:
+  1. Re-check the statement.
+  2. Lock the target rows (`SELECT ... FOR UPDATE`) and require the same count as the preview. This saves the before-image.
+  3. Run the statement and require the affected count to match.
+  4. Read the after-image.
+
+  Any mismatch rolls the transaction back and the fix becomes `failed` with the reason.
+- **Rollback.** First check that the rows still equal the after-image; if someone changed them since, the rollback is refused. Then undo in one transaction:
+  - UPDATE: restore the changed columns.
+  - DELETE: re-insert the before rows.
+  - INSERT: delete by key.
+
+  Every step must affect exactly 1 row, or the whole rollback is undone and logged as `rollback_failed`.
+- `@effect/sql-mysql2` forces `multipleStatements: true` on its pool. We don't rely on the driver: every fix statement goes through the guard, which allows one statement and no comments.
+- Rollback needs the opposite privilege. The write user now also has `INSERT` on `rawat_jl_pr` and `rawat_inap_pr`, so a deleted tindakan can be restored. Fixes on those tables are still DELETE only.
+- There's no login yet, so who approves comes from the `actor` field in the request body. M5 replaces it with the logged-in user.
 
 ## Decisions and questions
 

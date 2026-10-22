@@ -5,12 +5,13 @@
 import { NodeFileSystem } from "@effect/platform-node";
 import { LlmClient, makeFakeClient, type FakeTurn, type LlmInfo } from "@simrs/llm";
 import type { AgentEvent } from "@simrs/shared";
-import { AuditLogMemory, khanzaReadLayer } from "@simrs/tools";
+import { AuditLogMemory, FixStoreLive, khanzaReadLayer, khanzaWriteLayer } from "@simrs/tools";
 import { connectionAs, testDb } from "@simrs/tools/testing";
 import { Duration, Effect, Layer, ManagedRuntime } from "effect";
 import { SqlClient } from "effect/sql";
 import { HttpRouter } from "effect/http";
 import { AgentLive } from "../src/agent/Agent.ts";
+import { FixExecutorLive } from "../src/fixes/FixExecutor.ts";
 import { systemPromptLayer } from "../src/agent/prompt.ts";
 import { Routes } from "../src/http/routes.ts";
 import { StoreLive } from "../src/store.ts";
@@ -21,10 +22,12 @@ export const makeTestApp = (script: ReadonlyArray<FakeTurn>, info?: Partial<LlmI
   const db = testDb;
   if (db === null) throw new Error("no test DB");
   const fake = makeFakeClient(script, info);
-  const app = AgentLive.pipe(
+  const app = Layer.mergeAll(AgentLive, FixExecutorLive).pipe(
     Layer.provideMerge(
       Layer.mergeAll(
         StoreLive,
+        FixStoreLive,
+        khanzaWriteLayer(connectionAs(db, db.writeUser, db.writePass)),
         khanzaReadLayer({ connection: connectionAs(db, db.readUser, db.readPass), timeout: Duration.seconds(5) }),
         Layer.succeed(LlmClient, fake),
         systemPromptLayer("Test system prompt."),
@@ -57,7 +60,7 @@ export const makeTestApp = (script: ReadonlyArray<FakeTurn>, info?: Partial<LlmI
         ...(body === undefined ? {} : { body: JSON.stringify(body), headers: { "content-type": "application/json" } }),
       }),
     );
-  return { fake, call, audit, dispose };
+  return { fake, call, audit, runtime, dispose };
 };
 
 /** Reads a whole SSE response into events. */

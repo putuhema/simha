@@ -11,7 +11,7 @@
  */
 import { LlmClient, type ChatMessage, type LlmEvent, type ToolCall } from "@simrs/llm";
 import type { AgentEvent, Ticket } from "@simrs/shared";
-import { AuditLog, defaultRegistry, KhanzaRead, maskPii, maskText, runTool, type ToolRegistry } from "@simrs/tools";
+import { AuditLog, defaultRegistry, FixStore, KhanzaRead, maskPii, maskText, runTool, type ToolRegistry } from "@simrs/tools";
 import { Cause, Context, Effect, Exit, Layer, Queue, Stream } from "effect";
 import { Store } from "../store.ts";
 import { SystemPrompt } from "./prompt.ts";
@@ -59,6 +59,7 @@ const make = Effect.gen(function* () {
   const read = yield* KhanzaRead;
   const audit = yield* AuditLog;
   const store = yield* Store;
+  const fixes = yield* FixStore;
   const system = yield* SystemPrompt;
   const registry: ToolRegistry = defaultRegistry;
 
@@ -73,6 +74,7 @@ const make = Effect.gen(function* () {
       const exit = yield* runTool(tool, call.args, { sessionId: runId }).pipe(
         Effect.provideService(KhanzaRead, read),
         Effect.provideService(AuditLog, audit),
+        Effect.provideService(FixStore, fixes),
         Effect.exit,
       );
       const durationMs = performance.now() - started;

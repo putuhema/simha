@@ -33,6 +33,8 @@ export interface ToolCallEnd {
 
 export interface QueryRecord {
   readonly toolCallId: string | null;
+  /** Set for statements run by the fix executor (write pool). */
+  readonly fixId?: string | null;
   readonly pool: "read" | "write";
   readonly sql: string;
   readonly params: ReadonlyArray<unknown>;
@@ -85,6 +87,7 @@ const make = Effect.gen(function* () {
   const query = (e: QueryRecord) =>
     sql`INSERT INTO queries ${sql.insert({
       tool_call_id: e.toolCallId,
+      fix_id: e.fixId ?? null,
       pool: e.pool,
       sql: e.sql,
       params_json: toJson(e.params),

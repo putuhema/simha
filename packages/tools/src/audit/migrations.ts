@@ -96,7 +96,53 @@ const agent = Effect.gen(function* () {
   yield* sql`CREATE INDEX agent_runs_started ON agent_runs (started_at)`;
 });
 
+const fixes = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  // A proposed change to Khanza. It only runs after an 'approved' row exists in fix_events.
+  yield* sql`
+    CREATE TABLE fixes (
+      id              TEXT PRIMARY KEY,
+      run_id          TEXT,
+      tool_call_id    TEXT,
+      ticket_id       TEXT REFERENCES tickets (id),
+      title           TEXT NOT NULL,
+      reason          TEXT NOT NULL,
+      kind            TEXT NOT NULL CHECK (kind IN ('update', 'insert', 'delete')),
+      table_name      TEXT NOT NULL,
+      sql_original    TEXT NOT NULL,
+      params_json     TEXT NOT NULL,
+      sql_final       TEXT NOT NULL,
+      expected_rows   INTEGER NOT NULL,
+      primary_key     TEXT NOT NULL,
+      preview_json    TEXT NOT NULL,
+      status          TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'applied', 'failed', 'rejected', 'rolled_back')),
+      before_json     TEXT,
+      after_json      TEXT,
+      error           TEXT,
+      created_by      TEXT NOT NULL,
+      created_at      TEXT NOT NULL,
+      updated_at      TEXT NOT NULL
+    )`;
+  yield* sql`CREATE INDEX fixes_ticket ON fixes (ticket_id, created_at)`;
+  // Who did what to a fix, in order. Never updated or deleted.
+  yield* sql`
+    CREATE TABLE fix_events (
+      id       INTEGER PRIMARY KEY AUTOINCREMENT,
+      fix_id   TEXT NOT NULL REFERENCES fixes (id),
+      action   TEXT NOT NULL CHECK (action IN (
+                 'proposed', 'approved', 'rejected', 'applied', 'apply_failed',
+                 'rollback_requested', 'rolled_back', 'rollback_failed')),
+      actor    TEXT NOT NULL,
+      detail   TEXT,
+      at       TEXT NOT NULL
+    )`;
+  yield* sql`CREATE INDEX fix_events_fix ON fix_events (fix_id, id)`;
+  // Write queries are linked to the fix they belong to.
+  yield* sql`ALTER TABLE queries ADD COLUMN fix_id TEXT REFERENCES fixes (id)`;
+});
+
 export const auditMigrations = {
   "0001_init": init,
   "0002_agent": agent,
+  "0003_fixes": fixes,
 };

@@ -18,7 +18,7 @@ import { tmpdir } from "node:os";
 import * as NodePath from "node:path";
 import mysql from "mysql2/promise";
 import type { TestProject } from "vitest/node";
-import { MISCONFIGURED, TEST_DB_NAME, type TestDbInfo } from "./test-db-info.ts";
+import { MISCONFIGURED, TEST_ADMIN, TEST_DB_NAME, type TestDbInfo } from "./test-db-info.ts";
 
 const fixtures = NodePath.join(import.meta.dirname, "fixtures");
 
@@ -161,9 +161,13 @@ const prepareDatabase = async (target: AdminTarget): Promise<TestDbInfo> => {
         `GRANT SELECT, INSERT, UPDATE, DELETE ON ${db}.kamar_inap TO '${writeUser}'@'%'`,
         `GRANT SELECT, UPDATE ON ${db}.kamar TO '${writeUser}'@'%'`,
         `GRANT SELECT, UPDATE ON ${db}.reg_periksa TO '${writeUser}'@'%'`,
-        `GRANT SELECT, DELETE ON ${db}.rawat_jl_pr TO '${writeUser}'@'%'`,
-        `GRANT SELECT, DELETE ON ${db}.rawat_inap_pr TO '${writeUser}'@'%'`,
+        `GRANT SELECT, INSERT, DELETE ON ${db}.rawat_jl_pr TO '${writeUser}'@'%'`,
+        `GRANT SELECT, INSERT, DELETE ON ${db}.rawat_inap_pr TO '${writeUser}'@'%'`,
         `GRANT SELECT, UPDATE ON ${db}.bridging_surat_kontrol_bpjs TO '${writeUser}'@'%'`,
+        // Test-only admin for fixtures, limited to the test database.
+        `DROP USER IF EXISTS '${TEST_ADMIN.user}'@'%'`,
+        `CREATE USER '${TEST_ADMIN.user}'@'%' IDENTIFIED BY '${TEST_ADMIN.password}'`,
+        `GRANT ALL PRIVILEGES ON ${db}.* TO '${TEST_ADMIN.user}'@'%'`,
         // Wrongly configured users, to prove the harness refuses them.
         `DROP USER IF EXISTS '${MISCONFIGURED.readCanWrite}'@'%'`,
         `DROP USER IF EXISTS '${MISCONFIGURED.writeGlobal}'@'%'`,
@@ -182,8 +186,8 @@ const prepareDatabase = async (target: AdminTarget): Promise<TestDbInfo> => {
       readPass,
       writeUser,
       writePass,
-      adminUser: target.user,
-      adminPass: target.password,
+      adminUser: TEST_ADMIN.user,
+      adminPass: TEST_ADMIN.password,
       version,
     };
   } finally {

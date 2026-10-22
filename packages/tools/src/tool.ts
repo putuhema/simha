@@ -9,7 +9,7 @@
 import { Effect, Schema } from "effect";
 import { AuditLog } from "./audit/AuditLog.ts";
 import { ToolError, ToolInputError } from "./errors.ts";
-import { CurrentToolCall } from "./khanza/current-tool-call.ts";
+import { CurrentSession, CurrentToolCall } from "./khanza/current-tool-call.ts";
 import type { KhanzaQueryError } from "./errors.ts";
 
 export type ToolKind = "read" | "diagnose" | "propose" | "render";
@@ -51,6 +51,7 @@ export const runTool = <P, O, R>(tool: Tool<P, O, R>, input: unknown, options: R
       Effect.mapError((e) => new ToolInputError({ tool: tool.name, message: describeInputError(e) })),
       Effect.flatMap(tool.handler),
       Effect.provideService(CurrentToolCall, id),
+      Effect.provideService(CurrentSession, options.sessionId ?? null),
       Effect.exit,
     );
 

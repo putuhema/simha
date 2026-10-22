@@ -77,6 +77,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.2
+      mysql2:
+        specifier: ^3.24.6
+        version: 3.24.6(@types/node@24.19.2)
       vitest:
         specifier: 'catalog:'
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.1))
@@ -121,6 +124,12 @@ importers:
       effect:
         specifier: 'catalog:'
         version: 4.0.5
+      mysql2:
+        specifier: ^3.24.6
+        version: 3.24.6(@types/node@24.19.2)
+      node-sql-parser:
+        specifier: ^5.4.0
+        version: 5.4.0
     devDependencies:
       '@effect/vitest':
         specifier: 'catalog:'
@@ -128,9 +137,6 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.2
-      mysql2:
-        specifier: ^3.24.6
-        version: 3.24.6(@types/node@24.19.2)
       vitest:
         specifier: 'catalog:'
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.1))
@@ -733,6 +739,9 @@ packages:
   '@types/node@26.6.5':
     resolution: {integrity: sha512-uMzsv9stDdofIZBx4UGh4Z9ZgXnGC9seRDscilBcTHAeOFk67MZg/k9bWVfO+bk4qZmG+l52hRnLwUiH2LnJTg==}
 
+  '@types/pegjs@0.10.6':
+    resolution: {integrity: sha512-eLYXDbZWXh2uxf+w8sXS8d6KSoXTswfps6fvCUuVAGN8eRpfe7h9eSRydxiSJvo9Bf+GzifsDOr9TMQlmJdmkw==}
+
   '@types/ws@8.18.2':
     resolution: {integrity: sha512-67MQl+fpWKVTT1NYdnmo3U4sc/xPo/zQBncVnI74qmQa0z/b+1g6iYqNmGCPbxO+zz2aklb08a0oHfegiVd0/w==}
 
@@ -877,6 +886,10 @@ packages:
   aws-ssl-profiles@1.1.2:
     resolution: {integrity: sha512-NZKeq9AfyQvEeNlN0zSYAaWrmBffJh3IELMZfRpJVWgrpEbtEpnjvzqBPf+mxoI287JohRDoa+/nsfqqiZmF6g==}
     engines: {node: '>= 6.0.0'}
+
+  big-integer@1.6.52:
+    resolution: {integrity: sha512-QxD8cf2eVqJOOz63z6JIN9BzvVs/dlySa5HGSBH5xtR8dPteIRQnBxxKqkNTiT6jbDTF6jAfrd4oMcND9RGbQg==}
+    engines: {node: '>=0.6'}
 
   chai@6.3.0:
     resolution: {integrity: sha512-XWAtwJ6OHO+tj0EKCs0Y2UamnyOxseZWltU4x2U2wh8g4AigdjwvtUjvLP2tqkA/avxHEtzxNaqGq/YGNwckKg==}
@@ -1048,6 +1061,10 @@ packages:
     resolution: {integrity: sha512-uKdg2G3GNCKQn9byYOpxbGqrT2fGO5KRt5J/8b3pok8rT6qxGWF6hxMyJiEYtAf+FVyYuD9hRaDqX5uPFYJ4ZQ==}
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
+
+  node-sql-parser@5.4.0:
+    resolution: {integrity: sha512-jVe6Z61gPcPjCElPZ6j8llB3wnqGcuQzefim1ERsqIakxnEy5JlzV7XKdO1KmacRG5TKwPc4vJTgSRQ0LfkbFw==}
+    engines: {node: '>=8'}
 
   obug@3.0.0:
     resolution: {integrity: sha512-5vvB5+W7ePv+p3uqxi+RcW1XAzLW0/hxt3/4X4Lc4qHudzOhmBiBwOY6DRob4WnanAEGvNcLjF+KNOufrUoEQw==}
@@ -1659,6 +1676,8 @@ snapshots:
     dependencies:
       undici-types: 8.9.0
 
+  '@types/pegjs@0.10.6': {}
+
   '@types/ws@8.18.2':
     dependencies:
       '@types/node': 26.6.5
@@ -1737,6 +1756,8 @@ snapshots:
   assertion-error@2.0.1: {}
 
   aws-ssl-profiles@1.1.2: {}
+
+  big-integer@1.6.52: {}
 
   chai@6.3.0: {}
 
@@ -1890,6 +1911,11 @@ snapshots:
       lru.min: 1.1.5
 
   nanoid@3.3.20: {}
+
+  node-sql-parser@5.4.0:
+    dependencies:
+      '@types/pegjs': 0.10.6
+      big-integer: 1.6.52
 
   obug@3.0.0: {}
 

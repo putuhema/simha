@@ -5,7 +5,7 @@ AI assistant for hospital IT staff working with **SIMRS Khanza**.
 - **Tiket mode:** paste a nurse's complaint. The agent reads the real patient data through safe, read-only tools, explains each check, gives a diagnosis and proposes a fix as SQL. The fix only runs after a person clicks **Approve**, and it can be rolled back.
 - **Tanya Data mode:** ask questions about hospital data in plain Indonesian ("10 obat paling banyak dipakai minggu ini"). The agent writes a guarded `SELECT` and shows the answer as a table, chart or number.
 
-> Status: **M2 done** (database layer, audit log, read tools, AI agent with streaming HTTP API). No UI yet; use `pnpm tool` and `curl`. See [docs/PLAN.md](docs/PLAN.md).
+> Status: **M3 done** (database layer, audit log, read and diagnose tools, AI agent with streaming HTTP API, fixes with approval and rollback). No UI yet; use `pnpm tool` and `curl`. See [docs/PLAN.md](docs/PLAN.md).
 
 ## Safety model (short version)
 
@@ -47,15 +47,16 @@ CREATE USER 'harness_write'@'10.0.0.%' IDENTIFIED BY 'change-me-write'
 GRANT SELECT, INSERT, UPDATE, DELETE ON sik.kamar_inap                  TO 'harness_write'@'10.0.0.%';
 GRANT SELECT, UPDATE                 ON sik.kamar                       TO 'harness_write'@'10.0.0.%';
 GRANT SELECT, UPDATE                 ON sik.reg_periksa                 TO 'harness_write'@'10.0.0.%';
-GRANT SELECT, DELETE                 ON sik.rawat_jl_pr                 TO 'harness_write'@'10.0.0.%';
-GRANT SELECT, DELETE                 ON sik.rawat_inap_pr               TO 'harness_write'@'10.0.0.%';
+GRANT SELECT, INSERT, DELETE         ON sik.rawat_jl_pr                 TO 'harness_write'@'10.0.0.%';
+GRANT SELECT, INSERT, DELETE         ON sik.rawat_inap_pr               TO 'harness_write'@'10.0.0.%';
 GRANT SELECT, UPDATE                 ON sik.bridging_surat_kontrol_bpjs TO 'harness_write'@'10.0.0.%';
 ```
 
 Notes:
 
 - The write user needs `SELECT` on each table so the server can capture the before-image and check the row count.
-- These grants are a second safety wall. The server also keeps its own allow-list of tables a fix may change. The final list is confirmed in milestone M3; trim it to what you actually need.
+- Rollback runs the opposite statement, so a table needs the opposite privilege too: undoing a DELETE re-inserts the rows (hence `INSERT` on `rawat_jl_pr` / `rawat_inap_pr`), undoing an INSERT deletes them. A fix itself can still only DELETE from those tables; the server's allow-list (`packages/tools/src/fixes/guard.ts`) decides which statements a fix may use.
+- These grants are a second safety wall behind that allow-list. Trim both to what you actually need.
 - Every table in the write grants must exist. If one is missing in your schema, remove that line.
 - Check what a user can do with `SHOW GRANTS FOR 'harness_write'@'10.0.0.%';`
 - The harness checks both users at startup: it refuses a read user with any write privilege (including `root`), and a write user with privileges `ON *.*`, `PROXY` or `WITH GRANT OPTION`.
@@ -130,6 +131,51 @@ Events: `run_started` (run and conversation id, provider, model), `text_delta` (
 | `POST /ask` | `{ question, conversationId? }` (SSE) |
 
 Request and event Schemas are in `packages/shared/src/api.ts`.
+
+### 5. Review, approve and roll back fixes
+
+When the agent finds data to fix, it calls `usulkanPerbaikan`. That only **stores a proposal** (status `pending`) with the exact SQL and a preview of the rows it will change. Nothing touches Khanza until someone approves it.
+
+```bash
+curl localhost:8787/fixes?status=pending           # proposals waiting for review
+curl localhost:8787/fixes/<id>                     # { fix, events }: SQL, preview, history
+curl -X POST localhost:8787/fixes/<id>/approve  -H 'content-type: application/json' -d '{"actor":"it-budi"}'
+curl -X POST localhost:8787/fixes/<id>/reject   -H 'content-type: application/json' -d '{"actor":"it-budi","reason":"Salah kamar"}'
+curl -X POST localhost:8787/fixes/<id>/rollback -H 'content-type: application/json' -d '{"actor":"it-budi"}'
+```
+
+| Endpoint | |
+|---|---|
+| `GET /fixes` | list; optional `?status=` and `?ticketId=` |
+| `POST /fixes` | an IT person proposes a fix directly: `{ title, reason, sql, params?, ticketId?, createdBy }` |
+| `GET /fixes/:id` | the fix and its events |
+| `POST /fixes/:id/approve` | `{ actor }`: approve and run it |
+| `POST /fixes/:id/reject` | `{ actor, reason? }` |
+| `POST /fixes/:id/rollback` | `{ actor }`: undo an applied fix |
+
+What the server checks:
+
+- **Proposal.** One UPDATE, INSERT or DELETE on an allow-listed table:
+
+  | Table | Allowed |
+  |---|---|
+  | `kamar_inap` | UPDATE, INSERT, DELETE |
+  | `kamar`, `reg_periksa`, `bridging_surat_kontrol_bpjs` | UPDATE |
+  | `rawat_jl_pr`, `rawat_inap_pr` | DELETE |
+
+  - UPDATE and DELETE need a WHERE, and no ORDER BY or LIMIT.
+  - Primary-key columns can't be changed.
+  - No SQL comments.
+  - At most 20 rows.
+- **Approve.** The approval is written to the audit log first. Then, in one transaction on the write user, the server:
+  1. Locks the rows and checks the count still matches the preview, saving them as the before-image.
+  2. Runs the SQL and checks the affected row count.
+  3. Saves the after-image.
+
+  Any mismatch rolls everything back and marks the fix `failed` with the reason.
+- **Rollback.** The server refuses if the rows changed since the fix ran. Otherwise it restores the before-image in one transaction.
+
+`actor` is a free-text name until login arrives in M5.
 
 ## AI providers
 
