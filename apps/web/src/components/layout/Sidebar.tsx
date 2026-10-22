@@ -18,6 +18,7 @@ import {
   PanelLeftOpen,
   Search,
   Settings,
+  SquareTerminal,
   SquarePen,
   Star,
   Ticket,
@@ -270,6 +271,12 @@ export const SidebarPanel = ({ health, healthError, stats, onNavigate, onClose, 
             <Search className="size-4" /> Cari
           </button>
         )}
+        {desktop ? (
+          <button type="button" className={itemClass} onClick={() => void desktop?.toggleTerminal()}>
+            <SquareTerminal className="size-4" /> Terminal
+            <kbd className="ml-auto font-sans text-[11px] text-ink-3 opacity-0 transition-opacity group-hover:opacity-100">Ctrl+`</kbd>
+          </button>
+        ) : null}
         <Link to="/tiket" onClick={onNavigate} className={itemClass} activeProps={{ className: activeClass }}>
           <Ticket className="size-4" /> Tiket
           {stats?.tiketTerbuka ? (
@@ -363,6 +370,11 @@ export const SidebarRail = ({ health, healthError, stats }: Pick<PanelProps, "he
         <Ticket className="size-[18px]" />
         {stats?.tiketTerbuka ? <span className="absolute top-2 right-2 size-2 rounded-full bg-teal ring-2 ring-paper" /> : null}
       </TipButton>
+      {desktop ? (
+        <TipButton label="Terminal" shortcut="Ctrl+`" side="right" onClick={() => void desktop?.toggleTerminal()} className={icon}>
+          <SquareTerminal className="size-[18px]" />
+        </TipButton>
+      ) : null}
       <div className="mt-auto flex flex-col items-center gap-2">
         <span
           title={healthError ? "Server tidak terhubung" : health ? "Khanza DB terhubung" : "Memeriksa…"}

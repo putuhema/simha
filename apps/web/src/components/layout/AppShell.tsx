@@ -12,6 +12,7 @@ import { cn } from "../../lib/cn.ts";
 import { useApi } from "../../lib/useApi.ts";
 import { useVersions } from "../../stores/refresh.ts";
 import { useSidebar } from "../../stores/sidebar.ts";
+import { KhanzaExitBanner } from "../desktop/KhanzaExitBanner.tsx";
 import { TipButton, TipProvider } from "../ui/Tip.tsx";
 import { SidebarPanel, SidebarRail, useNewChat, type Health } from "./Sidebar.tsx";
 
@@ -105,6 +106,7 @@ export const AppShell = () => {
               <SquarePen className="size-[18px]" />
             </TipButton>
           </div>
+          <KhanzaExitBanner />
           <div className="min-h-0 flex-1">
             <Outlet />
           </div>

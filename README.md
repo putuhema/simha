@@ -195,6 +195,10 @@ Change it later from the menu **Aplikasi → Pengaturan koneksi** or **Pengatura
 
 Khanza cannot yet be told to open a specific form; see "Khanza bridge" in `docs/PLAN.md`.
 
+Khanza runs on its own (it keeps running when SIMRS Harness quits). Everything it prints is saved to `logs/khanza.log` in the app data folder. If it stops within 15 seconds of a start, a banner says so, with **Lihat output**.
+
+**Terminal** (Ctrl+`, or **Terminal** in the sidebar). A panel at the bottom with tabs of real shells on that PC: PowerShell on Windows, your login shell (zsh) on macOS, with the same PATH and Java as a normal terminal. New shells start in the Khanza folder, so `./Aplikasi.bat` (macOS) or `.\Aplikasi.bat` (Windows) works right away. **Lihat output Khanza** opens a tab that follows `khanza.log`. Drag the panel's top edge to resize it. The panel is a page built into the app: the harness web UI (which may come from a network server) can open it but cannot type into it.
+
 **macOS** (e.g. an IT laptop with Khanza): `pnpm --filter @simrs/desktop dist:mac` builds `apps/desktop/release/mac-arm64/SIMRS Harness.app`. Choose `Aplikasi.bat` (run with `sh` from its folder, like `./Aplikasi.bat` in a terminal), a `.sh`, or `SIMRSKhanza.jar` (started with the same Java settings as `Aplikasi.bat`) as the Khanza file, and a running Khanza is found by its jar name (macOS asks once to allow "System Events" to bring it to the front).
 
 **Develop:** `pnpm --filter @simrs/desktop dev` builds the UI bundle and starts the app. While developing it uses the repo's `.env`. Set `SIMRS_DESKTOP_DATA_DIR` to keep settings and the audit DB in another folder.

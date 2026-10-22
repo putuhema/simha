@@ -10,6 +10,8 @@
       "entry": [
         "src/main.ts",
         "src/preload.ts",
+        "src/terminal-preload.ts",
+        "src/terminal/terminal.ts",
         "src/setup/setup.js",
         "scripts/*.mjs"
       ]

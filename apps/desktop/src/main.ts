@@ -1,17 +1,35 @@
 /**
  * SIMRS Harness desktop app (Electron).
  *
- * One window that shows the harness web UI, either from a server on the
- * hospital network ("remote") or from a server this app starts on the PC
- * ("local"). When nothing is set up, or the server cannot be reached, it
- * shows the setup page instead. The UI gets a small bridge
- * (window.simrsDesktop) for "Buka di Khanza".
+ * One window with two views:
+ * - the app view: the harness web UI, from a server on the hospital network
+ *   ("remote") or from a server this app starts on the PC ("local"), or the
+ *   setup page when nothing is set up or the server cannot be reached;
+ * - the terminal panel (Ctrl+`), a page built into the app that runs real
+ *   shells on this PC.
+ *
+ * The web UI gets a small bridge (window.simrsDesktop): Buka di Khanza,
+ * open the terminal panel. It can never type into a shell; only the terminal
+ * panel page can.
  */
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from "electron";
+import {
+  app,
+  BaseWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  shell,
+  WebContentsView,
+  type IpcMainEvent,
+  type IpcMainInvokeEvent,
+  type MenuItemConstructorOptions,
+  type WebContents,
+} from "electron";
 import path from "node:path";
-import { isLauncher, openKhanza } from "./khanza.ts";
+import { isLauncher, openKhanza, type KhanzaExit } from "./khanza.ts";
+import { createTerminal, killAllTerminals, killTerminal, resizeTerminal, startFolder, writeTerminal, type TerminalKind } from "./pty.ts";
 import { checkServer, ensureEnvFile, serverLogTail, startLocalServer, stopLocalServer } from "./server.ts";
-import { loadSettings, normalizeServerUrl, saveSettings, type DesktopSettings } from "./settings.ts";
+import { dataDir, loadSettings, normalizeServerUrl, saveSettings, type DesktopSettings } from "./settings.ts";
 
 // Before "ready": decides the app data folder (%APPDATA%\SIMRS Harness).
 app.setName("SIMRS Harness");
@@ -19,14 +37,24 @@ app.setName("SIMRS Harness");
 if (process.env["SIMRS_DESKTOP_DATA_DIR"]) app.setPath("userData", process.env["SIMRS_DESKTOP_DATA_DIR"]);
 if (process.platform === "win32") app.setAppUserModelId("id.simrs.harness");
 
-let win: BrowserWindow | null = null;
+let win: BaseWindow | null = null;
+let appView: WebContentsView | null = null;
+let terminalView: WebContentsView | null = null;
+let terminalOpen = false;
+let terminalHeight = 300;
+/** Commands for the terminal page sent before it finished loading. */
+let terminalQueue: Array<{ open?: TerminalKind; focus?: boolean }> = [];
+let terminalReady = false;
+
 /** Origin of the UI currently shown (null while the setup page is shown). */
 let appOrigin: string | null = null;
 /** Why the setup page is shown (connection failed, server stopped…). */
 let setupError: string | null = null;
 
-const setupPage = () => path.join(app.getAppPath(), "build", "setup", "index.html");
-const isSetupUrl = (url: string) => url.startsWith("file:") && url.replaceAll("\\", "/").endsWith("/setup/index.html");
+const buildFile = (...parts: Array<string>) => path.join(app.getAppPath(), "build", ...parts);
+const khanzaLog = () => path.join(dataDir(), "logs", "khanza.log");
+const isLocalPage = (url: string, page: string) => url.startsWith("file:") && url.replaceAll("\\", "/").endsWith(`/${page}/index.html`);
+const isSetupUrl = (url: string) => isLocalPage(url, "setup");
 const originOf = (url: string) => {
   try {
     return new URL(url).origin;
@@ -35,10 +63,36 @@ const originOf = (url: string) => {
   }
 };
 
+const secureWebPreferences = (preload: string) => ({
+  preload: buildFile(preload),
+  contextIsolation: true,
+  sandbox: true,
+  nodeIntegration: false,
+  spellcheck: false,
+});
+
+// --- Layout -------------------------------------------------------------------------------------
+
+const MIN_TERMINAL = 120;
+const MIN_APP = 240;
+
+const layout = () => {
+  if (!win || !appView) return;
+  const { width, height } = win.getContentBounds();
+  const term = terminalOpen && terminalView ? Math.max(MIN_TERMINAL, Math.min(terminalHeight, height - MIN_APP)) : 0;
+  appView.setBounds({ x: 0, y: 0, width, height: height - term });
+  if (terminalView) {
+    terminalView.setVisible(term > 0);
+    terminalView.setBounds({ x: 0, y: height - term, width, height: term });
+  }
+};
+
+// --- App view: setup page or harness UI ---------------------------------------------------------
+
 const showSetup = async (error: string | null) => {
   setupError = error;
   appOrigin = null;
-  await win?.loadFile(setupPage());
+  await appView?.webContents.loadFile(buildFile("setup", "index.html"));
 };
 
 /** Opens the harness UI for the saved settings, or the setup page. */
@@ -56,7 +110,7 @@ const connect = async () => {
     }
     appOrigin = originOf(url);
     setupError = null;
-    await win?.loadURL(url);
+    await appView?.webContents.loadURL(url);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const log = settings.mode === "local" ? serverLogTail() : "";
@@ -65,30 +119,7 @@ const connect = async () => {
   }
 };
 
-const createWindow = () => {
-  win = new BrowserWindow({
-    width: 1440,
-    height: 920,
-    minWidth: 960,
-    minHeight: 620,
-    show: false,
-    title: "SIMRS Harness",
-    backgroundColor: "#fffdf8",
-    autoHideMenuBar: process.platform !== "darwin",
-    webPreferences: {
-      preload: path.join(app.getAppPath(), "build", "preload.cjs"),
-      contextIsolation: true,
-      sandbox: true,
-      nodeIntegration: false,
-      spellcheck: false,
-    },
-  });
-  win.once("ready-to-show", () => win?.show());
-  win.on("closed", () => {
-    win = null;
-  });
-
-  const contents = win.webContents;
+const guardNavigation = (contents: WebContents) => {
   // Stay on the harness server; anything else opens in the normal browser.
   contents.on("will-navigate", (event, url) => {
     if (isSetupUrl(url) || (appOrigin && originOf(url) === appOrigin)) return;
@@ -100,6 +131,84 @@ const createWindow = () => {
     if (/^https?:/.test(url)) void shell.openExternal(url);
     return { action: "deny" };
   });
+};
+
+// --- Terminal panel -----------------------------------------------------------------------------
+
+const sendToTerminal = (command: { open?: TerminalKind; focus?: boolean }) => {
+  if (terminalReady) terminalView?.webContents.send("terminal:command", command);
+  else terminalQueue.push(command);
+};
+
+const ensureTerminalView = () => {
+  if (terminalView || !win) return;
+  terminalView = new WebContentsView({ webPreferences: secureWebPreferences("terminal-preload.cjs") });
+  terminalView.setBackgroundColor("#141c1a");
+  const contents = terminalView.webContents;
+  contents.on("will-navigate", (event) => event.preventDefault());
+  contents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:/.test(url)) void shell.openExternal(url);
+    return { action: "deny" };
+  });
+  contents.on("did-finish-load", () => {
+    terminalReady = true;
+    for (const command of terminalQueue) contents.send("terminal:command", command);
+    terminalQueue = [];
+  });
+  contents.on("render-process-gone", () => {
+    killAllTerminals();
+    terminalReady = false;
+    void contents.loadFile(buildFile("terminal", "index.html"));
+  });
+  win.contentView.addChildView(terminalView);
+  void contents.loadFile(buildFile("terminal", "index.html"));
+};
+
+const showTerminal = (open?: TerminalKind) => {
+  ensureTerminalView();
+  terminalOpen = true;
+  layout();
+  terminalView?.webContents.focus();
+  sendToTerminal(open ? { open } : { focus: true });
+};
+
+const hideTerminal = () => {
+  terminalOpen = false;
+  layout();
+  appView?.webContents.focus();
+};
+
+const toggleTerminal = () => (terminalOpen ? hideTerminal() : showTerminal());
+
+// --- Window -------------------------------------------------------------------------------------
+
+const createWindow = () => {
+  win = new BaseWindow({
+    width: 1440,
+    height: 920,
+    minWidth: 960,
+    minHeight: 620,
+    title: "SIMRS Harness",
+    backgroundColor: "#fffdf8",
+    autoHideMenuBar: process.platform !== "darwin",
+  });
+  appView = new WebContentsView({ webPreferences: secureWebPreferences("preload.cjs") });
+  appView.setBackgroundColor("#fffdf8");
+  win.contentView.addChildView(appView);
+  layout();
+  win.on("resize", layout);
+  win.on("closed", () => {
+    killAllTerminals();
+    win = null;
+    appView = null;
+    terminalView = null;
+    terminalOpen = false;
+    terminalReady = false;
+    terminalQueue = [];
+  });
+
+  const contents = appView.webContents;
+  guardNavigation(contents);
   // The server went away while the UI was open.
   contents.on("did-fail-load", (_event, code, description, url, isMainFrame) => {
     if (!isMainFrame || code === -3 || isSetupUrl(url)) return;
@@ -112,14 +221,16 @@ const createWindow = () => {
   void connect();
 };
 
-// --- Bridge (window.simrsDesktop) ---------------------------------------------------------------
+// --- Bridge for the web UI and the setup page (window.simrsDesktop) ----------------------------
 
-const fromOurWindow = (event: IpcMainInvokeEvent) => win !== null && event.sender === win.webContents;
-const fromSetup = (event: IpcMainInvokeEvent) => fromOurWindow(event) && isSetupUrl(event.senderFrame?.url ?? "");
+const fromAppView = (event: IpcMainInvokeEvent | IpcMainEvent) => appView !== null && event.sender === appView.webContents;
+const fromSetup = (event: IpcMainInvokeEvent) => fromAppView(event) && isSetupUrl(event.senderFrame?.url ?? "");
 const fromApp = (event: IpcMainInvokeEvent) => {
   const url = event.senderFrame?.url ?? "";
-  return fromOurWindow(event) && (isSetupUrl(url) || (appOrigin !== null && originOf(url) === appOrigin));
+  return fromAppView(event) && (isSetupUrl(url) || (appOrigin !== null && originOf(url) === appOrigin));
 };
+const fromTerminal = (event: IpcMainInvokeEvent | IpcMainEvent) =>
+  terminalView !== null && event.sender === terminalView.webContents && isLocalPage(event.senderFrame?.url ?? "", "terminal");
 const refuse = () => {
   throw new Error("Tidak diizinkan dari halaman ini.");
 };
@@ -130,7 +241,7 @@ const chooseLauncher = async (): Promise<string | null> => {
     buttonLabel: "Pilih",
     properties: ["openFile"],
     filters: [
-      { name: "Khanza (.bat, .cmd, .exe, .jar)", extensions: ["bat", "cmd", "exe", "jar", "sh", "command", "app"] },
+      { name: "Khanza (.bat, .cmd, .exe, .jar, .sh)", extensions: ["bat", "cmd", "exe", "jar", "sh", "command", "app"] },
       { name: "Semua file", extensions: ["*"] },
     ],
   };
@@ -138,7 +249,7 @@ const chooseLauncher = async (): Promise<string | null> => {
   const file = result.filePaths[0];
   if (result.canceled || !file) return null;
   if (!isLauncher(file)) {
-    void dialog.showMessageBox({ type: "warning", message: "Pilih file .bat, .cmd, .exe atau .jar yang biasa dipakai untuk membuka Khanza." });
+    void dialog.showMessageBox({ type: "warning", message: "Pilih file .bat, .cmd, .exe, .jar atau .sh yang biasa dipakai untuk membuka Khanza." });
     return null;
   }
   await saveSettings({ ...loadSettings(), khanzaLauncher: file });
@@ -150,19 +261,23 @@ const publicInfo = () => {
   return { version: app.getVersion(), platform: process.platform, mode: s.mode, serverUrl: s.serverUrl, port: s.port, khanzaLauncher: s.khanzaLauncher };
 };
 
+/** Khanza stopped right after a start: tell the web UI (it offers "Lihat output"). */
+const reportKhanzaExit = (exit: KhanzaExit) => {
+  if (appOrigin) appView?.webContents.send("desktop:khanzaExited", exit);
+};
+
 const registerIpc = () => {
   ipcMain.handle("desktop:info", (event) => (fromApp(event) ? publicInfo() : refuse()));
   ipcMain.handle("desktop:openKhanza", (event, copy: unknown) => {
     if (!fromApp(event)) return refuse();
     // Only short identifiers (no. rawat, no. RM) go to the clipboard.
     const text = typeof copy === "string" && copy.length > 0 && copy.length <= 64 ? copy : null;
-    return openKhanza(loadSettings().khanzaLauncher, text);
+    return openKhanza(loadSettings().khanzaLauncher, text, { logFile: khanzaLog(), onEarlyExit: reportKhanzaExit });
   });
   ipcMain.handle("desktop:chooseKhanzaLauncher", (event) => (fromApp(event) ? chooseLauncher() : refuse()));
-  ipcMain.handle("desktop:openSetup", (event) => {
-    if (!fromApp(event)) return refuse();
-    return showSetup(null);
-  });
+  ipcMain.handle("desktop:openSetup", (event) => (fromApp(event) ? showSetup(null) : refuse()));
+  ipcMain.handle("desktop:toggleTerminal", (event) => (fromApp(event) ? toggleTerminal() : refuse()));
+  ipcMain.handle("desktop:showKhanzaOutput", (event) => (fromApp(event) ? showTerminal("khanza-log") : refuse()));
 
   ipcMain.handle("setup:state", async (event) => {
     if (!fromSetup(event)) return refuse();
@@ -192,6 +307,45 @@ const registerIpc = () => {
     const file = await ensureEnvFile();
     shell.showItemInFolder(file);
   });
+
+  // --- Terminal panel page only ---
+  ipcMain.handle("terminal:create", async (event, kind: unknown, cols: unknown, rows: unknown) => {
+    if (!fromTerminal(event)) return refuse();
+    const which: TerminalKind = kind === "khanza-log" ? "khanza-log" : "shell";
+    const contents = event.sender;
+    const id = await createTerminal(
+      which,
+      { cols: Number(cols) || 80, rows: Number(rows) || 24 },
+      { cwd: startFolder(loadSettings().khanzaLauncher), logFile: khanzaLog() },
+      {
+        data: (termId, data) => {
+          if (!contents.isDestroyed()) contents.send("terminal:data", termId, data);
+        },
+        exit: (termId, code) => {
+          if (!contents.isDestroyed()) contents.send("terminal:exit", termId, code);
+        },
+      },
+    );
+    const title = process.platform === "win32" ? "PowerShell" : path.basename(process.env["SHELL"] || "zsh");
+    return { id, title };
+  });
+  ipcMain.on("terminal:write", (event, id: unknown, data: unknown) => {
+    if (fromTerminal(event) && typeof id === "number" && typeof data === "string") writeTerminal(id, data);
+  });
+  ipcMain.on("terminal:resize", (event, id: unknown, cols: unknown, rows: unknown) => {
+    if (fromTerminal(event) && typeof id === "number") resizeTerminal(id, Number(cols), Number(rows));
+  });
+  ipcMain.on("terminal:kill", (event, id: unknown) => {
+    if (fromTerminal(event) && typeof id === "number") killTerminal(id);
+  });
+  ipcMain.on("terminal:height", (event, height: unknown) => {
+    if (!fromTerminal(event) || typeof height !== "number" || !Number.isFinite(height)) return;
+    terminalHeight = Math.round(height);
+    layout();
+  });
+  ipcMain.on("terminal:hide", (event) => {
+    if (fromTerminal(event)) hideTerminal();
+  });
 };
 
 // --- Menu -------------------------------------------------------------------------------------
@@ -205,14 +359,26 @@ const buildMenu = () => {
         { label: "Pengaturan koneksi…", click: () => void showSetup(null) },
         { label: "Pilih file Khanza…", click: () => void chooseLauncher() },
         { type: "separator" },
-        { role: "reload", label: "Muat ulang" },
-        { role: "toggleDevTools", label: "Developer tools" },
+        { label: "Terminal", accelerator: "Ctrl+`", click: toggleTerminal },
+        { label: "Output Khanza", click: () => showTerminal("khanza-log") },
+        { type: "separator" },
+        { label: "Muat ulang", accelerator: "CmdOrCtrl+R", click: () => appView?.webContents.reload() },
+        { label: "Developer tools", accelerator: "CmdOrCtrl+Alt+I", click: () => appView?.webContents.toggleDevTools() },
         { type: "separator" },
         { role: "quit", label: "Keluar" },
       ],
     },
     { role: "editMenu" },
-    { role: "viewMenu" },
+    {
+      label: "Tampilan",
+      submenu: [
+        { label: "Perbesar", accelerator: "CmdOrCtrl+=", click: () => appView?.webContents.setZoomLevel(appView.webContents.getZoomLevel() + 0.5) },
+        { label: "Perkecil", accelerator: "CmdOrCtrl+-", click: () => appView?.webContents.setZoomLevel(appView.webContents.getZoomLevel() - 0.5) },
+        { label: "Ukuran normal", accelerator: "CmdOrCtrl+0", click: () => appView?.webContents.setZoomLevel(0) },
+        { type: "separator" },
+        { role: "togglefullscreen", label: "Layar penuh" },
+      ],
+    },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 };
@@ -232,9 +398,12 @@ if (!app.requestSingleInstanceLock()) {
     buildMenu();
     createWindow();
     app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      if (BaseWindow.getAllWindows().length === 0) createWindow();
     });
   });
   app.on("window-all-closed", () => app.quit());
-  app.on("before-quit", stopLocalServer);
+  app.on("before-quit", () => {
+    killAllTerminals();
+    stopLocalServer();
+  });
 }

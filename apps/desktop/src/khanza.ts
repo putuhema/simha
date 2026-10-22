@@ -6,11 +6,31 @@
  * Works on Windows (.bat, as on the hospital PCs) and macOS (the .jar or a
  * .sh). Khanza has no way to open a given form from outside (yet), so this
  * only opens the app; see docs/PLAN.md for the planned Khanza patch.
+ *
+ * Khanza runs on its own (it keeps running when this app quits). Everything
+ * it prints goes to logs/khanza.log; if it stops within EARLY_EXIT_SECONDS,
+ * the UI is told so the user can look at that output.
  */
 import { clipboard, shell } from "electron";
 import { execFile, spawn } from "node:child_process";
+import { closeSync, mkdirSync, openSync, writeSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import path from "node:path";
+
+/** Khanza stopping sooner than this after a start means something went wrong. */
+const EARLY_EXIT_SECONDS = 15;
+
+export interface KhanzaExit {
+  readonly seconds: number;
+  readonly code: number | null;
+}
+
+export interface LaunchOptions {
+  /** logs/khanza.log: Khanza's output from the last start. */
+  readonly logFile: string;
+  /** Called when Khanza stops within EARLY_EXIT_SECONDS of a start. */
+  readonly onEarlyExit: (exit: KhanzaExit) => void;
+}
 
 export type KhanzaResult =
   | { readonly status: "focused" | "launched"; readonly copied: string | null }
@@ -67,17 +87,25 @@ const focusRunningKhanza = (launcher: string | null) => {
 };
 
 /** Starts the launcher detached from this app, in its own folder (Khanza reads its settings from there). */
-const launch = async (launcher: string): Promise<void> => {
+const launch = async (launcher: string, options: LaunchOptions): Promise<void> => {
   const cwd = path.dirname(launcher);
   const ext = path.extname(launcher).toLowerCase();
-  const detached = { cwd, detached: true, stdio: "ignore" as const, windowsHide: true };
   const start = (file: string, args: ReadonlyArray<string>, extra: object = {}) =>
     new Promise<void>((resolve, reject) => {
-      const child = spawn(file, args, { ...detached, ...extra });
+      mkdirSync(path.dirname(options.logFile), { recursive: true });
+      const log = openSync(options.logFile, "w");
+      writeSync(log, `# ${new Date().toLocaleString("id-ID")} · ${launcher}\n# ${[file, ...args].join(" ")}\n\n`);
+      const startedAt = Date.now();
+      const child = spawn(file, args, { cwd, detached: true, stdio: ["ignore", log, log], windowsHide: true, ...extra });
+      closeSync(log); // the child keeps its own handle
       child.once("error", reject);
       child.once("spawn", () => {
         child.unref();
         resolve();
+      });
+      child.once("exit", (code) => {
+        const seconds = Math.round((Date.now() - startedAt) / 1000);
+        if (seconds < EARLY_EXIT_SECONDS) options.onEarlyExit({ seconds, code });
       });
     });
   if (ext === ".jar") return start(process.platform === "win32" ? "javaw" : "java", [...JAVA_FLAGS, "-jar", launcher]);
@@ -93,7 +121,7 @@ const launch = async (launcher: string): Promise<void> => {
   if (error) throw new Error(error);
 };
 
-export const openKhanza = async (launcher: string | null, copy: string | null): Promise<KhanzaResult> => {
+export const openKhanza = async (launcher: string | null, copy: string | null, options: LaunchOptions): Promise<KhanzaResult> => {
   if (copy) clipboard.writeText(copy);
   if (await focusRunningKhanza(launcher)) return { status: "focused", copied: copy };
   if (!launcher) return { status: "not_configured" };
@@ -103,7 +131,7 @@ export const openKhanza = async (launcher: string | null, copy: string | null): 
     return { status: "error", message: `File Khanza tidak ditemukan: ${launcher}` };
   }
   try {
-    await launch(launcher);
+    await launch(launcher, options);
     return { status: "launched", copied: copy };
   } catch (error) {
     return { status: "error", message: `Khanza tidak bisa dibuka: ${error instanceof Error ? error.message : String(error)}` };

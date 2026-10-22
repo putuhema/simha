@@ -1,5 +1,5 @@
 /** Pengaturan → Desktop (desktop app only): the server connection and the file that starts Khanza. */
-import { AppWindow, FolderOpen, Server } from "lucide-react";
+import { AppWindow, FolderOpen, Server, SquareTerminal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { OpenInKhanza } from "../../components/desktop/OpenInKhanza.tsx";
 import { Button } from "../../components/ui/Button.tsx";
@@ -66,10 +66,14 @@ export const DesktopSettings = () => {
             <FolderOpen /> Pilih file…
           </Button>
           {info.khanzaLauncher ? <OpenInKhanza copy={null} label="Tes buka Khanza" /> : null}
+          <Button size="sm" variant="ghost" onClick={() => void bridge.showKhanzaOutput()}>
+            <SquareTerminal /> Lihat output Khanza
+          </Button>
         </div>
         <p className="mt-3 flex items-start gap-1.5 text-[12px] text-ink-3">
           <AppWindow className="mt-0.5 size-3.5 shrink-0" />
           Biasanya file .bat di folder instalasi Khanza. Kalau Khanza sudah terbuka, jendelanya dibawa ke depan, tidak dibuka dua kali.
+          Semua yang ditulis Khanza saat dibuka dari sini tersimpan dan bisa dilihat di tab “Output Khanza” pada terminal (Ctrl+`).
         </p>
       </Panel>
     </div>

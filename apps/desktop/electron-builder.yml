@@ -11,6 +11,12 @@ files:
   - build/main.cjs
   - build/preload.cjs
   - build/setup/**
+  - build/terminal-preload.cjs
+  - build/terminal/**
+  - build/node_modules/**
+# Native code and helper programs cannot run from inside app.asar.
+asarUnpack:
+  - build/node_modules/node-pty/**
 extraResources:
   - from: build/server
     to: server

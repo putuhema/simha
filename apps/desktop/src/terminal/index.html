@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data:"
+    />
+    <title>Terminal</title>
+    <link rel="stylesheet" href="xterm.css" />
+    <link rel="stylesheet" href="terminal.css" />
+  </head>
+  <body>
+    <div id="grip" title="Seret untuk mengubah tinggi"></div>
+    <header>
+      <nav id="tabs" role="tablist" aria-label="Terminal"></nav>
+      <button id="newShell" class="icon" title="Terminal baru" aria-label="Terminal baru">+</button>
+      <span class="spacer"></span>
+      <button id="khanzaLog" class="text outline" title="Output Khanza yang dibuka dari aplikasi ini">Lihat output Khanza</button>
+      <span class="hint">Ctrl+`</span>
+      <button id="hide" class="icon" title="Tutup panel (Ctrl+`)" aria-label="Tutup panel">×</button>
+    </header>
+    <main id="screens"></main>
+    <script src="terminal.js"></script>
+  </body>
+</html>

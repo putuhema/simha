@@ -18,11 +18,23 @@ export type KhanzaResult =
   | { readonly status: "not_configured" }
   | { readonly status: "error"; readonly message: string };
 
+/** Khanza stopped this many seconds after "Buka di Khanza" started it. */
+export interface KhanzaExit {
+  readonly seconds: number;
+  readonly code: number | null;
+}
+
 interface DesktopBridge {
   readonly info: () => Promise<DesktopInfo>;
   readonly openKhanza: (copy?: string | null) => Promise<KhanzaResult>;
   readonly chooseKhanzaLauncher: () => Promise<string | null>;
   readonly openSetup: () => Promise<void>;
+  /** Show or hide the terminal panel (the UI cannot type into it). */
+  readonly toggleTerminal: () => Promise<void>;
+  /** Open the terminal panel on the "Output Khanza" tab. */
+  readonly showKhanzaOutput: () => Promise<void>;
+  /** Returns an unsubscribe function. */
+  readonly onKhanzaExit: (callback: (exit: KhanzaExit) => void) => () => void;
 }
 
 export const desktop: DesktopBridge | null =
