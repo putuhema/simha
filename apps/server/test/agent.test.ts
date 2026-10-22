@@ -56,6 +56,10 @@ describe.skipIf(testDb === null)("agent over HTTP", () => {
       const first = app.fake.requests[0];
       expect(first?.messages[0]).toMatchObject({ role: "user" });
       expect(first?.messages[0]?.role === "user" && first.messages[0].text).toContain("tidak bisa dipindah");
+      // ...and where the registration data ends, so "7 hari terakhir" does not hit an empty range.
+      expect(first?.messages[0]?.role === "user" && first.messages[0].text).toMatch(
+        /data registrasi terakhir di database: \d{4}-\d{2}-\d{2}/,
+      );
       expect(first?.tools.map((t) => t.name)).toContain("riwayatKamar");
 
       const after = (await (await app.call("GET", `/tickets/${ticket.id}`)).json()) as Ticket;
@@ -106,6 +110,42 @@ describe.skipIf(testDb === null)("agent over HTTP", () => {
     try {
       await readEvents(await app.call("POST", "/ask", { question: "NIK 5171000000000001" }));
       expect(JSON.stringify(app.fake.requests[0]?.messages)).toContain("5171000000000001");
+    } finally {
+      await app.dispose();
+    }
+  });
+
+  it("streams thinking and half-written tool calls before the turn ends", async () => {
+    const sql = "SELECT COUNT(*) AS jumlah FROM reg_periksa";
+    const args = JSON.stringify({ sql, alasan: "Hitung registrasi" });
+    const app = makeTestApp([
+      [
+        { type: "reasoning_delta", text: "Perlu hitung registrasi." },
+        { type: "tool_input_delta", index: 0, name: "jalankanQueryBaca", delta: args.slice(0, 15) },
+        { type: "tool_input_delta", index: 0, name: "jalankanQueryBaca", delta: args.slice(15) },
+        { type: "tool_call", call: { id: "q1", name: "jalankanQueryBaca", args: JSON.parse(args) } },
+        { type: "done", stopReason: "tool_use" },
+      ],
+      fakeTurn("Ada registrasi."),
+    ]);
+    try {
+      const events = await readEvents(await app.call("POST", "/ask", { question: "Berapa registrasi?" }));
+      expect(tags(events)).toEqual([
+        "run_started",
+        "reasoning_delta",
+        "tool_input_delta",
+        "tool_input_delta",
+        "tool_started",
+        "tool_finished",
+        "text_delta",
+        "done",
+      ]);
+      const drafts = events.filter((e) => e._tag === "tool_input_delta");
+      expect(drafts.map((d) => d.delta).join("")).toBe(args);
+      expect(new Set(drafts.map((d) => d.draftId)).size).toBe(1);
+      expect(events.find((e) => e._tag === "tool_started")).toMatchObject({ callId: "q1", draftId: drafts[0]?.draftId });
+      // Thinking is shown, never sent back to the model.
+      expect(JSON.stringify(app.fake.requests[1]?.messages)).not.toContain("Perlu hitung registrasi");
     } finally {
       await app.dispose();
     }

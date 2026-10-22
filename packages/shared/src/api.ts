@@ -151,11 +151,27 @@ export const RunStarted = Schema.TaggedStruct("run_started", {
 /** A piece of the AI's answer text. */
 export const TextDelta = Schema.TaggedStruct("text_delta", { text: Schema.String });
 
+/** A piece of the AI's thinking, shown live while it works out its next step. */
+export const ReasoningDelta = Schema.TaggedStruct("reasoning_delta", { text: Schema.String });
+
+/**
+ * The AI is still writing a tool call: `delta` is the next piece of its JSON
+ * arguments (e.g. the SQL as it is typed). `draftId` links it to the later
+ * `tool_started`.
+ */
+export const ToolInputDelta = Schema.TaggedStruct("tool_input_delta", {
+  draftId: Schema.String,
+  name: Schema.String,
+  delta: Schema.String,
+});
+
 /** The AI called a tool (one step in "Yang dicek AI"). */
 export const ToolStarted = Schema.TaggedStruct("tool_started", {
   callId: Schema.String,
   name: Schema.String,
   args: Schema.Unknown,
+  /** The `tool_input_delta` draft this call replaces, if it was streamed. */
+  draftId: Schema.optionalKey(Schema.String),
 });
 
 /** Tool finished. `result` is the full (unmasked) result, for the UI only. */
@@ -188,7 +204,7 @@ export const RunDone = Schema.TaggedStruct("done", {
 /** Last event of a failed run. */
 export const RunError = Schema.TaggedStruct("error", { message: Schema.String });
 
-export const AgentEvent = Schema.Union([RunStarted, TextDelta, ToolStarted, ToolFinished, RenderEvent, DocumentEvent, RunDone, RunError]);
+export const AgentEvent = Schema.Union([RunStarted, TextDelta, ReasoningDelta, ToolInputDelta, ToolStarted, ToolFinished, RenderEvent, DocumentEvent, RunDone, RunError]);
 export type AgentEvent = typeof AgentEvent.Type;
 
 // --- Errors -------------------------------------------------------------------

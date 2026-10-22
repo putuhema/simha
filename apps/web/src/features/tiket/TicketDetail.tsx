@@ -7,7 +7,7 @@ import type { Fix, Ticket } from "@simrs/shared";
 import { CheckCircle2, CircleSlash, RotateCw, SendHorizontal, Square } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Markdown } from "../../components/agent/Markdown.tsx";
-import { StepList } from "../../components/agent/StepList.tsx";
+import { PendingLine, pendingStep, StepList } from "../../components/agent/StepList.tsx";
 import { DocumentCard } from "../../components/blocks/DocumentCard.tsx";
 import { Badge } from "../../components/ui/Badge.tsx";
 import { Button } from "../../components/ui/Button.tsx";
@@ -57,11 +57,11 @@ const RunSection = ({
           </span>
         </div>
         {run.steps.length === 0 && run.status === "running" ? (
-          <p className="flex items-center gap-2 text-[13px] text-ink-3">
-            <Spinner /> AI sedang membaca keluhan…
+          <p className="flex items-start gap-2 text-[13px] text-ink-3">
+            <Spinner /> <PendingLine pending={{ label: "AI sedang membaca keluhan…", since: run.waitingSince, reasoning: run.reasoning }} />
           </p>
         ) : (
-          <StepList steps={run.steps} />
+          <StepList steps={run.steps} pending={pendingStep(run)} />
         )}
       </div>
 

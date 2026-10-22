@@ -13,6 +13,8 @@ export interface StepView {
   readonly error: string | null;
   readonly durationMs: number | null;
   readonly running: boolean;
+  /** The tool's JSON arguments while the AI is still writing them; null once the call is complete. */
+  readonly draft: string | null;
 }
 
 const LABELS: Readonly<Record<string, string>> = {
@@ -70,6 +72,7 @@ export const stepMark = (step: StepView): StepMark => {
 
 /** One line about the result, in Indonesian. */
 export const stepSummary = (step: StepView): string => {
+  if (step.draft !== null) return step.name === "jalankanQueryBaca" ? "AI sedang menulis query…" : "AI sedang menyiapkan…";
   if (step.running) return "Sedang berjalan…";
   if (step.error !== null) return step.error;
   const o = record(step.output);
@@ -116,6 +119,27 @@ export const stepSummary = (step: StepView): string => {
       return firstArray ? `${firstArray.length} baris` : "Selesai";
     }
   }
+};
+
+/** Keys whose (partial) value is worth showing while a tool call is being written, best first. */
+const DRAFT_KEYS = ["sql", "judul", "kataKunci", "nama", "noRkmMedis", "noRawat", "alasan"];
+
+/**
+ * The most useful string in half-written JSON arguments, e.g. the SQL typed
+ * so far from `{"sql":"SELECT p.nm_poli, COUNT(` .
+ */
+export const draftPreview = (draft: string): string => {
+  for (const key of DRAFT_KEYS) {
+    const match = new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)`).exec(draft);
+    if (match?.[1] === undefined) continue;
+    const raw = match[1].replace(/\\(u[0-9a-fA-F]{0,3})?$/, ""); // drop an escape cut in half
+    try {
+      return JSON.parse(`"${raw}"`) as string;
+    } catch {
+      return raw;
+    }
+  }
+  return "";
 };
 
 /** Findings of a diagnose tool, for the expanded view. */

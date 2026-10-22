@@ -6,7 +6,7 @@ import { fileNameFor, toCsv } from "./csv.ts";
 import { formatRelative } from "./format.ts";
 import { applyEvent, emptyRun } from "./run.ts";
 import { parseSseChunk } from "./sse.ts";
-import { stepMark, stepSummary, type StepView } from "./steps.ts";
+import { draftPreview, stepMark, stepSummary, type StepView } from "./steps.ts";
 
 describe("parseSseChunk", () => {
   it("returns complete events and keeps the unfinished rest", () => {
@@ -73,6 +73,7 @@ const step = (name: string, output: unknown, error: string | null = null): StepV
   error,
   durationMs: 5,
   running: false,
+  draft: null,
 });
 
 describe("steps", () => {
@@ -100,6 +101,32 @@ describe("applyEvent", () => {
     const run = events.reduce(applyEvent, emptyRun("Pertanyaan", "k"));
     expect(run).toMatchObject({ status: "done", runId: "r1", conversationId: "c1", model: "fake · m", text: "Selesai.", fixIds: ["f1"], blocks: [block] });
     expect(run.steps[0]).toMatchObject({ running: false, error: null, output: { fixId: "f1" } });
+  });
+
+  it("shows a tool step while the AI is still writing it, then swaps in the real call", () => {
+    const events: ReadonlyArray<AgentEvent> = [
+      { _tag: "reasoning_delta", text: "Perlu hitung per poli." },
+      { _tag: "tool_input_delta", draftId: "d0", name: "jalankanQueryBaca", delta: '{"sql":"SELECT nm' },
+      { _tag: "tool_input_delta", draftId: "d0", name: "jalankanQueryBaca", delta: '_poli\\n FROM' },
+    ];
+    const drafting = events.reduce(applyEvent, emptyRun("q", "k"));
+    expect(drafting.reasoning).toBe("Perlu hitung per poli.");
+    expect(drafting.steps).toHaveLength(1);
+    expect(drafting.steps[0]).toMatchObject({ id: "d0", running: true, draft: '{"sql":"SELECT nm_poli\\n FROM' });
+    expect(draftPreview(drafting.steps[0]?.draft ?? "")).toBe("SELECT nm_poli\n FROM");
+    expect(stepSummary(drafting.steps[0]!)).toBe("AI sedang menulis query…");
+
+    const started = applyEvent(drafting, { _tag: "tool_started", callId: "t1", name: "jalankanQueryBaca", args: { sql: "SELECT 1" }, draftId: "d0" });
+    expect(started.steps).toEqual([expect.objectContaining({ id: "t1", draft: null, input: { sql: "SELECT 1" }, running: true })]);
+    const finished = applyEvent(started, { _tag: "tool_finished", callId: "t1", name: "jalankanQueryBaca", ok: true, result: {}, durationMs: 1 });
+    expect(finished.reasoning).toBe("");
+  });
+
+  it("previews half-written arguments without breaking on cut escapes", () => {
+    expect(draftPreview('{"alasan":"x","sql":"SELECT \\"a')).toBe('SELECT "a');
+    expect(draftPreview('{"sql":"SELECT 1\\')).toBe("SELECT 1");
+    expect(draftPreview('{"judul":"Kunjungan per')).toBe("Kunjungan per");
+    expect(draftPreview('{"lim')).toBe("");
   });
 
   it("keeps the error message of a failed run", () => {

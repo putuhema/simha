@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { LlmInfo } from "../LlmClient.ts";
 import type { ChatMessage } from "../types.ts";
 import { toAnthropicMessages, toAnthropicTools } from "./anthropic.ts";
-import { normalizeBaseUrl, toOpenAiMessages, toStopReason, ToolCallAccumulator } from "./openai-compat.ts";
+import { normalizeBaseUrl, reasoningOf, toOpenAiMessages, toStopReason, ToolCallAccumulator } from "./openai-compat.ts";
 
 const history: Array<ChatMessage> = [
   { role: "user", text: "Cek kamar RM 000002" },
@@ -93,6 +93,24 @@ describe("OpenAI-compatible format", () => {
     expect(b?.name).toBe("statusKamar");
     expect(b?.args).toBe("not json");
     expect(b?.id).toMatch(/^call_1_/);
+  });
+
+  it("reports tool-call fragments live once the call has a name", () => {
+    const acc = new ToolCallAccumulator();
+    expect(acc.add(chunk([{ index: 0, id: "call_a", function: { name: "jalankanQueryBaca", arguments: "" } }]))).toEqual([
+      { type: "tool_input_delta", index: 0, name: "jalankanQueryBaca", delta: "" },
+    ]);
+    expect(acc.add(chunk([{ index: 0, function: { arguments: '{"sql":"SEL' } }]))).toEqual([
+      { type: "tool_input_delta", index: 0, name: "jalankanQueryBaca", delta: '{"sql":"SEL' },
+    ]);
+    expect(acc.add({ choices: [{ index: 0, delta: { content: "hi" } }] } as unknown as ChatCompletionChunk)).toEqual([]);
+  });
+
+  it("reads thinking text from reasoning_content or reasoning", () => {
+    expect(reasoningOf({ reasoning_content: "pikir" })).toBe("pikir");
+    expect(reasoningOf({ reasoning: "pikir" })).toBe("pikir");
+    expect(reasoningOf({ content: "jawab" })).toBe("");
+    expect(reasoningOf(undefined)).toBe("");
   });
 
   it("treats tool calls as tool_use even when the server says 'stop'", () => {

@@ -62,16 +62,21 @@ export const toOpenAiMessages = (system: string, messages: ReadonlyArray<ChatMes
 export class ToolCallAccumulator {
   private readonly parts = new Map<number, { id: string; name: string; args: string }>();
 
-  add(chunk: ChatCompletionChunk): void {
+  /** Adds a chunk's fragments; returns them as live `tool_input_delta` events (once the call has a name). */
+  add(chunk: ChatCompletionChunk): Array<LlmEvent> {
+    const live: Array<LlmEvent> = [];
     for (const choice of chunk.choices) {
       for (const delta of choice.delta?.tool_calls ?? []) {
         const part = this.parts.get(delta.index) ?? { id: "", name: "", args: "" };
         if (delta.id) part.id = delta.id;
         if (delta.function?.name) part.name += delta.function.name;
-        if (delta.function?.arguments) part.args += delta.function.arguments;
+        const args = delta.function?.arguments ?? "";
+        part.args += args;
         this.parts.set(delta.index, part);
+        if (part.name !== "") live.push({ type: "tool_input_delta", index: delta.index, name: part.name, delta: args });
       }
     }
+    return live;
   }
 
   calls(): Array<ToolCall> {
@@ -81,6 +86,17 @@ export class ToolCallAccumulator {
       .map(([index, p]) => ({ id: p.id || `call_${index}_${crypto.randomUUID().slice(0, 8)}`, name: p.name, args: parseArgs(p.args) }));
   }
 }
+
+/**
+ * Thinking text, which is not part of the OpenAI spec: DeepSeek, vLLM and
+ * most gateways send `reasoning_content`, OpenRouter and Ollama `reasoning`.
+ */
+export const reasoningOf = (delta: unknown): string => {
+  if (delta === null || typeof delta !== "object") return "";
+  const d = delta as { reasoning_content?: unknown; reasoning?: unknown };
+  const value = d.reasoning_content ?? d.reasoning;
+  return typeof value === "string" ? value : "";
+};
 
 export const toStopReason = (finishReason: string | null | undefined, hasToolCalls: boolean): StopReason => {
   // Some servers report "stop" even when they returned tool calls.
@@ -124,8 +140,10 @@ export const makeOpenAiCompatClient = (options: OpenAiCompatOptions): LlmClientS
       let finishReason: string | null = null;
       let usage: { inputTokens: number; outputTokens: number } | undefined;
       for await (const chunk of stream) {
-        calls.add(chunk);
+        yield* calls.add(chunk);
         for (const choice of chunk.choices) {
+          const reasoning = reasoningOf(choice.delta);
+          if (reasoning) yield { type: "reasoning_delta", text: reasoning };
           const delta = choice.delta?.content;
           if (delta) {
             text += delta;

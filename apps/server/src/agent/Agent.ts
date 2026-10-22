@@ -38,19 +38,26 @@ type AgentInput = (
   readonly askedBy: string | null;
 };
 
-/** Server clock, given to the model so "hari ini" and "minggu ini" mean the right dates. */
-const contextLine = (now: Date): string => {
+/**
+ * Server clock and the newest registration date in Khanza, given to the model
+ * so "hari ini" and "7 hari terakhir" mean the right dates. Without the data
+ * date, a model on an old or test database queries today's date, gets 0 rows,
+ * and spends extra turns finding where the data ends.
+ */
+const contextLine = (now: Date, latestData: string | null): string => {
   const date = new Intl.DateTimeFormat("id-ID", { dateStyle: "full", timeStyle: "short" }).format(now);
-  return `[Waktu server: ${date}; ${now.toISOString().slice(0, 10)}]`;
+  const data = latestData ? `; data registrasi terakhir di database: ${latestData}` : "";
+  return `[Waktu server: ${date}; ${now.toISOString().slice(0, 10)}${data}]`;
 };
 
 /** The user turn sent to the model for a question or a ticket. */
-const userText = (input: AgentInput, now: Date): string => {
-  if (input.kind === "ask") return `${contextLine(now)}\n${input.question}`;
-  if (input.question !== undefined) return `${contextLine(now)}\nPertanyaan lanjutan tentang tiket ini: ${input.question}`;
+const userText = (input: AgentInput, now: Date, latestData: string | null): string => {
+  const context = contextLine(now, latestData);
+  if (input.kind === "ask") return `${context}\n${input.question}`;
+  if (input.question !== undefined) return `${context}\nPertanyaan lanjutan tentang tiket ini: ${input.question}`;
   const t = input.ticket;
   return [
-    contextLine(now),
+    context,
     `Tiket dari perawat ${t.nurseName} (unit ${t.unit}), dibuat ${t.createdAt}:`,
     `"${t.complaint}"`,
     "Selidiki keluhan ini dengan data Khanza, lalu berikan diagnosis dan saran perbaikan.",
@@ -79,6 +86,21 @@ const make = Effect.gen(function* () {
   const docs = yield* SchemaDocs;
   const system = yield* SystemPrompt;
   const registry: ToolRegistry = defaultRegistry;
+
+  /** Newest reg_periksa date, cached for a few minutes; null when it cannot be read. */
+  const LATEST_DATA_TTL_MS = 5 * 60_000;
+  let latestDataCache: { readonly value: string | null; readonly at: number } | undefined;
+  const latestDataDate = Effect.gen(function* () {
+    const now = Date.now();
+    if (latestDataCache && now - latestDataCache.at < LATEST_DATA_TTL_MS) return latestDataCache.value;
+    const rows = yield* read.query<{ readonly d: unknown }>(
+      (sql) => sql`SELECT DATE_FORMAT(MAX(tgl_registrasi), '%Y-%m-%d') AS d FROM reg_periksa`,
+    );
+    const d = rows[0]?.d;
+    const value = typeof d === "string" && d !== "" ? d : null;
+    latestDataCache = { value, at: now };
+    return value;
+  }).pipe(Effect.catch(() => Effect.succeed(null)));
 
   const runOneTool = (call: ToolCall, runId: string, askedBy: string | null) =>
     Effect.gen(function* () {
@@ -145,7 +167,7 @@ const make = Effect.gen(function* () {
             }),
           );
 
-        const raw = userText(input, new Date());
+        const raw = userText(input, new Date(), yield* latestDataDate);
         yield* append({ role: "user", text: info.maskPii ? maskText(raw) : raw });
 
         let steps = 0;
@@ -160,12 +182,25 @@ const make = Effect.gen(function* () {
             let text = "";
             const calls: Array<ToolCall> = [];
             let done: Extract<LlmEvent, { type: "done" }> | undefined;
+            // Tool calls streamed while being written, in order; the n-th
+            // finished call replaces the n-th draft in the UI.
+            const drafts: Array<{ readonly index: number; readonly draftId: string }> = [];
             yield* llm.chat({ system, messages: [...history], tools: registry.descriptions }).pipe(
               Stream.runForEach((event) => {
                 switch (event.type) {
                   case "text_delta":
                     text += event.text;
                     return emit({ _tag: "text_delta", text: event.text });
+                  case "reasoning_delta":
+                    return emit({ _tag: "reasoning_delta", text: event.text });
+                  case "tool_input_delta": {
+                    let draft = drafts.find((d) => d.index === event.index);
+                    if (draft === undefined) {
+                      draft = { index: event.index, draftId: `${runId}:${steps}:${event.index}` };
+                      drafts.push(draft);
+                    }
+                    return emit({ _tag: "tool_input_delta", draftId: draft.draftId, name: event.name, delta: event.delta });
+                  }
                   case "tool_call":
                     calls.push(event.call);
                     return Effect.void;
@@ -183,8 +218,9 @@ const make = Effect.gen(function* () {
 
             if (stopReason !== "tool_use" || calls.length === 0) return;
 
-            for (const call of calls) {
-              yield* emit({ _tag: "tool_started", callId: call.id, name: call.name, args: call.args });
+            for (const [n, call] of calls.entries()) {
+              const draftId = drafts.toSorted((a, b) => a.index - b.index)[n]?.draftId;
+              yield* emit({ _tag: "tool_started", callId: call.id, name: call.name, args: call.args, ...(draftId ? { draftId } : {}) });
               const outcome = yield* runOneTool(call, runId, input.askedBy);
               yield* emit(
                 outcome.ok

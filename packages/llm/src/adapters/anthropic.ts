@@ -113,9 +113,18 @@ export const makeAnthropicClient = (options: AnthropicOptions): LlmClientService
       ...(useFallback ? { betas: [FALLBACK_BETA], fallbacks: "default" as const } : {}),
     });
     try {
+      const toolNames = new Map<number, string>();
       for await (const event of stream) {
-        if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-          yield { type: "text_delta", text: event.delta.text };
+        if (event.type === "content_block_start" && event.content_block.type === "tool_use") {
+          toolNames.set(event.index, event.content_block.name);
+          yield { type: "tool_input_delta", index: event.index, name: event.content_block.name, delta: "" };
+        } else if (event.type === "content_block_delta") {
+          if (event.delta.type === "text_delta") yield { type: "text_delta", text: event.delta.text };
+          else if (event.delta.type === "thinking_delta") yield { type: "reasoning_delta", text: event.delta.thinking };
+          else if (event.delta.type === "input_json_delta") {
+            const name = toolNames.get(event.index);
+            if (name !== undefined) yield { type: "tool_input_delta", index: event.index, name, delta: event.delta.partial_json };
+          }
         }
       }
       const message = await stream.finalMessage();

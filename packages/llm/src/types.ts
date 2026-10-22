@@ -61,6 +61,14 @@ export interface Usage {
 
 export type LlmEvent =
   | { readonly type: "text_delta"; readonly text: string }
+  /** A piece of the model's thinking, shown live; never sent back to the model. */
+  | { readonly type: "reasoning_delta"; readonly text: string }
+  /**
+   * A piece of a tool call while the model is still writing it, so the UI can
+   * show the step (and its SQL) before the turn ends. `index` orders calls in
+   * the turn; the complete call still arrives later as `tool_call`.
+   */
+  | { readonly type: "tool_input_delta"; readonly index: number; readonly name: string; readonly delta: string }
   | { readonly type: "tool_call"; readonly call: ToolCall }
   | {
       readonly type: "done";

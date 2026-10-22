@@ -7,7 +7,7 @@ import { useNavigate, useSearch } from "@tanstack/react-router";
 import { History, MessageSquarePlus, Play, SendHorizontal, Square, Star, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Markdown } from "../../components/agent/Markdown.tsx";
-import { StepList } from "../../components/agent/StepList.tsx";
+import { PendingLine, pendingStep, StepList } from "../../components/agent/StepList.tsx";
 import { DocumentCard } from "../../components/blocks/DocumentCard.tsx";
 import { RenderBlockView } from "../../components/blocks/RenderBlockView.tsx";
 import { Button } from "../../components/ui/Button.tsx";
@@ -42,12 +42,12 @@ const Turn = ({ turn, onSaved }: { readonly turn: RunView; readonly onSaved: () 
           {turn.steps.length} langkah{turn.model ? ` · ${turn.model}` : ""}
         </Collapsible.Trigger>
         <Collapsible.Panel className="mt-3 rounded-lg border border-line-2 bg-card/70 p-3">
-          <StepList steps={turn.steps} />
+          <StepList steps={turn.steps} pending={pendingStep(turn)} />
         </Collapsible.Panel>
       </Collapsible.Root>
     ) : turn.status === "running" ? (
-      <p className="flex items-center gap-2 text-[13px] text-ink-3">
-        <Spinner /> Memahami pertanyaan…
+      <p className="flex items-start gap-2 text-[13px] text-ink-3">
+        <Spinner /> <PendingLine pending={{ label: "Memahami pertanyaan…", since: turn.waitingSince, reasoning: turn.reasoning }} />
       </p>
     ) : null}
     {turn.blocks.map((block) => (
