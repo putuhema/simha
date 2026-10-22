@@ -86,6 +86,9 @@ const launch = async (launcher: string): Promise<void> => {
     return start(launcher, []);
   }
   if (ext === ".sh" || ext === ".command") return start("/bin/sh", [launcher]);
+  // Khanza's Aplikasi.bat is a single "java -jar ..." line, which a shell can run
+  // too (like ./Aplikasi.bat in a terminal). Windows line endings are dropped first.
+  if (ext === ".bat" || ext === ".cmd") return start("/bin/sh", ["-c", 'tr -d "\\r" < "$0" | /bin/sh', launcher]);
   const error = await shell.openPath(launcher);
   if (error) throw new Error(error);
 };

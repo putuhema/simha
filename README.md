@@ -195,7 +195,7 @@ Change it later from the menu **Aplikasi → Pengaturan koneksi** or **Pengatura
 
 Khanza cannot yet be told to open a specific form; see "Khanza bridge" in `docs/PLAN.md`.
 
-**macOS** (e.g. an IT laptop with Khanza): `pnpm --filter @simrs/desktop dist:mac` builds `apps/desktop/release/mac-arm64/SIMRS Harness.app`. Choose `SIMRSKhanza.jar` (or a `.sh`) as the Khanza file; it is started with the same Java settings as `Aplikasi.bat`, and a running Khanza is found by its jar name (macOS asks once to allow "System Events" to bring it to the front).
+**macOS** (e.g. an IT laptop with Khanza): `pnpm --filter @simrs/desktop dist:mac` builds `apps/desktop/release/mac-arm64/SIMRS Harness.app`. Choose `Aplikasi.bat` (run with `sh` from its folder, like `./Aplikasi.bat` in a terminal), a `.sh`, or `SIMRSKhanza.jar` (started with the same Java settings as `Aplikasi.bat`) as the Khanza file, and a running Khanza is found by its jar name (macOS asks once to allow "System Events" to bring it to the front).
 
 **Develop:** `pnpm --filter @simrs/desktop dev` builds the UI bundle and starts the app. While developing it uses the repo's `.env`. Set `SIMRS_DESKTOP_DATA_DIR` to keep settings and the audit DB in another folder.
 
