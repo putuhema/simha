@@ -17,9 +17,12 @@ The agent's `lihatSkema` tool reads this file together with `docs/schema.md` bef
 
 ## Codes
 
-- `kd_poli` for poli gigi is `TODO` (check `poliklinik`).
-- `kd_pj` for BPJS is `TODO`, for umum is `TODO` (check `penjab`).
-- Ward names: Melati = `kd_bangsal` `TODO`, Mawar = `TODO`.
+- `status = '1'` means active in `poliklinik`, `penjab`, `bangsal` and `dokter`; old codes stay with `status = '0'`.
+- Poli gigi: `kd_poli = 'U0010'` ("Poliklinik Gigi & Mulut").
+- Payer (`kd_pj` in `reg_periksa` and `pasien`): BPJS = `BPJ` ("BPJS KESEHATAN"); umum = `A09` ("UMUM"). Old inactive BPJS codes: `A65`, `A28` (BPJS MANDIRI). For "BPJS vs umum" group by `kd_pj` and join `penjab` for the name.
+- Melati wards: the active ones are `kls21`–`kls25` ("Per. Kelas 2 (Melati 1)" … "(Melati 5)"); `B0024`, `B0056`, `B0072`–`B0074`, `B0086` and `kls2` are inactive old codes. Mawar: `MW` (inactive). Search `bangsal.nm_bangsal` with LIKE when a ward name is mentioned.
+- Drugs given: `detail_pemberian_obat.jml` is the quantity, `tgl_perawatan` the date, `status` `Ralan`/`Ranap`; drug name is `databarang.nama_brng`.
+(Codes checked on our DB, Oct 2026.)
 
 ## Local schema changes
 

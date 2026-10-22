@@ -5,7 +5,7 @@ AI assistant for hospital IT staff working with **SIMRS Khanza**.
 - **Tiket mode:** paste a nurse's complaint. The agent reads the real patient data through safe, read-only tools, explains each check, gives a diagnosis and proposes a fix as SQL. The fix only runs after a person clicks **Approve**, and it can be rolled back.
 - **Tanya Data mode:** ask questions about hospital data in plain Indonesian ("10 obat paling banyak dipakai minggu ini"). The agent writes a guarded `SELECT` and shows the answer as a table, chart or number.
 
-> Status: **M3 done** (database layer, audit log, read and diagnose tools, AI agent with streaming HTTP API, fixes with approval and rollback). No UI yet; use `pnpm tool` and `curl`. See [docs/PLAN.md](docs/PLAN.md).
+> Status: **M4 done** (database layer, audit log, read and diagnose tools, AI agent with streaming HTTP API, fixes with approval and rollback, Tanya Data tools with charts and favorites). No UI yet; use `pnpm tool` and `curl`. See [docs/PLAN.md](docs/PLAN.md).
 
 ## Safety model (short version)
 
@@ -15,7 +15,8 @@ AI assistant for hospital IT staff working with **SIMRS Khanza**.
 | Writes need approval | The AI can only *propose* a fix. After Approve, the server runs it with a separate write user, in a transaction, and rolls back if the affected row count differs from the preview. |
 | Every fix can be undone | The affected rows are saved (before-image) before the change runs. |
 | Audit everything | Questions, tool calls, queries, fixes, approvals, rollbacks and the AI model used are logged in a separate SQLite DB, never in Khanza. |
-| Patient privacy | NIK, phone numbers and addresses are masked before data goes to an external AI provider. |
+| Patient privacy | NIK, phone numbers and addresses are masked before data goes to an external AI provider. AI-written queries can't return them at all (only filter or count them). |
+| AI-written SQL is checked | Tanya Data queries are parsed before they run: one SELECT only, no credential tables, max 500 rows, time limit. |
 
 ## Requirements
 
@@ -99,6 +100,8 @@ pnpm tool daftarTindakan '{"noRawat":"2026/01/15/000123"}'
 pnpm tool statusBilling '{"noRawat":"2026/01/15/000123"}'
 pnpm tool dataSep '{"noRawat":"2026/01/15/000123"}'
 pnpm tool suratKontrol '{"noSep":"0001R0010126V000123"}'
+pnpm tool lihatSkema '{"kataKunci":"obat"}'
+pnpm tool jalankanQueryBaca '{"sql":"SELECT COUNT(*) AS jumlah FROM reg_periksa WHERE tgl_registrasi = CURDATE()","alasan":"coba"}'
 ```
 
 Each run is recorded in the audit log (`data/audit.sqlite`): the tool call with its input and output, and every query with its parameters, row count and duration. Look at it with any SQLite viewer, e.g. `sqlite3 data/audit.sqlite "SELECT tool, status, started_at FROM tool_calls"`.
@@ -112,7 +115,7 @@ pnpm start       # http://127.0.0.1:8787
 ```bash
 # Tanya Data (answers stream back as Server-Sent Events)
 curl -N -X POST localhost:8787/ask -H 'content-type: application/json' \
-  -d '{"question":"Cek riwayat kamar pasien RM 012345"}'
+  -d '{"question":"10 obat paling banyak dipakai minggu ini"}'
 
 # Ticket: create, then investigate
 curl -X POST localhost:8787/tickets -H 'content-type: application/json' \
@@ -120,7 +123,7 @@ curl -X POST localhost:8787/tickets -H 'content-type: application/json' \
 curl -N -X POST localhost:8787/tickets/<id>/investigate
 ```
 
-Events: `run_started` (run and conversation id, provider, model), `text_delta` (answer text), `tool_started` / `tool_finished` (each check the agent makes, with the full result), then `done` or `error`. Send the `conversationId` from `run_started` with the next `/ask` to ask a follow-up in the same context.
+Events: `run_started` (run and conversation id, provider, model), `text_delta` (answer text), `tool_started` / `tool_finished` (each check the agent makes, with the full result), `render` (a table, chart, number or list with the SQL behind it), then `done` or `error`. Send the `conversationId` from `run_started` with the next `/ask` to ask a follow-up in the same context.
 
 | Endpoint | |
 |---|---|
@@ -129,6 +132,10 @@ Events: `run_started` (run and conversation id, provider, model), `text_delta` (
 | `GET /tickets`, `GET /tickets/:id` | list / one ticket |
 | `POST /tickets/:id/investigate` | run the agent on a ticket; optional `{ question }` for a follow-up (SSE) |
 | `POST /ask` | `{ question, conversationId? }` (SSE) |
+| `GET /favorites` | saved questions |
+| `POST /favorites` | `{ blockId, createdBy, question? }`: save the question and SQL behind a `render` block |
+| `POST /favorites/:id/run` | re-run a favorite without the AI; returns `{ block }` |
+| `DELETE /favorites/:id` | remove a favorite |
 
 Request and event Schemas are in `packages/shared/src/api.ts`.
 
@@ -211,6 +218,28 @@ Notes:
 
 All tools use fixed, parameterized SELECT queries on the read user, with a server-side time limit (`KHANZA_QUERY_TIMEOUT`, default 10 s).
 
+## Tanya Data tools
+
+The agent answers data questions with three tools:
+
+1. **`lihatSkema(kataKunci)`** finds tables and columns for a topic in three places:
+   - `docs/schema.md`;
+   - matching lines of `docs/khanza_notes.md`;
+   - the live database (`information_schema`), which covers the hundreds of tables not in `schema.md`.
+
+   Personal columns are marked, and login/credential tables are left out.
+2. **`jalankanQueryBaca(sql, alasan)`** runs a SELECT the AI wrote. Before it runs, `packages/tools/src/info/select-guard.ts` checks it:
+   - **One SELECT only** (WITH and UNION are fine). UPDATE, DELETE, SHOW, CALL, SET, several statements, comments, `INTO OUTFILE`, `FOR UPDATE`, `@variables`, other databases and functions like `SLEEP` or `LOAD_FILE` are rejected.
+   - **Personal columns** can be used in WHERE, JOIN, GROUP BY or inside `COUNT()`, but never returned. That covers NIK/KTP, phone numbers, addresses, email, BPJS card numbers, mother's name, passwords and bank accounts. `SELECT *` on a table that has such columns is rejected. In Khanza `nik` is the employee number, so it is allowed.
+   - **Credential tables** can't be read at all: `user`, `admin`, `set_akun_*`, `password_*` and similar.
+   - **At most 500 rows:** without a LIMIT, `LIMIT 501` is added so a cut result is reported. A larger LIMIT is rejected.
+   - **Same limits as the other tools:** it runs on the read user with the same time limit and is logged in the audit log with the question that triggered it.
+   - **Errors go back to the AI** so it can fix the query. After 3 failures in a row it stops and explains what it could not answer.
+   - **The AI sees the first 50 rows;** the full result is stored for display.
+3. **`tampilkan(tipe, judul, queryId, asumsi?, opsi?)`** shows a stored result as `table`, `bar`, `line`, `pie`, `stat` or `list`, with the SQL and a one-line assumption ("bulan ini = 1–22 Okt 2026, hanya rawat jalan"). The brief named this argument `data`; here it is a `queryId`, so the numbers on screen are exactly what the database returned and the AI never retypes them.
+
+Favorites store the question, the SQL and the chart settings, and re-run through the same guard and audit log.
+
 ## Development
 
 ```bash
@@ -246,7 +275,7 @@ packages/
 scripts/
   inspect-schema.ts     dump the live schema to docs/schema.md
   dump-test-schema.ts   copy table structure into the test fixture
-  run-tool.ts           run one read tool from the terminal (pnpm tool)
+  run-tool.ts           run one read or Tanya Data tool from the terminal (pnpm tool)
 docs/
   schema.md, khanza_notes.md, PLAN.md
 ```

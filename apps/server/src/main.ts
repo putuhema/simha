@@ -5,7 +5,7 @@
  */
 import { NodeFileSystem, NodeHttpServer, NodeRuntime } from "@effect/platform-node";
 import { LlmClientLive } from "@simrs/llm";
-import { AuditLogLive, FixStoreLive, KhanzaReadLive, KhanzaWriteLive } from "@simrs/tools";
+import { AuditLogLive, FixStoreLive, KhanzaReadLive, KhanzaWriteLive, ResultStoreLive, SchemaDocsLive } from "@simrs/tools";
 import { Effect, Layer } from "effect";
 import { HttpRouter } from "effect/http";
 import { createServer } from "node:http";
@@ -21,7 +21,7 @@ import { StoreLive } from "./store.ts";
  * and the fix executor (the only user of the Khanza write pool).
  */
 export const AppLive = Layer.mergeAll(AgentLive, FixExecutorLive).pipe(
-  Layer.provideMerge(Layer.mergeAll(StoreLive, FixStoreLive, KhanzaReadLive, KhanzaWriteLive, LlmClientLive, SystemPromptLive)),
+  Layer.provideMerge(Layer.mergeAll(StoreLive, FixStoreLive, ResultStoreLive, SchemaDocsLive, KhanzaReadLive, KhanzaWriteLive, LlmClientLive, SystemPromptLive)),
   Layer.provideMerge(AuditLogLive),
   Layer.provide(NodeFileSystem.layer),
 );

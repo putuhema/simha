@@ -7,13 +7,18 @@
  * 2. By pattern, in every string: 16-digit numbers (NIK) and Indonesian
  *    phone numbers, in case they appear in free text or unexpected columns.
  *
+ * Field names also cover every column the Tanya Data guard protects
+ * (info/sensitive.ts), e.g. BPJS card numbers and passwords.
+ *
  * Patient names, RM numbers and visit numbers are kept: the agent needs them.
  */
+import { protectedColumn } from "../info/sensitive.ts";
 
 const NIK_MASK = "[NIK disamarkan]";
 const PHONE_MASK = "[telepon disamarkan]";
 const ADDRESS_MASK = "[alamat disamarkan]";
 const EMAIL_MASK = "[email disamarkan]";
+const OTHER_MASK = "[disamarkan]";
 
 /** Column names (Khanza and common variants) that always hold a protected value. */
 const fieldMask = (key: string): string | undefined => {
@@ -22,7 +27,8 @@ const fieldMask = (key: string): string | undefined => {
   if (/^(no_?tl?p|no_telp|notelp|notelep|no_hp|nohp|telepon|telp|phone|hp)$/.test(k)) return PHONE_MASK;
   if (/^(alamat|almt)/.test(k) || k.endsWith("alamat")) return ADDRESS_MASK;
   if (k === "email") return EMAIL_MASK;
-  return undefined;
+  // Everything else jalankanQueryBaca refuses to return (card numbers, passwords, ...).
+  return protectedColumn(k) === undefined ? undefined : OTHER_MASK;
 };
 
 /** 16-digit NIK, not part of a longer number. */

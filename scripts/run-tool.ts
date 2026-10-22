@@ -1,5 +1,5 @@
 /**
- * Runs one read tool against the Khanza database in .env and prints the JSON
+ * Runs one read tool (or lihatSkema / jalankanQueryBaca) against the Khanza database in .env and prints the JSON
  * result, for trying tools before the server exists. The call and its queries
  * are written to the audit log (AUDIT_DB_PATH, default data/audit.sqlite).
  *
@@ -7,14 +7,26 @@
  *   pnpm tool                                   # list tools
  *   pnpm tool cariPasien '{"nama":"budi"}'
  *   pnpm tool riwayatKamar '{"noRawat":"2026/01/15/000123"}'
+ *   pnpm tool lihatSkema '{"kataKunci":"obat"}'
+ *   pnpm tool jalankanQueryBaca '{"sql":"SELECT COUNT(*) AS n FROM reg_periksa WHERE tgl_registrasi = CURDATE()","alasan":"tes"}'
  */
 import { NodeRuntime } from "@effect/platform-node";
-import { AuditLogLive, KhanzaReadLive, readTools, runTool, ToolInputError } from "@simrs/tools";
-import type { KhanzaRead, Tool } from "@simrs/tools";
+import {
+  AuditLogLive,
+  jalankanQueryBaca,
+  KhanzaReadLive,
+  lihatSkema,
+  readTools,
+  ResultStoreLive,
+  runTool,
+  SchemaDocsLive,
+  ToolInputError,
+} from "@simrs/tools";
+import type { KhanzaRead, ResultStore, SchemaDocs, Tool } from "@simrs/tools";
 import { Console, Effect, Layer } from "effect";
 
-type AnyReadTool = Tool<unknown, unknown, KhanzaRead>;
-const tools = readTools as unknown as ReadonlyArray<AnyReadTool>;
+type AnyReadTool = Tool<unknown, unknown, KhanzaRead | ResultStore | SchemaDocs>;
+const tools = [...readTools, lihatSkema, jalankanQueryBaca] as unknown as ReadonlyArray<AnyReadTool>;
 
 const [name, json = "{}"] = process.argv.slice(2);
 
@@ -41,7 +53,9 @@ const runOne = (tool: AnyReadTool) =>
     const result = yield* runTool(tool, input, { sessionId: "cli" });
     yield* Console.log(JSON.stringify(result, null, 2));
   }).pipe(
-    Effect.provide(KhanzaReadLive.pipe(Layer.provideMerge(AuditLogLive))),
+    Effect.provide(
+      Layer.mergeAll(KhanzaReadLive, ResultStoreLive, SchemaDocsLive).pipe(Layer.provideMerge(AuditLogLive)),
+    ),
     Effect.catchTags({
       ConfigError: (e) => fail(`Config error: ${e.message}\nCopy .env.example to .env and fill it in.`),
       KhanzaSetupError: (e) => fail(e.message),

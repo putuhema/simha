@@ -49,3 +49,15 @@ export const AuditDbPathConfig: Config.Config<string> = Config.String("AUDIT_DB_
   Config.withDefault("data/audit.sqlite"),
   Config.map((path) => (path === ":memory:" ? path : NodePath.resolve(repoRoot, path))),
 );
+
+/** docs/schema.md (from `pnpm inspect-schema`), read by lihatSkema. Relative to the repository root. */
+export const SchemaDocPathConfig: Config.Config<string> = Config.String("SCHEMA_DOC_PATH").pipe(
+  Config.withDefault("docs/schema.md"),
+  Config.map((path) => NodePath.resolve(repoRoot, path)),
+);
+
+/** docs/khanza_notes.md (hand-written by IT), read by lihatSkema and the system prompt. */
+export const KhanzaNotesPathConfig: Config.Config<string> = Config.String("KHANZA_NOTES_PATH").pipe(
+  Config.withDefault("docs/khanza_notes.md"),
+  Config.map((path) => NodePath.resolve(repoRoot, path)),
+);

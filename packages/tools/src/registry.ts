@@ -5,13 +5,18 @@ import { Schema } from "effect";
 import { diagnosaPindahKamar } from "./diagnose/diagnosaPindahKamar.ts";
 import { diagnosaTindakan } from "./diagnose/diagnosaTindakan.ts";
 import type { FixStore } from "./fixes/FixStore.ts";
+import { jalankanQueryBaca } from "./info/jalankanQueryBaca.ts";
+import { lihatSkema } from "./info/lihatSkema.ts";
+import type { ResultStore } from "./info/ResultStore.ts";
+import type { SchemaDocs } from "./info/SchemaDocs.ts";
+import { tampilkan } from "./info/tampilkan.ts";
 import type { KhanzaRead } from "./khanza/KhanzaRead.ts";
 import { usulkanPerbaikan } from "./propose/usulkanPerbaikan.ts";
 import { readTools } from "./read/index.ts";
 import type { Tool } from "./tool.ts";
 
 /** Services tool handlers may use. Never the Khanza write pool. */
-export type ToolServices = KhanzaRead | FixStore;
+export type ToolServices = KhanzaRead | FixStore | ResultStore | SchemaDocs;
 
 /** A tool with its parameter and output types erased, for lists of mixed tools. */
 export type AnyTool<R = ToolServices> = Tool<unknown, unknown, R>;
@@ -50,10 +55,13 @@ export const makeRegistry = <R>(tools: ReadonlyArray<AnyTool<R>>): ToolRegistry<
   };
 };
 
-/** Tools offered to the agent: read, diagnose and propose. Information tools join in M4. */
+/** Tools offered to the agent: read, diagnose, propose, and the Tanya Data tools. */
 export const defaultRegistry: ToolRegistry = makeRegistry([
   ...readTools,
   diagnosaPindahKamar,
   diagnosaTindakan,
   usulkanPerbaikan,
+  lihatSkema,
+  jalankanQueryBaca,
+  tampilkan,
 ] as unknown as ReadonlyArray<AnyTool>);

@@ -5,7 +5,7 @@
 import { NodeFileSystem } from "@effect/platform-node";
 import { LlmClient, makeFakeClient, type FakeTurn, type LlmInfo } from "@simrs/llm";
 import type { AgentEvent } from "@simrs/shared";
-import { AuditLogMemory, FixStoreLive, khanzaReadLayer, khanzaWriteLayer } from "@simrs/tools";
+import { AuditLogMemory, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, ResultStoreLive, schemaDocsLayer } from "@simrs/tools";
 import { connectionAs, testDb } from "@simrs/tools/testing";
 import { Duration, Effect, Layer, ManagedRuntime } from "effect";
 import { SqlClient } from "effect/sql";
@@ -18,7 +18,23 @@ import { StoreLive } from "../src/store.ts";
 
 export { testDb };
 
-export const makeTestApp = (script: ReadonlyArray<FakeTurn>, info?: Partial<LlmInfo>) => {
+/** Small docs for lihatSkema in tests (the real docs/schema.md describes the hospital DB). */
+const TEST_DOCS = {
+  schema: [
+    "## `poliklinik`",
+    "",
+    "Purpose: Clinics",
+    "",
+    "| # | Column | Type | Null | Key | Default | Extra | Comment |",
+    "|---|---|---|---|---|---|---|---|",
+    "| 1 | `kd_poli` | char(5) | no | PRI |  |  |  |",
+    "| 2 | `nm_poli` | varchar(50) | yes |  | NULL |  |  |",
+    "",
+  ].join("\n"),
+  notes: "# Notes\n\n- `kd_poli` for poli gigi is `GIG`.\n- TODO: more\n",
+};
+
+export const makeTestApp = (script: ReadonlyArray<FakeTurn>, info?: Partial<LlmInfo>, docs = TEST_DOCS) => {
   const db = testDb;
   if (db === null) throw new Error("no test DB");
   const fake = makeFakeClient(script, info);
@@ -27,6 +43,8 @@ export const makeTestApp = (script: ReadonlyArray<FakeTurn>, info?: Partial<LlmI
       Layer.mergeAll(
         StoreLive,
         FixStoreLive,
+        ResultStoreLive,
+        schemaDocsLayer(docs),
         khanzaWriteLayer(connectionAs(db, db.writeUser, db.writePass)),
         khanzaReadLayer({ connection: connectionAs(db, db.readUser, db.readPass), timeout: Duration.seconds(5) }),
         Layer.succeed(LlmClient, fake),

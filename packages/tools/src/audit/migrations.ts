@@ -141,8 +141,52 @@ const fixes = Effect.gen(function* () {
   yield* sql`ALTER TABLE queries ADD COLUMN fix_id TEXT REFERENCES fixes (id)`;
 });
 
+const tanyaData = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  // Results of jalankanQueryBaca (max 500 rows), so tampilkan can show them without the AI copying data.
+  yield* sql`
+    CREATE TABLE query_results (
+      id            TEXT PRIMARY KEY,
+      tool_call_id  TEXT REFERENCES tool_calls (id),
+      session_id    TEXT,
+      reason        TEXT NOT NULL,
+      sql_original  TEXT NOT NULL,
+      sql_final     TEXT NOT NULL,
+      columns_json  TEXT NOT NULL,
+      rows_json     TEXT NOT NULL,
+      row_count     INTEGER NOT NULL,
+      truncated     INTEGER NOT NULL,
+      created_at    TEXT NOT NULL
+    )`;
+  // Tables, charts and numbers shown in the chat, so a conversation can be shown again.
+  yield* sql`
+    CREATE TABLE render_blocks (
+      id            TEXT PRIMARY KEY,
+      query_id      TEXT NOT NULL REFERENCES query_results (id),
+      tool_call_id  TEXT REFERENCES tool_calls (id),
+      session_id    TEXT,
+      block_json    TEXT NOT NULL,
+      created_at    TEXT NOT NULL
+    )`;
+  yield* sql`CREATE INDEX render_blocks_session ON render_blocks (session_id, created_at)`;
+  // "Pertanyaan favorit": question + SQL + how to show it, re-run without the AI.
+  yield* sql`
+    CREATE TABLE favorites (
+      id          TEXT PRIMARY KEY,
+      question    TEXT NOT NULL,
+      title       TEXT NOT NULL,
+      sql         TEXT NOT NULL,
+      render_type TEXT NOT NULL,
+      options_json TEXT NOT NULL,
+      assumptions TEXT,
+      created_by  TEXT NOT NULL,
+      created_at  TEXT NOT NULL
+    )`;
+});
+
 export const auditMigrations = {
   "0001_init": init,
   "0002_agent": agent,
   "0003_fixes": fixes,
+  "0004_tanya_data": tanyaData,
 };

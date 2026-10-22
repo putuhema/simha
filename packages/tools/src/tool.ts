@@ -4,7 +4,7 @@
  * A tool is a name, a description, a `kind`, an Effect Schema for its
  * parameters and output, and a handler. `runTool` validates the input, runs
  * the handler, and records the call in the audit log. The registry and the
- * conversion to JSON Schema for AI providers come in M2.
+ * conversion to JSON Schema for AI providers are in registry.ts.
  */
 import { Effect, Schema } from "effect";
 import { AuditLog } from "./audit/AuditLog.ts";
@@ -23,6 +23,11 @@ export interface Tool<P, O, R> {
   readonly parameters: Schema.Codec<P, unknown>;
   readonly output: Schema.Codec<O, unknown>;
   readonly handler: (params: P) => Effect.Effect<O, ToolError | KhanzaQueryError, R>;
+  /**
+   * What the AI model sees of the output, when it should see less than the
+   * UI and the audit log (e.g. the first 50 of 500 rows). Default: all of it.
+   */
+  readonly forModel?: (output: O) => unknown;
 }
 
 export const defineTool = <P, O, R>(tool: Tool<P, O, R>): Tool<P, O, R> => tool;

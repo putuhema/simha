@@ -13,10 +13,15 @@
  *   POST /fixes/:id/approve         approve and run it (write user, one transaction)
  *   POST /fixes/:id/reject          reject it
  *   POST /fixes/:id/rollback        restore the rows it changed
+ *   GET  /favorites                 saved questions
+ *   POST /favorites                 save the question and SQL behind a chat result
+ *   DELETE /favorites/:id           remove one
+ *   POST /favorites/:id/run         re-run it without the AI; returns a render block
  */
 import { LlmClient } from "@simrs/llm";
 import {
   AskRequest,
+  CreateFavoriteRequest,
   CreateFixRequest,
   CreateTicketRequest,
   FixActionRequest,
@@ -24,10 +29,11 @@ import {
   InvestigateRequest,
   RejectFixRequest,
 } from "@simrs/shared";
-import { FixStore, KhanzaRead, planFix } from "@simrs/tools";
+import { FixStore, KhanzaRead, planFix, ResultStore } from "@simrs/tools";
 import { Effect, Layer, Schema } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { Agent } from "../agent/Agent.ts";
+import { favoriteFromBlock, runFavorite } from "../favorites.ts";
 import { FixExecutor, type FixActionError } from "../fixes/FixExecutor.ts";
 import { Store } from "../store.ts";
 import { sseResponse } from "./sse.ts";
@@ -55,6 +61,7 @@ const withBadRequest = <R>(effect: Effect.Effect<HttpServerResponse.HttpServerRe
 
 const ticketId = HttpRouter.params.pipe(Effect.map((p) => p["id"] ?? ""));
 const fixId = ticketId;
+const favoriteId = ticketId;
 
 /** Approve / reject / rollback outcome: the fix, or the reason it was refused. */
 const fixAction = <R>(effect: Effect.Effect<unknown, FixActionError | string, R>) =>
@@ -209,5 +216,49 @@ export const Routes = Layer.mergeAll(
         return yield* (yield* FixExecutor).rollback(yield* fixId, input.actor);
       }),
     ),
+  ),
+
+  HttpRouter.add(
+    "GET",
+    "/favorites",
+    Effect.gen(function* () {
+      return HttpServerResponse.jsonUnsafe(yield* (yield* ResultStore).listFavorites);
+    }),
+  ),
+
+  HttpRouter.add(
+    "POST",
+    "/favorites",
+    withBadRequest(
+      Effect.gen(function* () {
+        const input = yield* body(CreateFavoriteRequest);
+        return yield* favoriteFromBlock(input.blockId, input.createdBy, input.question).pipe(
+          Effect.map((favorite) => HttpServerResponse.jsonUnsafe(favorite, { status: 201 })),
+          Effect.catch((message: string) => Effect.succeed(errorResponse(404, message))),
+        );
+      }),
+    ),
+  ),
+
+  HttpRouter.add(
+    "DELETE",
+    "/favorites/:id",
+    Effect.gen(function* () {
+      const deleted = yield* (yield* ResultStore).deleteFavorite(yield* favoriteId);
+      return deleted ? HttpServerResponse.empty({ status: 204 }) : errorResponse(404, "Favorit tidak ditemukan.");
+    }),
+  ),
+
+  HttpRouter.add(
+    "POST",
+    "/favorites/:id/run",
+    Effect.gen(function* () {
+      const favorite = yield* (yield* ResultStore).getFavorite(yield* favoriteId);
+      if (!favorite) return errorResponse(404, "Favorit tidak ditemukan.");
+      return yield* runFavorite(favorite).pipe(
+        Effect.map((block) => HttpServerResponse.jsonUnsafe({ block })),
+        Effect.catch((message: string) => Effect.succeed(errorResponse(422, message))),
+      );
+    }),
   ),
 );

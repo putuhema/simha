@@ -23,6 +23,8 @@ import { detectServer, looksReadOnly, withStatementTimeout, type ServerInfo } fr
 
 export interface KhanzaReadService {
   readonly server: ServerInfo;
+  /** The Khanza database name (e.g. "sik"). */
+  readonly database: string;
   /**
    * Runs one read query. `build` receives the SQL template tag; use
    * `${value}` for every value so it is sent as a parameter.
@@ -65,7 +67,7 @@ const makeKhanzaRead = Effect.fn("makeKhanzaRead")(function* (options: KhanzaRea
   const audit = yield* AuditLog;
   const sql: SqlClient.SqlClient = yield* connectKhanza(options.connection, 5);
 
-  const [meta] = yield* sql<{ version: string }>`SELECT VERSION() AS version`;
+  const [meta] = yield* sql<{ version: string; database: string }>`SELECT VERSION() AS version, DATABASE() AS \`database\``;
   const server = detectServer(meta?.version ?? "");
 
   const grants = yield* sql.unsafe<Record<string, string>>("SHOW GRANTS");
@@ -118,7 +120,7 @@ const makeKhanzaRead = Effect.fn("makeKhanzaRead")(function* (options: KhanzaRea
       return rows;
     });
 
-  return KhanzaRead.of({ server, query });
+  return KhanzaRead.of({ server, database: meta?.database ?? options.connection.database, query });
 });
 
 /** Layer from explicit options (tests, scripts). */

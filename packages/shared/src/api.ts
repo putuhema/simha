@@ -43,6 +43,69 @@ export const AskRequest = Schema.Struct({
 });
 export type AskRequest = typeof AskRequest.Type;
 
+// --- Render blocks (Tanya Data answers) ----------------------------------------
+
+export const RenderType = Schema.Literals(["table", "bar", "line", "pie", "stat", "list"]);
+export type RenderType = typeof RenderType.Type;
+
+/**
+ * One result shown in the chat. The rows always come from a query the server
+ * ran (never typed by the AI), and `sql` is that query, for "Query yang dipakai".
+ *
+ * - table: `kolom` in order, all `baris`.
+ * - bar / line: `x` is the category or time column, `y` the value columns (series).
+ * - pie: `x` labels, one `y` value column.
+ * - stat: one number, `baris[0][y[0]]`, with `x` as an optional label column.
+ * - list: `baris[i][x]` as text.
+ */
+export const RenderBlock = Schema.Struct({
+  id: Schema.String,
+  tipe: RenderType,
+  judul: Schema.String,
+  /** One-line assumptions, e.g. "bulan ini = 1–21 Okt 2026, hanya rawat jalan". */
+  asumsi: Schema.NullOr(Schema.String),
+  queryId: Schema.String,
+  sql: Schema.String,
+  kolom: Schema.Array(Schema.String),
+  baris: Schema.Array(Schema.Record(Schema.String, Schema.Unknown)),
+  x: Schema.NullOr(Schema.String),
+  y: Schema.Array(Schema.String),
+  satuan: Schema.NullOr(Schema.String),
+  /** The query returned more rows than the 500-row limit; only the first 500 are here. */
+  terpotong: Schema.Boolean,
+});
+export type RenderBlock = typeof RenderBlock.Type;
+
+// --- Favorite questions --------------------------------------------------------
+
+/** A saved question with its SQL and how to show it; re-run without the AI. */
+export const Favorite = Schema.Struct({
+  id: Schema.String,
+  question: Schema.String,
+  judul: Schema.String,
+  sql: Schema.String,
+  tipe: RenderType,
+  opsi: Schema.Struct({
+    x: Schema.optionalKey(Schema.String),
+    y: Schema.optionalKey(Schema.Array(Schema.String)),
+    kolom: Schema.optionalKey(Schema.Array(Schema.String)),
+    satuan: Schema.optionalKey(Schema.String),
+  }),
+  asumsi: Schema.NullOr(Schema.String),
+  createdBy: Schema.String,
+  createdAt: Schema.String,
+});
+export type Favorite = typeof Favorite.Type;
+
+/** POST /favorites: save the question and query behind a render block ("Simpan ke favorit"). */
+export const CreateFavoriteRequest = Schema.Struct({
+  blockId: NonEmpty,
+  /** Defaults to the question that produced the block. */
+  question: Schema.optionalKey(NonEmpty.check(Schema.isMaxLength(1_000))),
+  createdBy: NonEmpty.check(Schema.isMaxLength(100)),
+});
+export type CreateFavoriteRequest = typeof CreateFavoriteRequest.Type;
+
 // --- Agent stream (Server-Sent Events) ---------------------------------------
 
 /** First event: which run, conversation and AI model this is. */
@@ -73,6 +136,12 @@ export const ToolFinished = Schema.TaggedStruct("tool_finished", {
   durationMs: Schema.Number,
 });
 
+/** A table, chart, number or list to show in the chat (from the `tampilkan` tool). */
+export const RenderEvent = Schema.TaggedStruct("render", {
+  callId: Schema.String,
+  block: RenderBlock,
+});
+
 /** Last event of a successful run. */
 export const RunDone = Schema.TaggedStruct("done", {
   runId: Schema.String,
@@ -84,7 +153,7 @@ export const RunDone = Schema.TaggedStruct("done", {
 /** Last event of a failed run. */
 export const RunError = Schema.TaggedStruct("error", { message: Schema.String });
 
-export const AgentEvent = Schema.Union([RunStarted, TextDelta, ToolStarted, ToolFinished, RunDone, RunError]);
+export const AgentEvent = Schema.Union([RunStarted, TextDelta, ToolStarted, ToolFinished, RenderEvent, RunDone, RunError]);
 export type AgentEvent = typeof AgentEvent.Type;
 
 // --- Errors -------------------------------------------------------------------

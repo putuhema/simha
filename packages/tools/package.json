@@ -14,6 +14,7 @@
   "dependencies": {
     "@effect/sql-mysql2": "catalog:",
     "@effect/sql-sqlite-node": "catalog:",
+    "@simrs/shared": "workspace:*",
     "effect": "catalog:",
     "mysql2": "^3.24.6",
     "node-sql-parser": "^5.4.0"

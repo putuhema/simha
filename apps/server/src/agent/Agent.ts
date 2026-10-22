@@ -10,8 +10,19 @@
  * fake test adapter.
  */
 import { LlmClient, type ChatMessage, type LlmEvent, type ToolCall } from "@simrs/llm";
-import type { AgentEvent, Ticket } from "@simrs/shared";
-import { AuditLog, defaultRegistry, FixStore, KhanzaRead, maskPii, maskText, runTool, type ToolRegistry } from "@simrs/tools";
+import type { AgentEvent, RenderBlock, Ticket } from "@simrs/shared";
+import {
+  AuditLog,
+  defaultRegistry,
+  FixStore,
+  KhanzaRead,
+  maskPii,
+  maskText,
+  ResultStore,
+  runTool,
+  SchemaDocs,
+  type ToolRegistry,
+} from "@simrs/tools";
 import { Cause, Context, Effect, Exit, Layer, Queue, Stream } from "effect";
 import { Store } from "../store.ts";
 import { SystemPrompt } from "./prompt.ts";
@@ -60,6 +71,8 @@ const make = Effect.gen(function* () {
   const audit = yield* AuditLog;
   const store = yield* Store;
   const fixes = yield* FixStore;
+  const results = yield* ResultStore;
+  const docs = yield* SchemaDocs;
   const system = yield* SystemPrompt;
   const registry: ToolRegistry = defaultRegistry;
 
@@ -75,12 +88,20 @@ const make = Effect.gen(function* () {
         Effect.provideService(KhanzaRead, read),
         Effect.provideService(AuditLog, audit),
         Effect.provideService(FixStore, fixes),
+        Effect.provideService(ResultStore, results),
+        Effect.provideService(SchemaDocs, docs),
         Effect.exit,
       );
       const durationMs = performance.now() - started;
-      return Exit.isSuccess(exit)
-        ? { ok: true as const, result: exit.value, durationMs }
-        : { ok: false as const, error: errorMessage(exit.cause), durationMs };
+      if (!Exit.isSuccess(exit)) return { ok: false as const, error: errorMessage(exit.cause), durationMs };
+      const result = exit.value;
+      return {
+        ok: true as const,
+        result,
+        forModel: tool.forModel ? tool.forModel(result) : result,
+        block: tool.kind === "render" ? (result as { readonly block: RenderBlock }).block : undefined,
+        durationMs,
+      };
     });
 
   /** Runs one question or ticket investigation and streams its events. */
@@ -164,11 +185,12 @@ const make = Effect.gen(function* () {
                   ? { _tag: "tool_finished", callId: call.id, name: call.name, ok: true, result: outcome.result, durationMs: outcome.durationMs }
                   : { _tag: "tool_finished", callId: call.id, name: call.name, ok: false, error: outcome.error, durationMs: outcome.durationMs },
               );
+              if (outcome.ok && outcome.block) yield* emit({ _tag: "render", callId: call.id, block: outcome.block });
               yield* append({
                 role: "tool",
                 toolCallId: call.id,
                 name: call.name,
-                content: outcome.ok ? toolContent(outcome.result, info.maskPii) : outcome.error,
+                content: outcome.ok ? toolContent(outcome.forModel, info.maskPii) : outcome.error,
                 isError: !outcome.ok,
               });
             }

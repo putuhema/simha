@@ -27,6 +27,7 @@
       {
         "additionalTestBlockFunctions": [
           "it.effect",
+          "it.effect.each",
           "it.live",
           "it.scoped",
           "it.scopedLive",

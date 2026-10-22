@@ -1,6 +1,6 @@
 # Plan
 
-Status: **M3 done, waiting for your test.** Next: M4.
+Status: **M4 done, waiting for your test.** Next: M5.
 
 ## Packages and main modules
 
@@ -21,7 +21,7 @@ Each one ends with tests passing and a stop for you to test.
 - **M1. Data layer. ✅ Done.** Config Layer, read and write pools, SQLite audit DB with migrations, the 8 read tools, `pnpm tool` to try them, tests on synthetic data (temporary MariaDB or `docker-compose.yml`).
 - **M2. Agent. ✅ Done.** Tool registry, LLM service with `anthropic`, `openai-compat` and `fake` adapters, agent loop, `POST /ask` and `POST /tickets/:id/investigate` with SSE, PII masking. Demo with DeepSeek and Gemini (and Claude through a gateway).
 - **M3. Fixes. ✅ Done.** `diagnosaPindahKamar`, `diagnosaTindakan`, `usulkanPerbaikan` → preview → approve → execute in a transaction → rollback. Tests prove a row-count mismatch rolls back and nothing is written without an approval row in the audit log.
-- **M4. Tanya Data tools.** `lihatSkema`, guarded `jalankanQueryBaca`, `tampilkan`. Tests prove non-SELECT, multiple statements and deny-listed columns are rejected.
+- **M4. Tanya Data tools. ✅ Done.** `lihatSkema`, guarded `jalankanQueryBaca`, `tampilkan`. Tests prove non-SELECT, multiple statements and deny-listed columns are rejected.
 - **M5. Web UI.** Tiket, Tanya Data (charts, tables, favorites), Pengaturan (provider, audit log). Login. Playwright smoke tests.
 - **M6. Desktop.** Electron app wrapping the UI, can start the local server, Windows installer.
 - **M7. MCP.** Same tools over stdio and streamable HTTP, README section for Claude Desktop / Claude Code.
@@ -70,6 +70,18 @@ Each one ends with tests passing and a stop for you to test.
 - `@effect/sql-mysql2` forces `multipleStatements: true` on its pool. We don't rely on the driver: every fix statement goes through the guard, which allows one statement and no comments.
 - Rollback needs the opposite privilege. The write user now also has `INSERT` on `rawat_jl_pr` and `rawat_inap_pr`, so a deleted tindakan can be restored. Fixes on those tables are still DELETE only.
 - There's no login yet, so who approves comes from the `actor` field in the request body. M5 replaces it with the logged-in user.
+
+## M4 notes
+
+- **Guard** (`packages/tools/src/info/select-guard.ts`). It walks the whole parsed query, so personal columns are caught in subqueries, derived tables, CTEs and UNION parts too. `MAX()`, `GROUP_CONCAT()` and `CONCAT()` would return the raw value, so only `COUNT()` may wrap a personal column. The brief said "aggregates"; we narrowed that to COUNT.
+- **Deny-list from our real schema** (`info/sensitive.ts`). It was built from the column names in `sik` (metadata only) and matches by name, so it also covers tables not in `docs/schema.md`. `nik` stays allowed because in Khanza it is the employee number. Credential tables (`user`, `admin`, `set_akun_*`, `password_*`, `mlite_users`, ...) can't be read and are hidden from `lihatSkema`.
+- **Masking.** `maskPii` now also masks every column the guard protects, by name, as a second layer.
+- **Stored results.** Results (max 500 rows), render blocks and favorites live in the audit DB (migration `0004_tanya_data`). `tampilkan` takes a `queryId` instead of data, so charts can't show numbers the AI made up.
+- **What the AI sees.** Tools can define `forModel` to send the AI less than the UI gets: 50 of 500 rows for queries, a short confirmation for `tampilkan`.
+- **Parser quirk.** node-sql-parser is stricter than MariaDB about a few words used as aliases (`AS status`). The error tells the model to use backticks or another alias, and the model fixes it on its own.
+- **Codes in `khanza_notes.md`.** Filled in from our reference tables: poli gigi `U0010`, BPJS `BPJ`, umum `A09`, Melati `kls21`–`kls25`, Mawar `MW` (inactive).
+- **Local `sik` copy.** It ends on 14 Jan 2026, so "hari ini" questions return 0 there.
+- **Live check** with DeepSeek through vikey, on the synthetic test DB. "Berapa pasien yang daftar hari ini?" gave a stat; "Jumlah kunjungan per poli bulan ini" and "10 tindakan paling sering di poli gigi bulan ini" gave bar charts. All numbers matched the data, with assumption lines.
 
 ## Decisions and questions
 

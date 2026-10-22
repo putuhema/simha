@@ -3,14 +3,9 @@
  * read once at startup. It does not change between requests, so providers
  * with prompt caching can reuse it.
  */
-import { Config, Context, Effect, FileSystem, Layer } from "effect";
+import { KhanzaNotesPathConfig } from "@simrs/tools";
+import { Context, Effect, FileSystem, Layer } from "effect";
 import * as NodePath from "node:path";
-
-const repoRoot = NodePath.resolve(import.meta.dirname, "..", "..", "..", "..");
-
-const KhanzaNotesPathConfig = Config.String("KHANZA_NOTES_PATH").pipe(
-  Config.withDefault(NodePath.join(repoRoot, "docs", "khanza_notes.md")),
-);
 
 export class SystemPrompt extends Context.Service<SystemPrompt, string>()("simrs/SystemPrompt") {}
 
