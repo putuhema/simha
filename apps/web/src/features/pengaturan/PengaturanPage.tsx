@@ -16,38 +16,43 @@ export const PengaturanPage = () => {
   const navigate = useNavigate();
   const isAdmin = useAuth((s) => s.user?.role === "admin");
   return (
-    <Tabs.Root value={tab} onValueChange={(value: SettingsTab) => void navigate({ to: "/pengaturan", search: { tab: value } })}>
-      <Tabs.List className="relative mb-4 flex gap-1 border-b border-line">
-        <Tabs.Tab value="ai" className={tabClass}>
-          AI
-        </Tabs.Tab>
-        <Tabs.Tab value="audit" className={tabClass}>
-          Audit log
-        </Tabs.Tab>
-        {isAdmin ? (
-          <Tabs.Tab value="pengguna" className={tabClass}>
-            Pengguna
-          </Tabs.Tab>
-        ) : null}
-        <Tabs.Tab value="akun" className={tabClass}>
-          Akun
-        </Tabs.Tab>
-        <Tabs.Indicator className="absolute bottom-[-1px] left-[var(--active-tab-left)] h-0.5 w-[var(--active-tab-width)] bg-teal transition-all duration-200" />
-      </Tabs.List>
-      <Tabs.Panel value="ai">
-        <LlmSettingsForm isAdmin={isAdmin} />
-      </Tabs.Panel>
-      <Tabs.Panel value="audit">
-        <AuditLog />
-      </Tabs.Panel>
-      {isAdmin ? (
-        <Tabs.Panel value="pengguna">
-          <Users />
-        </Tabs.Panel>
-      ) : null}
-      <Tabs.Panel value="akun">
-        <Account />
-      </Tabs.Panel>
-    </Tabs.Root>
+    <div className="quiet-scroll h-full overflow-y-auto">
+      <div className="mx-auto max-w-5xl px-4 pt-6 pb-10 sm:px-8">
+        <h1 className="mb-4 font-display text-[24px] font-semibold tracking-tight">Pengaturan</h1>
+        <Tabs.Root value={tab} onValueChange={(value: SettingsTab) => void navigate({ to: "/pengaturan", search: { tab: value } })}>
+          <Tabs.List className="relative mb-4 flex gap-1 border-b border-line">
+            <Tabs.Tab value="ai" className={tabClass}>
+              AI
+            </Tabs.Tab>
+            <Tabs.Tab value="audit" className={tabClass}>
+              Audit log
+            </Tabs.Tab>
+            {isAdmin ? (
+              <Tabs.Tab value="pengguna" className={tabClass}>
+                Pengguna
+              </Tabs.Tab>
+            ) : null}
+            <Tabs.Tab value="akun" className={tabClass}>
+              Akun
+            </Tabs.Tab>
+            <Tabs.Indicator className="absolute bottom-[-1px] left-[var(--active-tab-left)] h-0.5 w-[var(--active-tab-width)] bg-teal transition-all duration-200" />
+          </Tabs.List>
+          <Tabs.Panel value="ai">
+            <LlmSettingsForm isAdmin={isAdmin} />
+          </Tabs.Panel>
+          <Tabs.Panel value="audit">
+            <AuditLog />
+          </Tabs.Panel>
+          {isAdmin ? (
+            <Tabs.Panel value="pengguna">
+              <Users />
+            </Tabs.Panel>
+          ) : null}
+          <Tabs.Panel value="akun">
+            <Account />
+          </Tabs.Panel>
+        </Tabs.Root>
+      </div>
+    </div>
   );
 };

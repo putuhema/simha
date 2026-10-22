@@ -8,7 +8,6 @@ import { useEffect, useState } from "react";
 import { cn } from "../../lib/cn.ts";
 import { formatDuration } from "../../lib/format.ts";
 import { draftPreview, findingsOf, stepLabel, stepMark, stepSummary, stepTarget, type StepMark, type StepView } from "../../lib/steps.ts";
-import { Spinner } from "../ui/Spinner.tsx";
 
 const MARK: Readonly<Record<StepMark, { readonly symbol: string; readonly className: string; readonly label: string }>> = {
   ok: { symbol: "✓", className: "bg-ok-soft text-ok", label: "baik" },
@@ -36,7 +35,7 @@ const Step = ({ step }: { readonly step: StepView }) => {
         aria-label={label}
         className={cn("absolute top-0.5 left-0 grid size-5 place-items-center rounded-full font-mono text-[11px] font-semibold", className)}
       >
-        {mark === "running" ? <Spinner className="size-3" /> : symbol}
+        {mark === "running" ? <span className="size-1.5 rounded-full bg-teal" /> : symbol}
       </span>
       <Collapsible.Root>
         <Collapsible.Trigger className="group flex w-full items-start gap-1 text-left">
@@ -46,7 +45,7 @@ const Step = ({ step }: { readonly step: StepView }) => {
               <span className="truncate font-mono text-[12px] text-ink-3">{stepTarget(step.input)}</span>
             </div>
             <p className={cn("text-[13px]", mark === "error" ? "text-red" : mark === "warn" ? "text-amber" : "text-ink-2")}>
-              {stepSummary(step)}
+              {step.running ? <span className="shimmer">{stepSummary(step)}</span> : stepSummary(step)}
               {step.durationMs !== null && !step.running ? (
                 <span className="ml-2 font-mono text-[11px] text-ink-3">{formatDuration(step.durationMs)}</span>
               ) : null}
@@ -113,13 +112,10 @@ export const pendingStep = (run: {
   readonly waitingSince: number;
   readonly reasoning: string;
 }): PendingStep | null =>
-  run.status !== "running" || run.steps.some((s) => s.running)
+  // While answer text streams in, the text itself shows the AI is working.
+  run.status !== "running" || run.writing || run.steps.some((s) => s.running)
     ? null
-    : {
-        label: run.writing ? "AI sedang menulis jawaban…" : "AI sedang berpikir…",
-        since: run.waitingSince,
-        reasoning: run.writing ? "" : run.reasoning,
-      };
+    : { label: "AI sedang berpikir…", since: run.waitingSince, reasoning: run.reasoning };
 
 /** The last few hundred characters of the thinking, so the line stays short. */
 const reasoningTail = (text: string) => {
@@ -132,7 +128,7 @@ export const PendingLine = ({ pending }: { readonly pending: PendingStep }) => {
   const thinking = pending.reasoning ? reasoningTail(pending.reasoning) : "";
   return (
     <span className="block text-[13px] text-ink-3" data-testid="pending-step">
-      {pending.label}
+      <span className="shimmer">{pending.label}</span>
       {seconds > 0 ? <span className="ml-2 font-mono text-[11px]">{seconds} dtk</span> : null}
       {thinking ? (
         <span data-testid="pending-reasoning" className="mt-1 block text-[12px] leading-snug whitespace-pre-wrap text-ink-3/80 italic">
@@ -158,7 +154,7 @@ export const StepList = ({
       {pending ? (
         <li className="relative pl-8">
           <span className={cn("absolute top-0.5 left-0 grid size-5 place-items-center rounded-full", MARK.running.className)}>
-            <Spinner className="size-3" />
+            <span className="size-1.5 rounded-full bg-teal" />
           </span>
           <PendingLine pending={pending} />
         </li>

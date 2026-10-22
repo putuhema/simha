@@ -1,5 +1,5 @@
 /**
- * Routes: /tiket?id=…, /tanya?c=…, /pengaturan?tab=…. The root shows the
+ * Routes: /tanya?c=… (home), /tiket?id=…, /pengaturan?tab=…. The root shows the
  * login or first-run setup page until someone is logged in.
  */
 import { createRootRoute, createRoute, createRouter, Outlet, redirect } from "@tanstack/react-router";
@@ -48,7 +48,7 @@ const Root = () => {
 const page = (load: () => Promise<ComponentType>) => {
   const Page = lazy(async () => ({ default: await load() }));
   return () => (
-    <Suspense fallback={<Spinner className="text-ink-3" />}>
+    <Suspense fallback={<div className="grid h-full place-items-center"><Spinner className="text-ink-3" /></div>}>
       <Page />
     </Suspense>
   );
@@ -64,7 +64,7 @@ const indexRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/",
   beforeLoad: () => {
-    throw redirect({ to: "/tiket" });
+    throw redirect({ to: "/tanya" });
   },
 });
 
@@ -105,7 +105,7 @@ const notFoundRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "$",
   beforeLoad: () => {
-    throw redirect({ to: "/tiket" });
+    throw redirect({ to: "/tanya" });
   },
 });
 

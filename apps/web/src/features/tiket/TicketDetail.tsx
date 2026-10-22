@@ -58,7 +58,7 @@ const RunSection = ({
         </div>
         {run.steps.length === 0 && run.status === "running" ? (
           <p className="flex items-start gap-2 text-[13px] text-ink-3">
-            <Spinner /> <PendingLine pending={{ label: "AI sedang membaca keluhan…", since: run.waitingSince, reasoning: run.reasoning }} />
+            <PendingLine pending={{ label: "AI sedang membaca keluhan…", since: run.waitingSince, reasoning: run.reasoning }} />
           </p>
         ) : (
           <StepList steps={run.steps} pending={pendingStep(run)} />

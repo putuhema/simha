@@ -28,12 +28,23 @@ test("first run asks for an admin account and logs in", async () => {
   await page.getByLabel("Ulangi password").fill(ADMIN.password);
   await page.getByRole("button", { name: "Buat akun dan masuk" }).click();
 
-  await expect(page).toHaveURL(/\/tiket$/);
+  await expect(page).toHaveURL(/\/tanya$/);
+  await expect(page.getByRole("heading", { name: "Mau cek data apa hari ini?" })).toBeVisible();
   await expect(page.getByText("Khanza DB terhubung · read-only")).toBeVisible();
   await expect(page.getByTestId("user-menu")).toContainText(ADMIN.name);
 });
 
+test("the sidebar collapses to an icon rail and back", async () => {
+  const sidebar = page.getByRole("complementary", { name: "Sidebar" }).first();
+  await page.getByRole("button", { name: "Tutup sidebar" }).click();
+  await expect(page.getByRole("button", { name: "Buka sidebar" })).toBeVisible();
+  await expect(sidebar.getByText("Percakapan", { exact: true })).toHaveCount(0);
+  await page.keyboard.press("ControlOrMeta+Shift+S");
+  await expect(sidebar.getByRole("button", { name: "Percakapan baru" })).toBeVisible();
+});
+
 test("a ticket is investigated, the fix approved and rolled back", async () => {
+  await page.getByRole("link", { name: /^Tiket/ }).click();
   await page.getByRole("button", { name: "Tiket baru" }).click();
   await page.getByLabel("Nama perawat").fill("Ns. Ayu");
   await page.getByLabel("Unit / bangsal").fill("Mawar");
@@ -68,7 +79,7 @@ test("a ticket is investigated, the fix approved and rolled back", async () => {
 });
 
 test("Tanya Data shows a chart with its SQL and saves a favorite", async () => {
-  await page.getByRole("link", { name: "Tanya Data" }).click();
+  await page.getByRole("button", { name: "Percakapan baru" }).first().click();
   await page.getByLabel("Pertanyaan").fill("Jumlah kunjungan per poli");
   await page.getByLabel("Pertanyaan").press("Enter");
 
@@ -83,8 +94,11 @@ test("Tanya Data shows a chart with its SQL and saves a favorite", async () => {
   await block.getByRole("button", { name: "Simpan ke favorit" }).click();
   await expect(block.getByRole("button", { name: "Tersimpan" })).toBeDisabled();
 
-  await page.getByRole("button", { name: "Percakapan baru" }).click();
-  await page.getByTestId("favorites").getByRole("button", { name: "Jalankan" }).click();
+  // The thread is listed in the sidebar.
+  await expect(page.getByTestId("conversations").getByRole("link", { name: "Jumlah kunjungan per poli" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Percakapan baru" }).first().click();
+  await page.getByTestId("favorites").getByRole("button", { name: "Kunjungan per poli", exact: true }).click();
   await expect(page.getByText("★ Jumlah kunjungan per poli")).toBeVisible();
   await expect(page.getByTestId("render-block")).toHaveCount(1);
 });
@@ -110,7 +124,7 @@ test("the agent makes a patient history document that can be printed", async () 
 });
 
 test("the patient card makes CPPT / SOAP without the AI", async () => {
-  await page.getByRole("link", { name: "Tiket" }).click();
+  await page.getByRole("link", { name: /^Tiket/ }).click();
   await page.getByRole("button", { name: /Ns. Ayu/ }).click();
   await page.getByTestId("patient-card").getByRole("button", { name: "CPPT / SOAP" }).click();
   const dialog = page.getByRole("dialog");
@@ -122,7 +136,8 @@ test("the patient card makes CPPT / SOAP without the AI", async () => {
 });
 
 test("settings test the AI connection and show the audit log", async () => {
-  await page.getByRole("link", { name: "Pengaturan" }).click();
+  await page.getByTestId("user-menu").first().click();
+  await page.getByRole("menuitem", { name: /Pengaturan/ }).click();
   await page.getByRole("button", { name: "Tes koneksi" }).click();
   await expect(page.getByText(/Terhubung \(\d+ ms\)/)).toBeVisible();
 
@@ -134,7 +149,8 @@ test("settings test the AI connection and show the audit log", async () => {
 
 test("works in a narrow window without sideways scrolling", async () => {
   await page.setViewportSize({ width: 400, height: 800 });
-  await page.getByRole("link", { name: "Tiket" }).click();
+  await page.getByRole("button", { name: "Buka menu" }).click();
+  await page.getByRole("link", { name: /^Tiket/ }).click();
   await page.getByRole("button", { name: /Ns. Ayu/ }).click();
   await expect(page.getByTestId("fix-card")).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -143,7 +159,7 @@ test("works in a narrow window without sideways scrolling", async () => {
 });
 
 test("logout returns to the login page", async () => {
-  await page.getByTestId("user-menu").click();
+  await page.getByTestId("user-menu").first().click();
   await page.getByRole("menuitem", { name: "Keluar" }).click();
   await expect(page.getByRole("heading", { name: "Masuk" })).toBeVisible();
   await page.goto("/tanya");
