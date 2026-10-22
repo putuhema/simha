@@ -3,7 +3,7 @@ import { KhanzaRead } from "../khanza/KhanzaRead.ts";
 import { decodeRows, defineTool } from "../tool.ts";
 import { ACTIVE_STAY, NoRkmMedis, NullableNum, NullableStr, Str } from "./common.ts";
 
-const KunjunganRow = Schema.Struct({
+export const KunjunganRow = Schema.Struct({
   no_rawat: Str,
   no_reg: NullableStr,
   tgl_registrasi: NullableStr,

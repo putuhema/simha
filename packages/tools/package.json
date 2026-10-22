@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./testing": "./test/helpers.ts",
-    "./testing/global-setup": "./test/global-setup.ts"
+    "./testing/global-setup": "./test/global-setup.ts",
+    "./testing/db": "./test/test-db.ts"
   },
   "scripts": {
     "typecheck": "tsc -p ."

@@ -5,7 +5,7 @@ AI assistant for hospital IT staff working with **SIMRS Khanza**.
 - **Tiket mode:** paste a nurse's complaint. The agent reads the real patient data through safe, read-only tools, explains each check, gives a diagnosis and proposes a fix as SQL. The fix only runs after a person clicks **Approve**, and it can be rolled back.
 - **Tanya Data mode:** ask questions about hospital data in plain Indonesian ("10 obat paling banyak dipakai minggu ini"). The agent writes a guarded `SELECT` and shows the answer as a table, chart or number.
 
-> Status: **M4 done** (database layer, audit log, read and diagnose tools, AI agent with streaming HTTP API, fixes with approval and rollback, Tanya Data tools with charts and favorites). No UI yet; use `pnpm tool` and `curl`. See [docs/PLAN.md](docs/PLAN.md).
+> Status: **M5 done**: web UI (Tiket, Tanya Data, Pengaturan) with login, on top of the database layer, audit log, read/diagnose/Tanya Data tools, AI agent and fixes with approval and rollback. See [docs/PLAN.md](docs/PLAN.md).
 
 ## Safety model (short version)
 
@@ -106,59 +106,40 @@ pnpm tool jalankanQueryBaca '{"sql":"SELECT COUNT(*) AS jumlah FROM reg_periksa 
 
 Each run is recorded in the audit log (`data/audit.sqlite`): the tool call with its input and output, and every query with its parameters, row count and duration. Look at it with any SQLite viewer, e.g. `sqlite3 data/audit.sqlite "SELECT tool, status, started_at FROM tool_calls"`.
 
-### 4. Run the server and ask the agent
+### 4. Build the UI and start the server
 
 ```bash
+pnpm build       # web UI -> apps/web/dist (once, and after updates)
 pnpm start       # http://127.0.0.1:8787
 ```
 
-```bash
-# Tanya Data (answers stream back as Server-Sent Events)
-curl -N -X POST localhost:8787/ask -H 'content-type: application/json' \
-  -d '{"question":"10 obat paling banyak dipakai minggu ini"}'
+Open http://127.0.0.1:8787. The first visit asks for the **first admin account**. After that everyone logs in with their own account, which admins create under **Pengaturan → Pengguna**.
 
-# Ticket: create, then investigate
-curl -X POST localhost:8787/tickets -H 'content-type: application/json' \
-  -d '{"nurseName":"Ns. Ayu","unit":"Mawar","complaint":"Pasien RM 012345 tidak bisa dipindah ke kamar Mawar"}'
-curl -N -X POST localhost:8787/tickets/<id>/investigate
-```
+- **Tiket.** Paste a nurse's complaint with **+ Tiket baru**. The AI investigates right away. The middle column shows:
+  - "Yang dicek AI" (✓ fine, ! problem found, ✕ failed; click a step for its details);
+  - the diagnosis;
+  - "Saran perbaikan" with the proposed SQL, how many rows it changes, and **Setujui / Edit / Tolak**. After approval it shows the result and **Rollback**.
 
-Events: `run_started` (run and conversation id, provider, model), `text_delta` (answer text), `tool_started` / `tool_finished` (each check the agent makes, with the full result), `render` (a table, chart, number or list with the SQL behind it), then `done` or `error`. Send the `conversationId` from `run_started` with the next `/ask` to ask a follow-up in the same context.
+  The right column shows the patient (identity, current visit, room, DPJP, visit timeline) and the AI's summary. Ask follow-up questions at the bottom.
+- **Tanya Data.** Ask in plain Indonesian. Answers show tables (sortable, CSV export), charts and numbers, each with an assumption line and "Query yang dipakai". **Simpan ke favorit** saves the question and SQL; favorites re-run without the AI.
+- **Pengaturan.** The tabs are:
+  - **AI:** provider, model, base URL, API key, "samarkan data" and **Tes koneksi**. Saving switches the AI without a restart and overrides `.env`; admins only.
+  - **Audit log:** questions, tool calls, queries, fix approvals, logins, filterable.
+  - **Pengguna:** admins only.
+  - **Akun:** change your own password.
 
-| Endpoint | |
-|---|---|
-| `GET /health` | Khanza server, read-only status, AI provider and model |
-| `POST /tickets` | `{ nurseName, unit, complaint }` |
-| `GET /tickets`, `GET /tickets/:id` | list / one ticket |
-| `POST /tickets/:id/investigate` | run the agent on a ticket; optional `{ question }` for a follow-up (SSE) |
-| `POST /ask` | `{ question, conversationId? }` (SSE) |
-| `GET /favorites` | saved questions |
-| `POST /favorites` | `{ blockId, createdBy, question? }`: save the question and SQL behind a `render` block |
-| `POST /favorites/:id/run` | re-run a favorite without the AI; returns `{ block }` |
-| `DELETE /favorites/:id` | remove a favorite |
+To serve the hospital network, set `SERVER_HOST=0.0.0.0`. Behind HTTPS (e.g. a reverse proxy), also set `COOKIE_SECURE=true`.
 
-Request and event Schemas are in `packages/shared/src/api.ts`.
+Security notes:
 
-### 5. Review, approve and roll back fixes
+- **Passwords:** scrypt hashes in the audit DB.
+- **Sessions:** an HttpOnly, SameSite=Strict cookie (12 hours); only a hash of the token is stored.
+- **Wrong passwords:** after 5 wrong tries a username is locked for a minute.
+- **API key:** an API key saved on the settings page is stored in `data/audit.sqlite`. Keep that file readable only by the account that runs the server.
 
-When the agent finds data to fix, it calls `usulkanPerbaikan`. That only **stores a proposal** (status `pending`) with the exact SQL and a preview of the rows it will change. Nothing touches Khanza until someone approves it.
+### 5. Fixes: approve and roll back
 
-```bash
-curl localhost:8787/fixes?status=pending           # proposals waiting for review
-curl localhost:8787/fixes/<id>                     # { fix, events }: SQL, preview, history
-curl -X POST localhost:8787/fixes/<id>/approve  -H 'content-type: application/json' -d '{"actor":"it-budi"}'
-curl -X POST localhost:8787/fixes/<id>/reject   -H 'content-type: application/json' -d '{"actor":"it-budi","reason":"Salah kamar"}'
-curl -X POST localhost:8787/fixes/<id>/rollback -H 'content-type: application/json' -d '{"actor":"it-budi"}'
-```
-
-| Endpoint | |
-|---|---|
-| `GET /fixes` | list; optional `?status=` and `?ticketId=` |
-| `POST /fixes` | an IT person proposes a fix directly: `{ title, reason, sql, params?, ticketId?, createdBy }` |
-| `GET /fixes/:id` | the fix and its events |
-| `POST /fixes/:id/approve` | `{ actor }`: approve and run it |
-| `POST /fixes/:id/reject` | `{ actor, reason? }` |
-| `POST /fixes/:id/rollback` | `{ actor }`: undo an applied fix |
+When the agent finds data to fix, it calls `usulkanPerbaikan`. That only **stores a proposal** (status `pending`) with the exact SQL and a preview of the rows it will change. Nothing touches Khanza until someone approves it in the UI. The user who approves is recorded in the audit log.
 
 What the server checks:
 
@@ -180,9 +161,54 @@ What the server checks:
   3. Saves the after-image.
 
   Any mismatch rolls everything back and marks the fix `failed` with the reason.
+- **Edit.** **Edit** saves a corrected proposal, which is checked again, and rejects the original.
 - **Rollback.** The server refuses if the rows changed since the fix ran. Otherwise it restores the before-image in one transaction.
 
-`actor` is a free-text name until login arrives in M5.
+### HTTP API
+
+The UI uses the same API. Everything except `/api/health`, `/api/auth/state`, `/api/auth/login` and `/api/auth/setup` needs a login cookie:
+
+```bash
+curl -c jar -X POST localhost:8787/api/auth/login -H 'content-type: application/json' \
+  -d '{"username":"it-budi","password":"..."}'
+curl -b jar -N -X POST localhost:8787/api/ask -H 'content-type: application/json' \
+  -d '{"question":"10 obat paling banyak dipakai minggu ini"}'
+```
+
+`/api/ask` and `/api/tickets/:id/investigate` stream Server-Sent Events:
+
+- `run_started`: run and conversation id, provider, model;
+- `text_delta`: answer text;
+- `tool_started` / `tool_finished`: each check, with the full result;
+- `render`: a table, chart, number or list, with its SQL;
+- then `done` or `error`.
+
+Send the `conversationId` with the next `/api/ask` for a follow-up.
+
+| Endpoint | |
+|---|---|
+| `GET /api/health` | Khanza server, read-only status, AI provider and model (public) |
+| `GET /api/auth/state` | logged-in user, or `setupNeeded` (public) |
+| `POST /api/auth/setup` | `{ username, displayName, password }`: first admin, only while there are no users |
+| `POST /api/auth/login`, `POST /api/auth/logout` | |
+| `POST /api/auth/password` | `{ currentPassword, newPassword }` |
+| `GET /api/users`, `POST /api/users`, `PATCH /api/users/:id` | manage users (admin) |
+| `GET /api/stats` | registrations today, inpatients, open tickets, fixes waiting |
+| `POST /api/tickets`, `GET /api/tickets`, `GET /api/tickets/:id` | `{ nurseName, unit, complaint }` |
+| `PATCH /api/tickets/:id` | `{ status }`: close or reopen |
+| `GET /api/tickets/:id/transcript` | past investigations: steps, answers, blocks, fixes |
+| `POST /api/tickets/:id/investigate` | run the agent; optional `{ question }` for a follow-up (SSE) |
+| `POST /api/ask` | `{ question, conversationId? }` (SSE) |
+| `GET /api/conversations`, `GET /api/conversations/:id` | Tanya Data threads (`?mine=1`) |
+| `GET /api/patients/:rm` | patient card (no NIK, phone or address) |
+| `GET /api/fixes`, `GET /api/fixes/:id` | `?status=pending&ticketId=` |
+| `POST /api/fixes` | `{ title, reason, sql, params?, ticketId?, replaces? }` |
+| `POST /api/fixes/:id/approve`, `/reject` (`{ reason? }`), `/rollback` | |
+| `GET /api/favorites`, `POST /api/favorites` (`{ blockId, question? }`), `DELETE /api/favorites/:id`, `POST /api/favorites/:id/run` | |
+| `GET /api/settings/llm`, `PUT /api/settings/llm`, `POST /api/settings/llm/test` | AI provider (changes: admin) |
+| `GET /api/audit` | `?kind=runs\|tools\|queries\|fixes\|events&q=&from=&to=&limit=&offset=` |
+
+Request and event Schemas are in `packages/shared/src/api.ts`.
 
 ## AI providers
 
@@ -248,7 +274,19 @@ pnpm lint        # oxlint
 pnpm test        # vitest (all workspaces)
 pnpm knip        # unused files, exports and dependencies
 pnpm start       # start the HTTP server (apps/server)
+pnpm dev:web     # UI with hot reload on :5173, /api forwarded to :8787 (run pnpm start too)
+pnpm build       # build the UI into apps/web/dist
+pnpm e2e         # build the UI and run the Playwright smoke tests
 ```
+
+**End-to-end tests and UI demos.** `node apps/server/test/e2e-server.ts` starts a server on :8799 with:
+
+- the real API;
+- the throwaway synthetic test DB;
+- a scripted "AI";
+- the built UI.
+
+Open it to try the UI without a real AI or real patient data. The scripted AI understands a ticket about "RM 000002" and the questions "… per poli" and "… hari ini". `pnpm e2e` runs Playwright against that server; the first time, install the browser with `pnpm --filter @simrs/web exec playwright install chromium`.
 
 ### Test database
 

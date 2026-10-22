@@ -113,12 +113,11 @@ describe.skipIf(testDb === null)("fixes", () => {
         reason: "Dua kamar aktif",
         sql: closeRoomSql,
         params: ["Pindah Kamar", "2099-01-01", "09:00:00", noRawat, "TST-B1"],
-        createdBy: "it-budi",
       });
       expect(created.status).toBe(201);
       const fix = (await created.json()) as Fix;
 
-      const approved = (await (await app.call("POST", `/fixes/${fix.id}/approve`, { actor: "it-budi" })).json()) as Fix;
+      const approved = (await (await app.call("POST", `/fixes/${fix.id}/approve`)).json()) as Fix;
       expect(approved).toMatchObject({ status: "applied", error: null });
       expect(approved.before).toEqual([expect.objectContaining({ kd_kamar: "TST-B1", stts_pulang: "-", tgl_keluar: "0000-00-00" })]);
       expect(approved.after).toEqual([expect.objectContaining({ kd_kamar: "TST-B1", stts_pulang: "Pindah Kamar", tgl_keluar: "2099-01-01" })]);
@@ -127,7 +126,7 @@ describe.skipIf(testDb === null)("fixes", () => {
         { kd_kamar: "TST-B2", stts_pulang: "-", tgl_keluar: "0000-00-00", jam_keluar: "00:00:00" },
       ]);
 
-      const rolledBack = (await (await app.call("POST", `/fixes/${fix.id}/rollback`, { actor: "it-sari" })).json()) as Fix;
+      const rolledBack = (await (await app.callAs("it-sari", "POST", `/fixes/${fix.id}/rollback`)).json()) as Fix;
       expect(rolledBack.status).toBe("rolled_back");
       expect((await kamarInap(noRawat)).map((r) => [r.stts_pulang, r.tgl_keluar, r.jam_keluar])).toEqual([
         ["-", "0000-00-00", "00:00:00"],
@@ -158,7 +157,6 @@ describe.skipIf(testDb === null)("fixes", () => {
           reason: "test",
           sql: "UPDATE kamar_inap SET stts_pulang = 'Pindah Kamar' WHERE no_rawat = ? AND stts_pulang = '-'",
           params: [noRawat],
-          createdBy: "it-budi",
         })
       ).json()) as Fix;
       expect(fix.expectedRows).toBe(1);
@@ -169,7 +167,7 @@ describe.skipIf(testDb === null)("fixes", () => {
         [noRawat],
       );
 
-      const result = (await (await app.call("POST", `/fixes/${fix.id}/approve`, { actor: "it-budi" })).json()) as Fix;
+      const result = (await (await app.call("POST", `/fixes/${fix.id}/approve`)).json()) as Fix;
       expect(result.status).toBe("failed");
       expect(result.error).toMatch(/diharapkan 1 baris, ternyata 2/);
       expect((await kamarInap(noRawat)).map((r) => r.stts_pulang)).toEqual(["-", "-"]);
@@ -192,10 +190,9 @@ describe.skipIf(testDb === null)("fixes", () => {
           reason: "test",
           sql: "DELETE FROM kamar_inap WHERE no_rawat = ?",
           params: [noRawat],
-          createdBy: "it-budi",
         })
       ).json()) as Fix;
-      expect(((await (await app.call("POST", `/fixes/${fix.id}/approve`, { actor: "it-budi" })).json()) as Fix).status).toBe(
+      expect(((await (await app.call("POST", `/fixes/${fix.id}/approve`)).json()) as Fix).status).toBe(
         "applied",
       );
       expect(await kamarInap(noRawat)).toEqual([]);
@@ -205,7 +202,7 @@ describe.skipIf(testDb === null)("fixes", () => {
         "INSERT INTO kamar_inap (no_rawat, kd_kamar, tgl_masuk, jam_masuk, stts_pulang) VALUES (?, 'TST-D2', '2099-01-01', '09:00:00', 'Sehat')",
         [noRawat],
       );
-      const response = await app.call("POST", `/fixes/${fix.id}/rollback`, { actor: "it-sari" });
+      const response = await app.callAs("it-sari", "POST", `/fixes/${fix.id}/rollback`);
       expect(response.status).toBe(422);
       expect(((await response.json()) as { error: string }).error).toMatch(/Database menolak rollback/);
 
@@ -231,13 +228,12 @@ describe.skipIf(testDb === null)("fixes", () => {
           reason: "test",
           sql: closeRoomSql,
           params: ["Pindah Kamar", "2099-01-01", "09:00:00", noRawat, "TST-E1"],
-          createdBy: "it-budi",
         })
       ).json()) as Fix;
-      await app.call("POST", `/fixes/${fix.id}/approve`, { actor: "it-budi" });
+      await app.call("POST", `/fixes/${fix.id}/approve`);
       await admin.query("UPDATE kamar_inap SET stts_pulang = 'Membaik' WHERE no_rawat = ?", [noRawat]);
 
-      const response = await app.call("POST", `/fixes/${fix.id}/rollback`, { actor: "it-sari" });
+      const response = await app.callAs("it-sari", "POST", `/fixes/${fix.id}/rollback`);
       expect(response.status).toBe(422);
       expect(((await response.json()) as { error: string }).error).toMatch(/sudah berubah/);
       expect((await kamarInap(noRawat))[0]?.stts_pulang).toBe("Membaik");
@@ -256,7 +252,6 @@ describe.skipIf(testDb === null)("fixes", () => {
           reason: "test",
           sql: closeRoomSql,
           params: ["Pindah Kamar", "2099-01-01", "09:00:00", noRawat, "TST-F1"],
-          createdBy: "it-budi",
         })
       ).json()) as Fix;
 
@@ -272,7 +267,7 @@ describe.skipIf(testDb === null)("fixes", () => {
       expect(refused).toMatchObject({ _tag: "FixActionError", status: 409 });
       expect((await kamarInap(noRawat))[0]?.stts_pulang).toBe("-");
 
-      await app.call("POST", `/fixes/${fix.id}/approve`, { actor: "it-budi" });
+      await app.call("POST", `/fixes/${fix.id}/approve`);
 
       // Every write statement in the audit log belongs to a fix whose approval was recorded first.
       const unapproved = await app.audit<{ n: number }>(`
@@ -299,24 +294,23 @@ describe.skipIf(testDb === null)("fixes", () => {
             reason: "test",
             sql: closeRoomSql,
             params: ["Pindah Kamar", "2099-01-01", "09:00:00", noRawat, "TST-G1"],
-            createdBy: "it-budi",
           })
         ).json()) as Fix;
 
       const first = await propose();
       const [a, b] = await Promise.all([
-        app.call("POST", `/fixes/${first.id}/approve`, { actor: "it-budi" }),
-        app.call("POST", `/fixes/${first.id}/approve`, { actor: "it-sari" }),
+        app.call("POST", `/fixes/${first.id}/approve`),
+        app.callAs("it-sari", "POST", `/fixes/${first.id}/approve`),
       ]);
       expect([a.status, b.status].toSorted()).toEqual([200, 409]);
 
-      await app.call("POST", `/fixes/${first.id}/rollback`, { actor: "it-budi" });
+      await app.call("POST", `/fixes/${first.id}/rollback`);
       const second = await propose();
       const rejected = (await (
-        await app.call("POST", `/fixes/${second.id}/reject`, { actor: "it-sari", reason: "Salah kamar" })
+        await app.callAs("it-sari", "POST", `/fixes/${second.id}/reject`, { reason: "Salah kamar" })
       ).json()) as Fix;
       expect(rejected.status).toBe("rejected");
-      expect((await app.call("POST", `/fixes/${second.id}/approve`, { actor: "it-budi" })).status).toBe(409);
+      expect((await app.call("POST", `/fixes/${second.id}/approve`)).status).toBe(409);
     } finally {
       await app.dispose();
     }
@@ -331,11 +325,10 @@ describe.skipIf(testDb === null)("fixes", () => {
         reason: "test",
         sql: "INSERT INTO kamar_inap (no_rawat, kd_kamar, trf_kamar, tgl_masuk, jam_masuk, stts_pulang) VALUES (?, 'TST-H2', 100, '2099-01-02', '07:00:00', '-')",
         params: [noRawat],
-        createdBy: "it-budi",
       };
       const fix = (await (await app.call("POST", "/fixes", insert)).json()) as Fix;
       expect(fix).toMatchObject({ kind: "insert", expectedRows: 1, preview: [] });
-      const applied = (await (await app.call("POST", `/fixes/${fix.id}/approve`, { actor: "it-budi" })).json()) as Fix;
+      const applied = (await (await app.call("POST", `/fixes/${fix.id}/approve`)).json()) as Fix;
       expect(applied.status).toBe("applied");
       expect((await kamarInap(noRawat)).map((r) => r.kd_kamar)).toEqual(["TST-H1", "TST-H2"]);
 
@@ -343,7 +336,7 @@ describe.skipIf(testDb === null)("fixes", () => {
       expect(duplicate.status).toBe(400);
       expect(((await duplicate.json()) as { error: string }).error).toMatch(/sudah ada/);
 
-      await app.call("POST", `/fixes/${fix.id}/rollback`, { actor: "it-budi" });
+      await app.call("POST", `/fixes/${fix.id}/rollback`);
       expect((await kamarInap(noRawat)).map((r) => r.kd_kamar)).toEqual(["TST-H1"]);
     } finally {
       await app.dispose();
@@ -366,15 +359,14 @@ describe.skipIf(testDb === null)("fixes", () => {
           reason: "test",
           sql: "DELETE FROM rawat_jl_pr WHERE no_rawat = ? AND kd_jenis_prw = ?",
           params: [noRawat, "TST-PRW"],
-          createdBy: "it-budi",
         })
       ).json()) as Fix;
       expect(fix).toMatchObject({ kind: "delete", expectedRows: 1 });
-      const applied = (await (await app.call("POST", `/fixes/${fix.id}/approve`, { actor: "it-budi" })).json()) as Fix;
+      const applied = (await (await app.call("POST", `/fixes/${fix.id}/approve`)).json()) as Fix;
       expect(applied.status).toBe("applied");
       expect(await tindakan()).toEqual([]);
 
-      const rolledBack = await app.call("POST", `/fixes/${fix.id}/rollback`, { actor: "it-budi" });
+      const rolledBack = await app.call("POST", `/fixes/${fix.id}/rollback`);
       expect(rolledBack.status).toBe(200);
       expect(await tindakan()).toEqual([{ kd_jenis_prw: "TST-PRW", biaya_rawat: 6, stts_bayar: "Belum" }]);
     } finally {

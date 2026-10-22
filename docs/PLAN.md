@@ -1,6 +1,6 @@
 # Plan
 
-Status: **M4 done, waiting for your test.** Next: M5.
+Status: **M5 done, waiting for your test.** Next: M6.
 
 ## Packages and main modules
 
@@ -22,7 +22,7 @@ Each one ends with tests passing and a stop for you to test.
 - **M2. Agent. ✅ Done.** Tool registry, LLM service with `anthropic`, `openai-compat` and `fake` adapters, agent loop, `POST /ask` and `POST /tickets/:id/investigate` with SSE, PII masking. Demo with DeepSeek and Gemini (and Claude through a gateway).
 - **M3. Fixes. ✅ Done.** `diagnosaPindahKamar`, `diagnosaTindakan`, `usulkanPerbaikan` → preview → approve → execute in a transaction → rollback. Tests prove a row-count mismatch rolls back and nothing is written without an approval row in the audit log.
 - **M4. Tanya Data tools. ✅ Done.** `lihatSkema`, guarded `jalankanQueryBaca`, `tampilkan`. Tests prove non-SELECT, multiple statements and deny-listed columns are rejected.
-- **M5. Web UI.** Tiket, Tanya Data (charts, tables, favorites), Pengaturan (provider, audit log). Login. Playwright smoke tests.
+- **M5. Web UI. ✅ Done.** Tiket, Tanya Data (charts, tables, favorites), Pengaturan (provider, audit log). Login. Playwright smoke tests.
 - **M6. Desktop.** Electron app wrapping the UI, can start the local server, Windows installer.
 - **M7. MCP.** Same tools over stdio and streamable HTTP, README section for Claude Desktop / Claude Code.
 
@@ -82,6 +82,23 @@ Each one ends with tests passing and a stop for you to test.
 - **Codes in `khanza_notes.md`.** Filled in from our reference tables: poli gigi `U0010`, BPJS `BPJ`, umum `A09`, Melati `kls21`–`kls25`, Mawar `MW` (inactive).
 - **Local `sik` copy.** It ends on 14 Jan 2026, so "hari ini" questions return 0 there.
 - **Live check** with DeepSeek through vikey, on the synthetic test DB. "Berapa pasien yang daftar hari ini?" gave a stat; "Jumlah kunjungan per poli bulan ini" and "10 tindakan paling sering di poli gigi bulan ini" gave bar charts. All numbers matched the data, with assumption lines.
+
+## M5 notes
+
+- **Login.** Users, sessions and an event log are in the audit DB (migration `0005_auth`). The first visit creates the first admin; admins add more users. Every API route except health, login and first-run setup needs a session. The user is now who approves fixes, asks questions (`agent_runs.asked_by`) and creates tickets, so the `actor` / `createdBy` request fields are gone.
+- **API under `/api`.** The server serves the built UI at every other path, with security headers (CSP `default-src 'self'`, no framing). Fonts are bundled, so nothing loads from the internet.
+- **AI settings page.** It changes the provider without a restart. `LlmClient` is now a proxy over the current adapter. A broken AI configuration no longer stops the server; questions fail with the reason until an admin fixes it.
+- **History.** Ticket and chat history are rebuilt from the audit DB (`agent_runs`, `tool_calls`, `render_blocks`, `fixes`), so a reload shows the same steps, charts and fixes as the live stream.
+- **New read tool `kartuPasien`:** identity, the latest visits and DPJP, for the patient column. The AI can use it too, for "ringkas kunjungan pasien ini".
+- **UI stack.** React 19, Vite 8, TanStack Router, Tailwind v4, Base UI, ECharts (loaded on first chart), TanStack Table v9, Zustand. `@effect/atom-react` is not used: the UI only reads JSON from the API, so plain stores were enough.
+- **Tests.**
+  - Vitest unit tests for the UI helpers: SSE parsing, CSV, answer sections, step marks, chart options.
+  - Server tests for login, roles, settings, transcripts, the audit API and static files.
+  - 7 Playwright smoke tests. They cover setup, ticket → approve → rollback, Tanya Data chart + favorite, stat card, settings + audit log, a 400 px window, and logout.
+- **Bugs the tests caught.**
+  - "Percakapan baru" reopened the old thread from the URL.
+  - The narrow layout scrolled sideways.
+  - The answer splitter swallowed the first "-" of a list.
 
 ## Decisions and questions
 

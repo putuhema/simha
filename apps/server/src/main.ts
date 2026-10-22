@@ -4,24 +4,39 @@
  *   pnpm start   (from the repo root)
  */
 import { NodeFileSystem, NodeHttpServer, NodeRuntime } from "@effect/platform-node";
-import { LlmClientLive } from "@simrs/llm";
 import { AuditLogLive, FixStoreLive, KhanzaReadLive, KhanzaWriteLive, ResultStoreLive, SchemaDocsLive } from "@simrs/tools";
 import { Effect, Layer } from "effect";
 import { HttpRouter } from "effect/http";
 import { createServer } from "node:http";
 import { AgentLive } from "./agent/Agent.ts";
+import { AuthLive } from "./auth/Auth.ts";
 import { FixExecutorLive } from "./fixes/FixExecutor.ts";
 import { SystemPromptLive } from "./agent/prompt.ts";
-import { ServerConfig } from "./config.ts";
+import { HttpSettingsLive, ServerConfig } from "./config.ts";
 import { Routes } from "./http/routes.ts";
+import { LlmSettingsLive } from "./llm/LlmSettings.ts";
 import { StoreLive } from "./store.ts";
+import { ViewsLive } from "./views.ts";
 
 /**
  * Everything the routes need: audit DB, Khanza read pool, AI provider, agent,
- * and the fix executor (the only user of the Khanza write pool).
+ * login, and the fix executor (the only user of the Khanza write pool).
  */
-export const AppLive = Layer.mergeAll(AgentLive, FixExecutorLive).pipe(
-  Layer.provideMerge(Layer.mergeAll(StoreLive, FixStoreLive, ResultStoreLive, SchemaDocsLive, KhanzaReadLive, KhanzaWriteLive, LlmClientLive, SystemPromptLive)),
+export const AppLive = Layer.mergeAll(AgentLive, FixExecutorLive, ViewsLive).pipe(
+  Layer.provideMerge(
+    Layer.mergeAll(
+      StoreLive,
+      FixStoreLive,
+      ResultStoreLive,
+      SchemaDocsLive,
+      AuthLive,
+      HttpSettingsLive,
+      KhanzaReadLive,
+      KhanzaWriteLive,
+      LlmSettingsLive,
+      SystemPromptLive,
+    ),
+  ),
   Layer.provideMerge(AuditLogLive),
   Layer.provide(NodeFileSystem.layer),
 );

@@ -184,9 +184,56 @@ const tanyaData = Effect.gen(function* () {
     )`;
 });
 
+const auth = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  // IT staff who can log in. Passwords are scrypt hashes; usernames are case-insensitive.
+  yield* sql`
+    CREATE TABLE users (
+      id             TEXT PRIMARY KEY,
+      username       TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      display_name   TEXT NOT NULL,
+      password_hash  TEXT NOT NULL,
+      role           TEXT NOT NULL CHECK (role IN ('admin', 'staff')),
+      active         INTEGER NOT NULL DEFAULT 1,
+      created_at     TEXT NOT NULL,
+      updated_at     TEXT NOT NULL
+    )`;
+  // Login sessions. Only a SHA-256 hash of the cookie token is stored.
+  yield* sql`
+    CREATE TABLE sessions (
+      token_hash    TEXT PRIMARY KEY,
+      user_id       TEXT NOT NULL REFERENCES users (id),
+      created_at    TEXT NOT NULL,
+      expires_at    TEXT NOT NULL,
+      last_seen_at  TEXT NOT NULL
+    )`;
+  // Logins, logouts, account and settings changes.
+  yield* sql`
+    CREATE TABLE app_events (
+      id      INTEGER PRIMARY KEY AUTOINCREMENT,
+      action  TEXT NOT NULL,
+      actor   TEXT,
+      detail  TEXT,
+      ip      TEXT,
+      at      TEXT NOT NULL
+    )`;
+  // Settings changed in the app (e.g. the AI provider); override .env.
+  yield* sql`
+    CREATE TABLE settings (
+      key         TEXT PRIMARY KEY,
+      value_json  TEXT NOT NULL,
+      updated_by  TEXT NOT NULL,
+      updated_at  TEXT NOT NULL
+    )`;
+  // Who asked each question and who created each ticket.
+  yield* sql`ALTER TABLE agent_runs ADD COLUMN asked_by TEXT`;
+  yield* sql`ALTER TABLE tickets ADD COLUMN created_by TEXT`;
+});
+
 export const auditMigrations = {
   "0001_init": init,
   "0002_agent": agent,
   "0003_fixes": fixes,
   "0004_tanya_data": tanyaData,
+  "0005_auth": auth,
 };

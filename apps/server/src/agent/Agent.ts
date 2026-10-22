@@ -30,9 +30,13 @@ import { SystemPrompt } from "./prompt.ts";
 /** Upper bound on model turns per question, so a confused model cannot loop forever. */
 export const MAX_STEPS = 12;
 
-type AgentInput =
+type AgentInput = (
   | { readonly kind: "ask"; readonly question: string; readonly conversationId?: string | undefined }
-  | { readonly kind: "ticket"; readonly ticket: Ticket; readonly question?: string | undefined };
+  | { readonly kind: "ticket"; readonly ticket: Ticket; readonly question?: string | undefined }
+) & {
+  /** Username of the IT staff member asking (audit log). */
+  readonly askedBy: string | null;
+};
 
 /** Server clock, given to the model so "hari ini" and "minggu ini" mean the right dates. */
 const contextLine = (now: Date): string => {
@@ -124,6 +128,7 @@ const make = Effect.gen(function* () {
           ticketId,
           kind: input.kind,
           question,
+          askedBy: input.askedBy,
           provider: info.provider,
           model: info.model,
           maskPii: info.maskPii,

@@ -12,6 +12,8 @@ interface RunStart {
   readonly ticketId: string | null;
   readonly kind: "ask" | "ticket";
   readonly question: string;
+  /** Username of the IT staff member who asked. */
+  readonly askedBy: string | null;
   readonly provider: string;
   readonly model: string;
   readonly maskPii: boolean;
@@ -34,12 +36,14 @@ interface TicketRow {
   readonly unit: string;
   readonly complaint: string;
   readonly status: TicketStatus;
+  readonly created_by: string | null;
   readonly created_at: string;
   readonly updated_at: string;
 }
 
 const toTicket = (r: TicketRow): Ticket => ({
   id: r.id,
+  createdBy: r.created_by,
   nurseName: r.nurse_name,
   unit: r.unit,
   complaint: r.complaint,
@@ -57,15 +61,23 @@ const now = () => new Date().toISOString();
 const make = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
 
-  const createTicket = (input: CreateTicketRequest) =>
+  const createTicket = (input: CreateTicketRequest, createdBy: string) =>
     Effect.gen(function* () {
-      const ticket: Ticket = { id: crypto.randomUUID(), ...input, status: "open", createdAt: now(), updatedAt: now() };
+      const ticket: Ticket = {
+        id: crypto.randomUUID(),
+        createdBy,
+        ...input,
+        status: "open",
+        createdAt: now(),
+        updatedAt: now(),
+      };
       yield* sql`INSERT INTO tickets ${sql.insert({
         id: ticket.id,
         nurse_name: ticket.nurseName,
         unit: ticket.unit,
         complaint: ticket.complaint,
         status: ticket.status,
+        created_by: createdBy,
         created_at: ticket.createdAt,
         updated_at: ticket.updatedAt,
       })}`;
@@ -128,6 +140,7 @@ const make = Effect.gen(function* () {
       ticket_id: run.ticketId,
       kind: run.kind,
       question: run.question,
+      asked_by: run.askedBy,
       provider: run.provider,
       model: run.model,
       mask_pii: run.maskPii ? 1 : 0,

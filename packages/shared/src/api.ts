@@ -19,6 +19,8 @@ export type CreateTicketRequest = typeof CreateTicketRequest.Type;
 
 export const Ticket = Schema.Struct({
   id: Schema.String,
+  /** Username of the IT staff member who entered it. */
+  createdBy: Schema.NullOr(Schema.String),
   nurseName: Schema.String,
   unit: Schema.String,
   complaint: Schema.String,
@@ -102,7 +104,6 @@ export const CreateFavoriteRequest = Schema.Struct({
   blockId: NonEmpty,
   /** Defaults to the question that produced the block. */
   question: Schema.optionalKey(NonEmpty.check(Schema.isMaxLength(1_000))),
-  createdBy: NonEmpty.check(Schema.isMaxLength(100)),
 });
 export type CreateFavoriteRequest = typeof CreateFavoriteRequest.Type;
 
@@ -221,12 +222,8 @@ export const FixEvent = Schema.Struct({
 export const FixDetail = Schema.Struct({ fix: Fix, events: Schema.Array(FixEvent) });
 export type FixDetail = typeof FixDetail.Type;
 
-/** Body of approve / rollback. `actor` is the IT staff member (replaced by the login session in M5). */
-export const FixActionRequest = Schema.Struct({ actor: NonEmpty.check(Schema.isMaxLength(100)) });
-export type FixActionRequest = typeof FixActionRequest.Type;
-
+/** Body of reject. Approve and rollback have no body; who did it comes from the login session. */
 export const RejectFixRequest = Schema.Struct({
-  actor: NonEmpty.check(Schema.isMaxLength(100)),
   reason: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(2_000))),
 });
 export type RejectFixRequest = typeof RejectFixRequest.Type;
@@ -238,6 +235,175 @@ export const CreateFixRequest = Schema.Struct({
   sql: NonEmpty.check(Schema.isMaxLength(5_000)),
   params: Schema.optionalKey(Schema.Array(FixParam)),
   ticketId: Schema.optionalKey(Schema.String),
-  createdBy: NonEmpty.check(Schema.isMaxLength(100)),
+  /** Set when this edits an AI proposal: the old one is rejected and replaced. */
+  replaces: Schema.optionalKey(Schema.String),
 });
 export type CreateFixRequest = typeof CreateFixRequest.Type;
+
+// --- Login and users -------------------------------------------------------------
+
+export const Role = Schema.Literals(["admin", "staff"]);
+export type Role = typeof Role.Type;
+
+export const User = Schema.Struct({
+  id: Schema.String,
+  username: Schema.String,
+  displayName: Schema.String,
+  /** admin: manage users and AI settings. staff: everything else. */
+  role: Role,
+  active: Schema.Boolean,
+  createdAt: Schema.String,
+});
+export type User = typeof User.Type;
+
+/** GET /api/auth/state: who is logged in, and whether the first admin must still be created. */
+export const AuthState = Schema.Struct({ setupNeeded: Schema.Boolean, user: Schema.NullOr(User) });
+export type AuthState = typeof AuthState.Type;
+
+const Username = Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9._-]{3,32}$/)).annotate({
+  description: "3-32 letters, digits, dot, dash or underscore",
+});
+const Password = Schema.String.check(Schema.isMinLength(8), Schema.isMaxLength(200));
+const DisplayName = NonEmpty.check(Schema.isMaxLength(100));
+
+export const LoginRequest = Schema.Struct({
+  username: NonEmpty.check(Schema.isMaxLength(64)),
+  password: NonEmpty.check(Schema.isMaxLength(200)),
+});
+export type LoginRequest = typeof LoginRequest.Type;
+
+/** POST /api/auth/setup: the first admin account. Only allowed while there are no users. */
+export const SetupRequest = Schema.Struct({ username: Username, displayName: DisplayName, password: Password });
+export type SetupRequest = typeof SetupRequest.Type;
+
+export const CreateUserRequest = Schema.Struct({
+  username: Username,
+  displayName: DisplayName,
+  password: Password,
+  role: Role,
+});
+export type CreateUserRequest = typeof CreateUserRequest.Type;
+
+export const UpdateUserRequest = Schema.Struct({
+  displayName: Schema.optionalKey(DisplayName),
+  role: Schema.optionalKey(Role),
+  active: Schema.optionalKey(Schema.Boolean),
+  /** Set a new password (admin reset). */
+  password: Schema.optionalKey(Password),
+});
+export type UpdateUserRequest = typeof UpdateUserRequest.Type;
+
+export const ChangePasswordRequest = Schema.Struct({ currentPassword: NonEmpty, newPassword: Password });
+export type ChangePasswordRequest = typeof ChangePasswordRequest.Type;
+
+// --- Dashboard ------------------------------------------------------------------------
+
+/** GET /api/stats: the stat row. Khanza numbers are null when the database could not be read. */
+export const Stats = Schema.Struct({
+  registrasiHariIni: Schema.NullOr(Schema.Number),
+  pasienRawatInap: Schema.NullOr(Schema.Number),
+  tiketTerbuka: Schema.Number,
+  perbaikanMenunggu: Schema.Number,
+  khanzaError: Schema.NullOr(Schema.String),
+});
+export type Stats = typeof Stats.Type;
+
+// --- Conversation history ---------------------------------------------------------------
+
+/** One tool call of a past run ("Yang dicek AI"). */
+export const ToolStep = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  kind: Schema.String,
+  input: Schema.Unknown,
+  ok: Schema.Boolean,
+  /** Full result, or null when it was too large to keep in the audit log. */
+  output: Schema.Unknown,
+  error: Schema.NullOr(Schema.String),
+  durationMs: Schema.NullOr(Schema.Number),
+  startedAt: Schema.String,
+});
+export type ToolStep = typeof ToolStep.Type;
+
+export const RunTranscript = Schema.Struct({
+  id: Schema.String,
+  kind: Schema.Literals(["ask", "ticket"]),
+  question: Schema.String,
+  askedBy: Schema.NullOr(Schema.String),
+  provider: Schema.String,
+  model: Schema.String,
+  status: Schema.String,
+  finalText: Schema.NullOr(Schema.String),
+  error: Schema.NullOr(Schema.String),
+  startedAt: Schema.String,
+  finishedAt: Schema.NullOr(Schema.String),
+  steps: Schema.Array(ToolStep),
+  blocks: Schema.Array(RenderBlock),
+  fixIds: Schema.Array(Schema.String),
+});
+export type RunTranscript = typeof RunTranscript.Type;
+
+/** GET /api/conversations/:id and GET /api/tickets/:id/transcript. */
+export const Transcript = Schema.Struct({
+  conversationId: Schema.NullOr(Schema.String),
+  runs: Schema.Array(RunTranscript),
+});
+export type Transcript = typeof Transcript.Type;
+
+/** GET /api/conversations: recent Tanya Data threads. */
+export const ConversationSummary = Schema.Struct({
+  id: Schema.String,
+  firstQuestion: Schema.String,
+  askedBy: Schema.NullOr(Schema.String),
+  runCount: Schema.Number,
+  lastAt: Schema.String,
+});
+export type ConversationSummary = typeof ConversationSummary.Type;
+
+// --- AI provider settings ---------------------------------------------------------------------
+
+/** GET /api/settings/llm. The API key itself is never sent back. */
+export const LlmSettingsView = Schema.Struct({
+  provider: Schema.String,
+  model: Schema.String,
+  baseUrl: Schema.NullOr(Schema.String),
+  maskPii: Schema.Boolean,
+  apiKeySet: Schema.Boolean,
+  /** "env": from .env; "app": changed on the settings page (overrides .env). */
+  source: Schema.Literals(["env", "app"]),
+  updatedBy: Schema.NullOr(Schema.String),
+  updatedAt: Schema.NullOr(Schema.String),
+});
+export type LlmSettingsView = typeof LlmSettingsView.Type;
+
+/** PUT /api/settings/llm and POST /api/settings/llm/test. */
+export const UpdateLlmSettingsRequest = Schema.Struct({
+  provider: NonEmpty.check(Schema.isMaxLength(50)),
+  model: Schema.String.check(Schema.isMaxLength(200)),
+  baseUrl: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(500))),
+  /** Absent: keep the current key. Empty string: remove it. */
+  apiKey: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(500))),
+  maskPii: Schema.Boolean,
+});
+export type UpdateLlmSettingsRequest = typeof UpdateLlmSettingsRequest.Type;
+
+export const LlmTestResult = Schema.Struct({
+  ok: Schema.Boolean,
+  reply: Schema.NullOr(Schema.String),
+  error: Schema.NullOr(Schema.String),
+  durationMs: Schema.Number,
+});
+export type LlmTestResult = typeof LlmTestResult.Type;
+
+// --- Audit log ------------------------------------------------------------------------------
+
+export const AuditKind = Schema.Literals(["runs", "tools", "queries", "fixes", "events"]);
+export type AuditKind = typeof AuditKind.Type;
+
+/** GET /api/audit?kind=&q=&from=&to=&limit=&offset= */
+export const AuditPage = Schema.Struct({
+  kind: AuditKind,
+  rows: Schema.Array(Schema.Record(Schema.String, Schema.Unknown)),
+  total: Schema.Number,
+});
+export type AuditPage = typeof AuditPage.Type;

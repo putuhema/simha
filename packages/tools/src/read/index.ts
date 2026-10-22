@@ -1,13 +1,14 @@
 import { cariPasien } from "./cariPasien.ts";
 import { daftarTindakan } from "./daftarTindakan.ts";
 import { dataSep } from "./dataSep.ts";
+import { kartuPasien } from "./kartuPasien.ts";
 import { kunjunganAktif } from "./kunjunganAktif.ts";
 import { riwayatKamar } from "./riwayatKamar.ts";
 import { statusBilling } from "./statusBilling.ts";
 import { statusKamar } from "./statusKamar.ts";
 import { suratKontrol } from "./suratKontrol.ts";
 
-export { cariPasien, daftarTindakan, dataSep, kunjunganAktif, riwayatKamar, statusBilling, statusKamar, suratKontrol };
+export { cariPasien, daftarTindakan, dataSep, kartuPasien, kunjunganAktif, riwayatKamar, statusBilling, statusKamar, suratKontrol };
 
 /** The read tools, in the order the AI model sees them. */
 export const readTools = [
@@ -19,4 +20,5 @@ export const readTools = [
   statusBilling,
   dataSep,
   suratKontrol,
+  kartuPasien,
 ] as const;

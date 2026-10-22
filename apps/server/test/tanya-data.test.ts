@@ -119,7 +119,7 @@ describe.skipIf(testDb === null)("Tanya Data over HTTP", () => {
       const [block] = renders(events);
       if (!block) throw new Error("no block");
 
-      const created = await app.call("POST", "/favorites", { blockId: block.id, createdBy: "it-budi" });
+      const created = await app.call("POST", "/favorites", { blockId: block.id });
       expect(created.status).toBe(201);
       const favorite = (await created.json()) as Favorite;
       expect(favorite).toMatchObject({
@@ -129,7 +129,6 @@ describe.skipIf(testDb === null)("Tanya Data over HTTP", () => {
         tipe: "bar",
         opsi: { x: "poli", y: ["jumlah"], satuan: "kunjungan" },
         asumsi: block.asumsi,
-        createdBy: "it-budi",
       });
       expect(((await (await app.call("GET", "/favorites")).json()) as Array<Favorite>).map((f) => f.id)).toEqual([favorite.id]);
 
@@ -149,7 +148,7 @@ describe.skipIf(testDb === null)("Tanya Data over HTTP", () => {
 
       expect((await app.call("DELETE", `/favorites/${favorite.id}`)).status).toBe(204);
       expect((await app.call("POST", `/favorites/${favorite.id}/run`)).status).toBe(404);
-      expect((await app.call("POST", "/favorites", { blockId: "nope", createdBy: "it-budi" })).status).toBe(404);
+      expect((await app.call("POST", "/favorites", { blockId: "nope" })).status).toBe(404);
     } finally {
       await app.dispose();
     }

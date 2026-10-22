@@ -7,7 +7,7 @@ import { containsWords, NullableStr, Str } from "./common.ts";
 const MAX_RESULTS = 20;
 
 /** Identity fields only. NIK, phone and address are never selected. */
-const PasienRow = Schema.Struct({
+export const PasienRow = Schema.Struct({
   no_rkm_medis: Str,
   nm_pasien: NullableStr,
   jk: NullableStr,
