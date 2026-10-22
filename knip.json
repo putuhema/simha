@@ -17,8 +17,6 @@
   },
   "ignoreBinaries": [
     "mariadbd",
-    "mariadb-install-db",
-    "java",
-    "javaw"
+    "mariadb-install-db"
   ]
 }

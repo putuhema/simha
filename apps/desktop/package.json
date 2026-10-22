@@ -8,7 +8,8 @@
     "build": "pnpm --filter @simrs/web build && node scripts/build.mjs",
     "dev": "node scripts/dev.mjs",
     "dist:win": "pnpm build && electron-builder --win nsis --x64",
-    "dist:dir": "pnpm build && electron-builder --dir"
+    "dist:dir": "pnpm build && electron-builder --dir",
+    "dist:mac": "pnpm build && electron-builder --mac dir"
   },
   "devDependencies": {
     "@types/node": "catalog:",
