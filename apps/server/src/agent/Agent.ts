@@ -10,7 +10,7 @@
  * fake test adapter.
  */
 import { LlmClient, type ChatMessage, type LlmEvent, type ToolCall } from "@simrs/llm";
-import type { AgentEvent, RenderBlock, Ticket } from "@simrs/shared";
+import type { AgentEvent, DocumentInfo, RenderBlock, Ticket } from "@simrs/shared";
 import {
   AuditLog,
   defaultRegistry,
@@ -80,7 +80,7 @@ const make = Effect.gen(function* () {
   const system = yield* SystemPrompt;
   const registry: ToolRegistry = defaultRegistry;
 
-  const runOneTool = (call: ToolCall, runId: string) =>
+  const runOneTool = (call: ToolCall, runId: string, askedBy: string | null) =>
     Effect.gen(function* () {
       const tool = registry.get(call.name);
       const started = performance.now();
@@ -88,7 +88,7 @@ const make = Effect.gen(function* () {
         const known = registry.tools.map((t) => t.name).join(", ");
         return { ok: false as const, error: `Tool "${call.name}" tidak ada. Tool yang tersedia: ${known}.`, durationMs: 0 };
       }
-      const exit = yield* runTool(tool, call.args, { sessionId: runId }).pipe(
+      const exit = yield* runTool(tool, call.args, { sessionId: runId, actor: askedBy }).pipe(
         Effect.provideService(KhanzaRead, read),
         Effect.provideService(AuditLog, audit),
         Effect.provideService(FixStore, fixes),
@@ -103,7 +103,8 @@ const make = Effect.gen(function* () {
         ok: true as const,
         result,
         forModel: tool.forModel ? tool.forModel(result) : result,
-        block: tool.kind === "render" ? (result as { readonly block: RenderBlock }).block : undefined,
+        block: tool.kind === "render" ? (result as { readonly block?: RenderBlock }).block : undefined,
+        document: tool.kind === "render" ? (result as { readonly document?: DocumentInfo }).document : undefined,
         durationMs,
       };
     });
@@ -184,13 +185,14 @@ const make = Effect.gen(function* () {
 
             for (const call of calls) {
               yield* emit({ _tag: "tool_started", callId: call.id, name: call.name, args: call.args });
-              const outcome = yield* runOneTool(call, runId);
+              const outcome = yield* runOneTool(call, runId, input.askedBy);
               yield* emit(
                 outcome.ok
                   ? { _tag: "tool_finished", callId: call.id, name: call.name, ok: true, result: outcome.result, durationMs: outcome.durationMs }
                   : { _tag: "tool_finished", callId: call.id, name: call.name, ok: false, error: outcome.error, durationMs: outcome.durationMs },
               );
               if (outcome.ok && outcome.block) yield* emit({ _tag: "render", callId: call.id, block: outcome.block });
+              if (outcome.ok && outcome.document) yield* emit({ _tag: "document", callId: call.id, document: outcome.document });
               yield* append({
                 role: "tool",
                 toolCallId: call.id,

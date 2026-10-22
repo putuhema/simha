@@ -9,3 +9,8 @@ export const CurrentToolCall = Context.Reference<string | null>("simrs/CurrentTo
 export const CurrentSession = Context.Reference<string | null>("simrs/CurrentSession", {
   defaultValue: () => null,
 });
+
+/** Username of the person the tool runs for (null for scripts), e.g. shown on generated documents. */
+export const CurrentActor = Context.Reference<string | null>("simrs/CurrentActor", {
+  defaultValue: () => null,
+});

@@ -3,7 +3,7 @@
  * agent events. Also converts a stored run (transcript) to the same shape, so
  * live and reloaded answers render with the same components.
  */
-import type { AgentEvent, RenderBlock, RunTranscript } from "@simrs/shared";
+import type { AgentEvent, DocumentInfo, RenderBlock, RunTranscript } from "@simrs/shared";
 import { request } from "./api.ts";
 import { readEventStream } from "./sse.ts";
 import type { StepView } from "./steps.ts";
@@ -22,6 +22,7 @@ export interface RunView {
   readonly text: string;
   readonly steps: ReadonlyArray<StepView>;
   readonly blocks: ReadonlyArray<RenderBlock>;
+  readonly documents: ReadonlyArray<DocumentInfo>;
   readonly fixIds: ReadonlyArray<string>;
   readonly error: string | null;
   readonly at: string;
@@ -38,6 +39,7 @@ export const emptyRun = (question: string, key: string = crypto.randomUUID()): R
   text: "",
   steps: [],
   blocks: [],
+  documents: [],
   fixIds: [],
   error: null,
   at: new Date().toISOString(),
@@ -72,6 +74,8 @@ export const applyEvent = (run: RunView, event: AgentEvent): RunView => {
     }
     case "render":
       return { ...run, blocks: [...run.blocks, event.block] };
+    case "document":
+      return { ...run, documents: [...run.documents, event.document] };
     case "done":
       return { ...run, status: "done", text: event.text };
     case "error":
@@ -98,6 +102,7 @@ export const fromTranscript = (run: RunTranscript): RunView => ({
     running: false,
   })),
   blocks: run.blocks,
+  documents: run.documents,
   fixIds: run.fixIds,
   error: run.error,
   at: run.startedAt,

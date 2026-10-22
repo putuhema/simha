@@ -160,4 +160,83 @@ export const KHANZA_TABLES: ReadonlyArray<ExpectedTable> = [
     columns: ["no_rawat", "kd_jenis_prw", "kd_dokter", "nip", "tgl_perawatan", "jam_rawat", "biaya_rawat"],
     extra: true,
   },
+  // Patient documents (dokumenPasien): history, CPPT/SOAP and resume.
+  {
+    name: "pemeriksaan_ralan",
+    purpose: "Outpatient CPPT / SOAP: keluhan (S), pemeriksaan + vitals (O), penilaian (A), rtl (P)",
+    columns: ["no_rawat", "tgl_perawatan", "jam_rawat", "keluhan", "pemeriksaan", "penilaian", "rtl", "instruksi", "evaluasi", "nip"],
+    extra: true,
+  },
+  {
+    name: "pemeriksaan_ranap",
+    purpose: "Inpatient CPPT / SOAP, same columns as pemeriksaan_ralan",
+    columns: ["no_rawat", "tgl_perawatan", "jam_rawat", "keluhan", "pemeriksaan", "penilaian", "rtl", "instruksi", "evaluasi", "nip"],
+    extra: true,
+  },
+  {
+    name: "diagnosa_pasien",
+    purpose: "Diagnoses of a visit (ICD-10), with priority",
+    columns: ["no_rawat", "kd_penyakit", "status", "prioritas"],
+    extra: true,
+  },
+  {
+    name: "penyakit",
+    purpose: "ICD-10 master: kd_penyakit -> nm_penyakit",
+    columns: ["kd_penyakit", "nm_penyakit"],
+    extra: true,
+  },
+  {
+    name: "resume_pasien",
+    purpose: "Outpatient medical resume written in Khanza",
+    columns: ["no_rawat", "kd_dokter", "keluhan_utama", "jalannya_penyakit", "diagnosa_utama", "kd_diagnosa_utama"],
+    extra: true,
+  },
+  {
+    name: "resume_pasien_ranap",
+    purpose: "Inpatient medical resume written in Khanza",
+    columns: ["no_rawat", "kd_dokter", "keluhan_utama", "jalannya_penyakit", "diagnosa_utama", "kd_diagnosa_utama"],
+    extra: true,
+  },
+  {
+    name: "setting",
+    purpose: "Hospital name, address and logo (document header)",
+    columns: ["nama_instansi", "alamat_instansi", "kabupaten", "propinsi", "kontak", "email", "logo"],
+    extra: true,
+  },
+  {
+    name: "petugas",
+    purpose: "Staff names (who wrote a CPPT entry, by nip)",
+    columns: ["nip", "nama"],
+    extra: true,
+  },
+  {
+    name: "periksa_lab",
+    purpose: "Lab examinations of a visit",
+    columns: ["no_rawat", "kd_jenis_prw", "tgl_periksa", "jam"],
+    extra: true,
+  },
+  {
+    name: "detail_periksa_lab",
+    purpose: "Lab result values per item",
+    columns: ["no_rawat", "kd_jenis_prw", "tgl_periksa", "jam", "id_template", "nilai", "nilai_rujukan", "keterangan"],
+    extra: true,
+  },
+  {
+    name: "template_laboratorium",
+    purpose: "Lab item names and units (id_template)",
+    columns: ["id_template", "kd_jenis_prw", "Pemeriksaan", "satuan"],
+    extra: true,
+  },
+  {
+    name: "jns_perawatan_lab",
+    purpose: "Lab examination names",
+    columns: ["kd_jenis_prw", "nm_perawatan"],
+    extra: true,
+  },
+  {
+    name: "hasil_radiologi",
+    purpose: "Radiology reports (free text)",
+    columns: ["no_rawat", "tgl_periksa", "jam", "hasil"],
+    extra: true,
+  },
 ];

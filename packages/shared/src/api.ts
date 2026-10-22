@@ -78,6 +78,37 @@ export const RenderBlock = Schema.Struct({
 });
 export type RenderBlock = typeof RenderBlock.Type;
 
+// --- Patient documents ------------------------------------------------------------
+
+export const DocumentKind = Schema.Literals(["riwayat", "cppt", "resume"]);
+export type DocumentKind = typeof DocumentKind.Type;
+
+/**
+ * A printable patient document (riwayat pasien, CPPT/SOAP, resume medis).
+ * The HTML is built by the server from Khanza data with a fixed template,
+ * never written by the AI. Fetch it from GET /api/documents/:id.
+ */
+export const DocumentInfo = Schema.Struct({
+  id: Schema.String,
+  jenis: DocumentKind,
+  judul: Schema.String,
+  /** Who or what it is about, e.g. "RM 000002 · SITI AMINAH · 2026/10/21/000002". */
+  subjek: Schema.String,
+  /** One line about the contents, e.g. "3 catatan CPPT, 2 diagnosis, 2 hasil lab". */
+  ringkas: Schema.String,
+  dibuatOleh: Schema.NullOr(Schema.String),
+  dibuatPada: Schema.String,
+});
+export type DocumentInfo = typeof DocumentInfo.Type;
+
+/** POST /api/documents: make a document without the AI (buttons on the patient card). */
+export const CreateDocumentRequest = Schema.Struct({
+  jenis: DocumentKind,
+  noRkmMedis: Schema.optionalKey(NonEmpty.check(Schema.isMaxLength(15))),
+  noRawat: Schema.optionalKey(NonEmpty.check(Schema.isMaxLength(17))),
+});
+export type CreateDocumentRequest = typeof CreateDocumentRequest.Type;
+
 // --- Favorite questions --------------------------------------------------------
 
 /** A saved question with its SQL and how to show it; re-run without the AI. */
@@ -143,6 +174,9 @@ export const RenderEvent = Schema.TaggedStruct("render", {
   block: RenderBlock,
 });
 
+/** A patient document was made (from the `dokumenPasien` tool). */
+export const DocumentEvent = Schema.TaggedStruct("document", { callId: Schema.String, document: DocumentInfo });
+
 /** Last event of a successful run. */
 export const RunDone = Schema.TaggedStruct("done", {
   runId: Schema.String,
@@ -154,7 +188,7 @@ export const RunDone = Schema.TaggedStruct("done", {
 /** Last event of a failed run. */
 export const RunError = Schema.TaggedStruct("error", { message: Schema.String });
 
-export const AgentEvent = Schema.Union([RunStarted, TextDelta, ToolStarted, ToolFinished, RenderEvent, RunDone, RunError]);
+export const AgentEvent = Schema.Union([RunStarted, TextDelta, ToolStarted, ToolFinished, RenderEvent, DocumentEvent, RunDone, RunError]);
 export type AgentEvent = typeof AgentEvent.Type;
 
 // --- Errors -------------------------------------------------------------------
@@ -339,6 +373,7 @@ export const RunTranscript = Schema.Struct({
   finishedAt: Schema.NullOr(Schema.String),
   steps: Schema.Array(ToolStep),
   blocks: Schema.Array(RenderBlock),
+  documents: Schema.Array(DocumentInfo),
   fixIds: Schema.Array(Schema.String),
 });
 export type RunTranscript = typeof RunTranscript.Type;

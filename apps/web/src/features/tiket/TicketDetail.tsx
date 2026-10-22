@@ -8,6 +8,7 @@ import { CheckCircle2, CircleSlash, RotateCw, SendHorizontal, Square } from "luc
 import { useState, type FormEvent } from "react";
 import { Markdown } from "../../components/agent/Markdown.tsx";
 import { StepList } from "../../components/agent/StepList.tsx";
+import { DocumentCard } from "../../components/blocks/DocumentCard.tsx";
 import { Badge } from "../../components/ui/Badge.tsx";
 import { Button } from "../../components/ui/Button.tsx";
 import { Card } from "../../components/ui/Card.tsx";
@@ -64,6 +65,9 @@ const RunSection = ({
         )}
       </div>
 
+      {run.documents.map((document) => (
+        <DocumentCard key={document.id} document={document} />
+      ))}
       {run.status === "running" && run.text ? <Markdown text={run.text} className="text-ink-2" /> : null}
 
       {run.status !== "running" ? (

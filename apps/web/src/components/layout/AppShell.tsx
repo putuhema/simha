@@ -107,7 +107,7 @@ export const AppShell = () => {
             {health.data ? (
               <span
                 className="hidden items-center gap-1.5 rounded border border-white/15 px-2 py-0.5 font-mono text-[11.5px] text-paper/85 md:flex"
-                title={health.data.llm.maskPii ? "NIK, telepon dan alamat disamarkan sebelum dikirim ke AI" : "Data tidak disamarkan (model lokal)"}
+                title={health.data.llm.maskPii ? "NIK, telepon, alamat dan catatan klinis disamarkan sebelum dikirim ke AI" : "Data tidak disamarkan (model lokal)"}
               >
                 <Database className="size-3.5" />
                 {health.data.llm.provider} · {health.data.llm.model}

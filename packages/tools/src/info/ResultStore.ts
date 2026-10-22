@@ -5,7 +5,7 @@
  * Query results are kept so `tampilkan` shows exactly the rows the database
  * returned (the AI never copies data into a chart), with the SQL that ran.
  */
-import type { Favorite, RenderBlock, RenderType } from "@simrs/shared";
+import type { DocumentInfo, Favorite, RenderBlock, RenderType } from "@simrs/shared";
 import { Context, Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 
@@ -57,6 +57,26 @@ const toFavorite = (r: FavoriteRow): Favorite => ({
   asumsi: r.assumptions,
   createdBy: r.created_by,
   createdAt: r.created_at,
+});
+
+export interface DocumentRow {
+  readonly id: string;
+  readonly kind: DocumentInfo["jenis"];
+  readonly title: string;
+  readonly subject: string;
+  readonly summary: string;
+  readonly actor: string | null;
+  readonly created_at: string;
+}
+
+export const toDocumentInfo = (r: DocumentRow): DocumentInfo => ({
+  id: r.id,
+  jenis: r.kind,
+  judul: r.title,
+  subjek: r.subject,
+  ringkas: r.summary,
+  dibuatOleh: r.actor,
+  dibuatPada: r.created_at,
 });
 
 const make = Effect.gen(function* () {
@@ -176,7 +196,33 @@ const make = Effect.gen(function* () {
       Effect.orDie,
     );
 
+  const saveDocument = (
+    info: DocumentInfo,
+    html: string,
+    origin: { readonly toolCallId: string | null; readonly sessionId: string | null },
+  ) =>
+    sql`INSERT INTO documents ${sql.insert({
+      id: info.id,
+      kind: info.jenis,
+      title: info.judul,
+      subject: info.subjek,
+      summary: info.ringkas,
+      session_id: origin.sessionId,
+      tool_call_id: origin.toolCallId,
+      actor: info.dibuatOleh,
+      html,
+      created_at: info.dibuatPada,
+    })}`.pipe(Effect.asVoid, Effect.orDie);
+
+  const getDocument = (id: string) =>
+    sql<DocumentRow & { html: string }>`SELECT * FROM documents WHERE id = ${id}`.pipe(
+      Effect.map(([r]) => (r ? { info: toDocumentInfo(r), html: r.html } : undefined)),
+      Effect.orDie,
+    );
+
   return {
+    saveDocument,
+    getDocument,
     saveResult,
     getResult,
     saveBlock,

@@ -121,6 +121,12 @@ Open http://127.0.0.1:8787. The first visit asks for the **first admin account**
   - "Saran perbaikan" with the proposed SQL, how many rows it changes, and **Setujui / Edit / Tolak**. After approval it shows the result and **Rollback**.
 
   The right column shows the patient (identity, current visit, room, DPJP, visit timeline) and the AI's summary. Ask follow-up questions at the bottom.
+- **Patient documents.** Under the patient card, **Riwayat**, **CPPT / SOAP** and **Resume** make a printable document straight from Khanza; no AI is involved. You can also ask the agent, e.g. "buatkan CPPT pasien 2026/10/21/000002". Each document has **Cetak / PDF**, open in a new tab, and download HTML.
+  - **Riwayat** shows all visits (latest 20) with diagnoses (ICD-10), rooms, tindakan and drugs.
+  - **CPPT** shows the SOAP notes from `pemeriksaan_ralan` / `pemeriksaan_ranap`, each with the doctor or nurse who wrote it and the vital signs, plus diagnoses, allergies, lab (abnormal values in red) and radiology.
+  - **Resume** shows the resume medis written in Khanza, or a clearly marked draft built from the CPPT, with the empty fields left for the doctor.
+
+  The HTML is filled from a fixed template by the server, never written by the AI, and every value is escaped. It is served with a CSP that allows no scripts. Generated documents are kept in the audit DB, and downloads are logged.
 - **Tanya Data.** Ask in plain Indonesian. Answers show tables (sortable, CSV export), charts and numbers, each with an assumption line and "Query yang dipakai". **Simpan ke favorit** saves the question and SQL; favorites re-run without the AI.
 - **Pengaturan.** The tabs are:
   - **AI:** provider, model, base URL, API key, "samarkan data" and **Tes koneksi**. Saving switches the AI without a restart and overrides `.env`; admins only.
@@ -204,6 +210,8 @@ Send the `conversationId` with the next `/api/ask` for a follow-up.
 | `GET /api/fixes`, `GET /api/fixes/:id` | `?status=pending&ticketId=` |
 | `POST /api/fixes` | `{ title, reason, sql, params?, ticketId?, replaces? }` |
 | `POST /api/fixes/:id/approve`, `/reject` (`{ reason? }`), `/rollback` | |
+| `POST /api/documents` | `{ jenis: "riwayat" \| "cppt" \| "resume", noRkmMedis?, noRawat? }`: make a patient document |
+| `GET /api/documents/:id` | its HTML (`?download=1` to save it) |
 | `GET /api/favorites`, `POST /api/favorites` (`{ blockId, question? }`), `DELETE /api/favorites/:id`, `POST /api/favorites/:id/run` | |
 | `GET /api/settings/llm`, `PUT /api/settings/llm`, `POST /api/settings/llm/test` | AI provider (changes: admin) |
 | `GET /api/audit` | `?kind=runs\|tools\|queries\|fixes\|events&q=&from=&to=&limit=&offset=` |
@@ -226,7 +234,7 @@ Switching provider is a `.env` change, no code change:
 Notes:
 
 - For a local model you may set `LLM_MASK_PII=false`; keep it `true` for anything outside the hospital.
-- Patient names, RM and visit numbers are sent to the model (it needs them). NIK, phone numbers and addresses are masked.
+- Patient names, RM and visit numbers are sent to the model (it needs them). NIK, phone numbers and addresses are masked, and so is free-text clinical writing: SOAP notes, radiology reports and resume text. Diagnoses, vital signs and lab values are still sent. With masking off (local model), the AI can also summarise the notes.
 - The vikey gateway drops tool results when a **Claude** model calls several tools at once (on both its endpoints), so the agent repeats checks or reports missing results. DeepSeek and Gemini through the same gateway work correctly. For Claude, use an Anthropic API key directly.
 
 ## Read tools

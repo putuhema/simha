@@ -9,7 +9,7 @@
 import { Effect, Schema } from "effect";
 import { AuditLog } from "./audit/AuditLog.ts";
 import { ToolError, ToolInputError } from "./errors.ts";
-import { CurrentSession, CurrentToolCall } from "./khanza/current-tool-call.ts";
+import { CurrentActor, CurrentSession, CurrentToolCall } from "./khanza/current-tool-call.ts";
 import type { KhanzaQueryError } from "./errors.ts";
 
 export type ToolKind = "read" | "diagnose" | "propose" | "render";
@@ -35,6 +35,8 @@ export const defineTool = <P, O, R>(tool: Tool<P, O, R>): Tool<P, O, R> => tool;
 export interface RunToolOptions {
   /** Ticket or chat session the call belongs to, for the audit log. */
   readonly sessionId?: string | null;
+  /** Username of the person asking (shown on generated documents). */
+  readonly actor?: string | null;
 }
 
 /** Schema error text, shortened to what an AI model needs to fix its input. */
@@ -57,6 +59,7 @@ export const runTool = <P, O, R>(tool: Tool<P, O, R>, input: unknown, options: R
       Effect.flatMap(tool.handler),
       Effect.provideService(CurrentToolCall, id),
       Effect.provideService(CurrentSession, options.sessionId ?? null),
+      Effect.provideService(CurrentActor, options.actor ?? null),
       Effect.exit,
     );
 

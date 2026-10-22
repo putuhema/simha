@@ -2,10 +2,17 @@
  * Right column: the patient the ticket is about (identity, current visit,
  * DPJP), the visit timeline, and the AI's diagnosis in one paragraph.
  */
-import { BedDouble, Stethoscope, UserRound } from "lucide-react";
+import type { DocumentInfo, DocumentKind } from "@simrs/shared";
+import { BedDouble, FileText, Stethoscope, UserRound } from "lucide-react";
+import { useState } from "react";
 import { Markdown } from "../../components/agent/Markdown.tsx";
+import { DocumentCard } from "../../components/blocks/DocumentCard.tsx";
+import { Button } from "../../components/ui/Button.tsx";
 import { Panel } from "../../components/ui/Card.tsx";
+import { Dialog } from "../../components/ui/Dialog.tsx";
+import { ErrorText } from "../../components/ui/Field.tsx";
 import { Empty, Spinner } from "../../components/ui/Spinner.tsx";
+import { api, errorMessage } from "../../lib/api.ts";
 import { useApi } from "../../lib/useApi.ts";
 
 interface Visit {
@@ -38,6 +45,45 @@ const Row = ({ label, children }: { readonly label: string; readonly children: R
     <dd className="text-right font-medium">{children}</dd>
   </div>
 );
+
+/** Riwayat / CPPT / Resume buttons: the server makes the document from Khanza data, no AI involved. */
+const DocumentButtons = ({ rm, noRawat }: { readonly rm: string; readonly noRawat: string | undefined }) => {
+  const [busy, setBusy] = useState<DocumentKind | null>(null);
+  const [document, setDocument] = useState<DocumentInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const make = async (jenis: DocumentKind) => {
+    setBusy(jenis);
+    setError(null);
+    try {
+      setDocument(await api.post<DocumentInfo>("/api/documents", jenis === "riwayat" ? { jenis, noRkmMedis: rm } : { jenis, noRawat }));
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+  const kinds: ReadonlyArray<readonly [DocumentKind, string]> = [
+    ["riwayat", "Riwayat"],
+    ["cppt", "CPPT / SOAP"],
+    ["resume", "Resume"],
+  ];
+  return (
+    <div className="mt-3 border-t border-line-2 pt-3">
+      <p className="eyebrow mb-2">Dokumen</p>
+      <div className="flex flex-wrap gap-1.5">
+        {kinds.map(([jenis, label]) => (
+          <Button key={jenis} size="sm" disabled={busy !== null || (jenis !== "riwayat" && !noRawat)} onClick={() => void make(jenis)}>
+            {busy === jenis ? <Spinner className="size-3" /> : <FileText />} {label}
+          </Button>
+        ))}
+      </div>
+      {error ? <div className="mt-2"><ErrorText>{error}</ErrorText></div> : null}
+      <Dialog open={document !== null} onOpenChange={(open) => !open && setDocument(null)} wide title={document?.judul ?? ""} description={document?.subjek}>
+        {document ? <DocumentCard document={document} height={620} /> : null}
+      </Dialog>
+    </div>
+  );
+};
 
 export const PatientPanel = ({ rm, summary }: { readonly rm: string | undefined; readonly summary: string }) => {
   const card = useApi<PatientCard>(rm ? `/api/patients/${encodeURIComponent(rm)}` : null);
@@ -88,6 +134,7 @@ export const PatientPanel = ({ rm, summary }: { readonly rm: string | undefined;
                 )}
               </Row>
             </dl>
+            <DocumentButtons rm={card.data.pasien.no_rkm_medis} noRawat={visit?.no_rawat} />
           </div>
         ) : null}
       </Panel>

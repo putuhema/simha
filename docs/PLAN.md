@@ -1,6 +1,6 @@
 # Plan
 
-Status: **M5 done, waiting for your test.** Next: M6.
+Status: **M5.1 (patient documents) done, waiting for your test.** Next: routine data checks and the agent test set (M5.2), then M6.
 
 ## Packages and main modules
 
@@ -23,6 +23,8 @@ Each one ends with tests passing and a stop for you to test.
 - **M3. Fixes. ✅ Done.** `diagnosaPindahKamar`, `diagnosaTindakan`, `usulkanPerbaikan` → preview → approve → execute in a transaction → rollback. Tests prove a row-count mismatch rolls back and nothing is written without an approval row in the audit log.
 - **M4. Tanya Data tools. ✅ Done.** `lihatSkema`, guarded `jalankanQueryBaca`, `tampilkan`. Tests prove non-SELECT, multiple statements and deny-listed columns are rejected.
 - **M5. Web UI. ✅ Done.** Tiket, Tanya Data (charts, tables, favorites), Pengaturan (provider, audit log). Login. Playwright smoke tests.
+- **M5.1. Patient documents. ✅ Done.** Riwayat pasien, CPPT / SOAP and resume medis as printable HTML from Khanza data (`dokumenPasien`), from the patient card or the agent.
+- **M5.2. Routine data checks and agent test set.** Scheduled checks for known data problems with "Buat tiket"; fixed scenarios with known answers to score each AI provider/model.
 - **M6. Desktop.** Electron app wrapping the UI, can start the local server, Windows installer.
 - **M7. MCP.** Same tools over stdio and streamable HTTP, README section for Claude Desktop / Claude Code.
 
@@ -99,6 +101,19 @@ Each one ends with tests passing and a stop for you to test.
   - "Percakapan baru" reopened the old thread from the URL.
   - The narrow layout scrolled sideways.
   - The answer splitter swallowed the first "-" of a list.
+
+## M5.1 notes
+
+- **Sources.** All checked against our schema first:
+  - SOAP: `pemeriksaan_ralan` / `pemeriksaan_ranap`. S = `keluhan`, O = `pemeriksaan` + vital signs, A = `penilaian`, P = `rtl`, plus `instruksi` and `evaluasi`.
+  - The writer is `nip`: a `petugas` in ~95% of our recent rows, otherwise a `dokter`.
+  - Diagnoses: `diagnosa_pasien` + `penyakit`. Lab: `detail_periksa_lab` + `template_laboratorium`. Radiology: `hasil_radiologi`. Resume: `resume_pasien` / `resume_pasien_ranap`.
+  - Header: Khanza `setting` (hospital name, address, logo).
+
+  These 13 tables were added to `docs/schema.md` and the test fixture, with synthetic seed rows.
+- **The AI never writes document content.** The server fills a fixed template, and the AI only asks for the document and may add a labelled summary in the chat. Every value is escaped (tested with `<script>` in a SOAP note). Documents are served with `default-src 'none'`, previewed in a sandboxed frame, stored in the audit DB (migration `0006_documents`), and downloads are logged.
+- **Privacy.** When masking is on (any external AI), free-text clinical fields are replaced with "[catatan klinis tidak dikirim ke AI]" before anything is sent. Diagnoses, vitals and lab numbers still go.
+- **No resume in Khanza.** The resume becomes a draft from the first CPPT entry, the diagnoses, tindakan and drugs. It is clearly marked, with empty fields left for the doctor.
 
 ## Decisions and questions
 

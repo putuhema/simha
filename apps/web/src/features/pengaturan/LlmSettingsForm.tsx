@@ -123,8 +123,8 @@ export const LlmSettingsForm = ({ isAdmin }: { readonly isAdmin: boolean }) => {
             <Switch.Thumb className="block size-4 translate-x-0.5 rounded-full bg-white shadow transition-transform data-[checked]:translate-x-[18px]" />
           </Switch.Root>
           <span className="text-[13px]">
-            <span className="font-medium">Samarkan NIK, telepon dan alamat</span>
-            <span className="block text-ink-3">Wajib untuk AI di luar rumah sakit. Boleh dimatikan hanya untuk model yang berjalan di server sendiri.</span>
+            <span className="font-medium">Samarkan NIK, telepon, alamat dan catatan klinis</span>
+            <span className="block text-ink-3">Wajib untuk AI di luar rumah sakit: teks SOAP, hasil radiologi dan resume tidak dikirim, hanya diagnosis, tanda vital dan angka lab. Boleh dimatikan hanya untuk model yang berjalan di server sendiri.</span>
           </span>
         </label>
 

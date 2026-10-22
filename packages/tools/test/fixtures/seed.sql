@@ -96,3 +96,72 @@ INSERT INTO bridging_sep (no_sep, no_rawat, tglsep, tglrujukan, no_rujukan, kdpp
 
 INSERT INTO bridging_surat_kontrol_bpjs (no_sep, tgl_surat, no_surat, tgl_rencana, kd_dokter_bpjs, nm_dokter_bpjs, kd_poli_bpjs, nm_poli_bpjs) VALUES
   ('0001R0011026V000001', '2026-10-01', '0001R0011026K000001', '2026-10-15', 'B001', 'drg. Sari Fiktif', 'GIG', 'GIGI');
+
+-- Patient documents (dokumenPasien): CPPT/SOAP, diagnoses, resume, lab, radiology, drugs. All fictional.
+INSERT INTO setting (nama_instansi, alamat_instansi, kabupaten, propinsi, kontak, email, aktifkan, kode_ppk, logo) VALUES
+  ('RSUD FIKTIF SEHAT', 'Jl. Contoh No. 1', 'Kota Contoh', 'Provinsi Contoh', '0361-000000', 'rs@contoh.test', 'Yes', '0000R000', x'');
+
+INSERT INTO petugas (nip, nama, jk, status) VALUES
+  ('P001', 'Ns. Rina Fiktif', 'P', '1'),
+  ('P002', 'Ns. Dewa Fiktif', 'L', '1');
+
+INSERT INTO penyakit (kd_penyakit, nm_penyakit, status, validcode, accpdx, asterisk, im) VALUES
+  ('A09', 'Diare dan gastroenteritis', 'Menular', '1', 'Y', '0', '0'),
+  ('A01.0', 'Demam tifoid', 'Menular', '1', 'Y', '0', '0'),
+  ('R50.9', 'Demam, tidak spesifik', 'Tidak Menular', '1', 'Y', '0', '0'),
+  ('K02.1', 'Karies dentin', 'Tidak Menular', '1', 'Y', '0', '0'),
+  ('E86', 'Dehidrasi', 'Tidak Menular', '1', 'N', '0', '0');
+
+INSERT INTO diagnosa_pasien (no_rawat, kd_penyakit, status, prioritas, status_penyakit) VALUES
+  ('2026/10/21/000002', 'A09', 'Ranap', 1, 'Baru'),
+  ('2026/10/21/000002', 'E86', 'Ranap', 2, 'Baru'),
+  ('2026/10/20/000001', 'R50.9', 'Ranap', 1, 'Baru'),
+  ('2026/10/01/000003', 'K02.1', 'Ralan', 1, 'Baru'),
+  ('2026/09/15/000004', 'A01.0', 'Ranap', 1, 'Baru');
+
+INSERT INTO pemeriksaan_ranap (no_rawat, tgl_perawatan, jam_rawat, suhu_tubuh, tensi, nadi, respirasi, tinggi, berat, spo2, gcs, kesadaran, keluhan, pemeriksaan, alergi, penilaian, rtl, instruksi, evaluasi, nip) VALUES
+  ('2026/10/21/000002', '2026-10-21', '09:00:00', '37.8', '100/70', '102', '22', '155', '52', '97', '15', 'Compos Mentis',
+   'BAB cair 6x sejak kemarin, mual, lemas.', 'Turgor kulit menurun, bising usus meningkat.', 'Tidak ada',
+   'Diare akut dengan dehidrasi ringan-sedang.', 'Infus RL 20 tpm, oralit, cek darah lengkap.', 'Observasi tanda vital tiap 4 jam.', '-', 'D001'),
+  ('2026/10/21/000002', '2026-10-21', '15:00:00', '37.4', '110/70', '96', '20', NULL, NULL, '98', '15', 'Compos Mentis',
+   'BAB cair 2x, mual berkurang.', 'Infus lancar, akral hangat.', 'Tidak ada',
+   'Masalah kekurangan volume cairan teratasi sebagian.', 'Lanjutkan intervensi, motivasi minum.', 'Catat intake dan output.', 'Pasien lebih segar.', 'P001'),
+  ('2026/10/21/000002', '2026-10-22', '07:00:00', '36.9', '110/80', '88', '20', NULL, NULL, '98', '15', 'Compos Mentis',
+   'Tidak BAB cair sejak malam.', 'Keadaan umum baik.', 'Tidak ada',
+   'Diare membaik.', 'Rencana pulang besok bila stabil.', 'Lepas infus bila intake baik.', 'Membaik.', 'P002'),
+  ('2026/09/15/000004', '2026-09-15', '12:00:00', '39.1', '110/70', '104', '22', '168', '60', '97', '15', 'Compos Mentis',
+   'Demam 7 hari, terutama malam hari.', 'Lidah kotor, nyeri tekan epigastrium.', 'Tidak ada',
+   'Suspek demam tifoid.', 'Cek widal, antibiotik empiris.', 'Kompres hangat bila demam.', '-', 'D001');
+
+INSERT INTO pemeriksaan_ralan (no_rawat, tgl_perawatan, jam_rawat, suhu_tubuh, tensi, nadi, respirasi, tinggi, berat, spo2, gcs, kesadaran, keluhan, pemeriksaan, alergi, rtl, penilaian, instruksi, evaluasi, nip) VALUES
+  ('2026/10/01/000003', '2026-10-01', '08:30:00', '36.6', '120/80', '80', '18', '170', '68', '99', '15', 'Compos Mentis',
+   'Gigi geraham kanan bawah ngilu saat minum dingin.', 'Karies dentin gigi 46.', 'Tidak ada',
+   'Tambal komposit gigi 46.', 'Karies dentin 46.', 'Kontrol bila nyeri.', '-', 'D002');
+
+INSERT INTO resume_pasien_ranap (no_rawat, kd_dokter, diagnosa_awal, alasan, keluhan_utama, pemeriksaan_fisik, jalannya_penyakit, pemeriksaan_penunjang, hasil_laborat, tindakan_dan_operasi, obat_di_rs, diagnosa_utama, kd_diagnosa_utama, diagnosa_sekunder, kd_diagnosa_sekunder, diagnosa_sekunder2, kd_diagnosa_sekunder2, diagnosa_sekunder3, kd_diagnosa_sekunder3, diagnosa_sekunder4, kd_diagnosa_sekunder4, prosedur_utama, kd_prosedur_utama, prosedur_sekunder, kd_prosedur_sekunder, prosedur_sekunder2, kd_prosedur_sekunder2, prosedur_sekunder3, kd_prosedur_sekunder3, alergi, diet, lab_belum, edukasi, cara_keluar, keadaan, dilanjutkan, obat_pulang) VALUES
+  ('2026/09/15/000004', 'D001', 'Observasi febris', 'Demam lama', 'Demam 7 hari', 'Lidah kotor, nyeri epigastrium', 'Demam turun hari ke-3 dengan antibiotik.', 'Widal positif', 'Leukosit normal', '-', 'Seftriakson, parasetamol', 'Demam tifoid', 'A01.0', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Tidak ada', 'Lunak', '-', 'Makan bertahap, cuci tangan', 'Atas Persetujuan Dokter', 'Membaik', 'Kembali Ke RS', 'Sefiksim 2x200 mg');
+
+INSERT INTO jns_perawatan_lab (kd_jenis_prw, nm_perawatan, bhp, tarif_perujuk, tarif_tindakan_dokter, kd_pj, status, kelas, kategori) VALUES
+  ('LAB01', 'Darah Lengkap', 0, 0, 0, 'BPJ', '1', '-', 'PK');
+
+INSERT INTO template_laboratorium (kd_jenis_prw, id_template, Pemeriksaan, satuan, nilai_rujukan_ld, nilai_rujukan_la, nilai_rujukan_pd, nilai_rujukan_pa, bagian_rs, bhp, bagian_perujuk, bagian_dokter, bagian_laborat, biaya_item, urut) VALUES
+  ('LAB01', 1, 'Hemoglobin', 'g/dL', '13-17', '13-17', '12-15', '12-15', 0, 0, 0, 0, 0, 0, 1),
+  ('LAB01', 2, 'Leukosit', '10^3/uL', '4-10', '4-10', '4-10', '4-10', 0, 0, 0, 0, 0, 0, 2);
+
+INSERT INTO periksa_lab (no_rawat, nip, kd_jenis_prw, tgl_periksa, jam, dokter_perujuk, bagian_rs, bhp, tarif_perujuk, tarif_tindakan_dokter, tarif_tindakan_petugas, biaya, kd_dokter, kategori) VALUES
+  ('2026/10/21/000002', 'P001', 'LAB01', '2026-10-21', '10:00:00', 'D001', 0, 0, 0, 0, 0, 0, 'D001', 'PK');
+
+INSERT INTO detail_periksa_lab (no_rawat, kd_jenis_prw, tgl_periksa, jam, id_template, nilai, nilai_rujukan, keterangan, bagian_rs, bhp, bagian_perujuk, bagian_dokter, bagian_laborat, biaya_item) VALUES
+  ('2026/10/21/000002', 'LAB01', '2026-10-21', '10:00:00', 1, '14.2', '12-15', '', 0, 0, 0, 0, 0, 0),
+  ('2026/10/21/000002', 'LAB01', '2026-10-21', '10:00:00', 2, '12.8', '4-10', 'H', 0, 0, 0, 0, 0, 0);
+
+INSERT INTO hasil_radiologi (no_rawat, tgl_periksa, jam, hasil) VALUES
+  ('2026/09/15/000004', '2026-09-16', '09:00:00', 'Foto thorax PA: cor dan pulmo dalam batas normal.');
+
+INSERT INTO databarang (kode_brng, nama_brng, kode_satbesar, kode_sat, dasar, isi, kapasitas, status) VALUES
+  ('B001', 'Paracetamol 500 mg', 'BOX', 'TAB', 500, 1, 1, '1'),
+  ('B002', 'Oralit', 'BOX', 'SAC', 1000, 1, 1, '1');
+
+INSERT INTO detail_pemberian_obat (tgl_perawatan, jam, no_rawat, kode_brng, h_beli, biaya_obat, jml, total, status, no_batch, no_faktur) VALUES
+  ('2026-10-21', '09:30:00', '2026/10/21/000002', 'B001', 300, 500, 6, 3000, 'Ranap', '-', '-'),
+  ('2026-10-21', '09:30:00', '2026/10/21/000002', 'B002', 600, 1000, 4, 4000, 'Ranap', '-', '-');

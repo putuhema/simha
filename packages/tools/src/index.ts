@@ -13,6 +13,7 @@ export type { KhanzaWriteService } from "./khanza/KhanzaWrite.ts";
 export type { ServerFlavor, ServerInfo } from "./khanza/server.ts";
 export { diagnosaPindahKamar } from "./diagnose/diagnosaPindahKamar.ts";
 export { diagnosaTindakan } from "./diagnose/diagnosaTindakan.ts";
+export { dokumenPasien } from "./documents/dokumenPasien.ts";
 export { checkFix, FIX_ALLOW_LIST, FixRejected, selectByKeys, sqlLiteral } from "./fixes/guard.ts";
 export type { CheckedFix, FixKind, FixParam } from "./fixes/guard.ts";
 export { FixStore, FixStoreLive } from "./fixes/FixStore.ts";
@@ -23,8 +24,8 @@ export { jalankanQueryBaca, MAX_QUERY_FAILURES } from "./info/jalankanQueryBaca.
 export { lihatSkema } from "./info/lihatSkema.ts";
 export { buildBlock, RenderRejected } from "./info/render.ts";
 export type { RenderSpec } from "./info/render.ts";
-export { ResultStore, ResultStoreLive } from "./info/ResultStore.ts";
-export type { QueryResult, StoredBlock } from "./info/ResultStore.ts";
+export { ResultStore, ResultStoreLive, toDocumentInfo } from "./info/ResultStore.ts";
+export type { DocumentRow, QueryResult, StoredBlock } from "./info/ResultStore.ts";
 export { SchemaDocs, SchemaDocsLive, schemaDocsLayer } from "./info/SchemaDocs.ts";
 export { checkSelect, MAX_QUERY_ROWS, QueryRejected } from "./info/select-guard.ts";
 export { tampilkan } from "./info/tampilkan.ts";

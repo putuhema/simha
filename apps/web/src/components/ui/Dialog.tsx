@@ -15,8 +15,8 @@ export const Dialog = ({
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly title: string;
-  readonly description?: string;
-  readonly wide?: boolean;
+  readonly description?: string | undefined;
+  readonly wide?: boolean | undefined;
   readonly children: ReactNode;
 }) => (
   <BaseDialog.Root open={open} onOpenChange={onOpenChange}>

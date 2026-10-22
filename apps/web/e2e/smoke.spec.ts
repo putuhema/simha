@@ -97,6 +97,30 @@ test("a number answer is shown as a stat card", async () => {
   await expect(stat).toContainText("pasien");
 });
 
+test("the agent makes a patient history document that can be printed", async () => {
+  await page.getByLabel("Pertanyaan").fill("Buatkan riwayat pasien RM 000002");
+  await page.getByLabel("Pertanyaan").press("Enter");
+  const card = page.getByTestId("document-card");
+  await expect(card).toContainText("Riwayat pasien");
+  await expect(card).toContainText("RM 000002 · SITI AMINAH");
+  const doc = card.frameLocator("iframe");
+  await expect(doc.getByRole("heading", { name: "Riwayat Pasien" })).toBeVisible();
+  await expect(doc.getByText("A09 – Diare dan gastroenteritis")).toBeVisible();
+  await expect(card.getByRole("button", { name: "Cetak / PDF" })).toBeEnabled();
+});
+
+test("the patient card makes CPPT / SOAP without the AI", async () => {
+  await page.getByRole("link", { name: "Tiket" }).click();
+  await page.getByRole("button", { name: /Ns. Ayu/ }).click();
+  await page.getByTestId("patient-card").getByRole("button", { name: "CPPT / SOAP" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("2026/10/21/000002");
+  const doc = dialog.frameLocator("iframe");
+  await expect(doc.getByText("BAB cair 6x sejak kemarin, mual, lemas.")).toBeVisible();
+  await expect(doc.getByText("Ns. Rina Fiktif")).toBeVisible();
+  await page.keyboard.press("Escape");
+});
+
 test("settings test the AI connection and show the audit log", async () => {
   await page.getByRole("link", { name: "Pengaturan" }).click();
   await page.getByRole("button", { name: "Tes koneksi" }).click();

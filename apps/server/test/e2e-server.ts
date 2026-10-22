@@ -11,6 +11,7 @@
  *   finds two active rooms and proposes closing the old one;
  * - "per poli": a bar chart of visits per clinic;
  * - "hari ini": the number of registrations today;
+ * - "riwayat": the history document of RM 000002;
  * - anything else: a short text answer.
  */
 import { NodeFileSystem, NodeHttpServer, NodeRuntime } from "@effect/platform-node";
@@ -48,6 +49,11 @@ const respond = (request: ChatRequest): ReturnType<typeof fakeTurn> => {
   const question = lastUserText(request);
   const results = toolResults(request);
   const step = results.length;
+
+  if (/riwayat/i.test(question)) {
+    if (step === 0) return fakeTurn("", [{ name: "dokumenPasien", args: { jenis: "riwayat", noRkmMedis: "000002" } }]);
+    return fakeTurn("Ringkasan AI (periksa kembali): satu kunjungan rawat inap dengan diare akut.");
+  }
 
   if (/RM 000002/.test(question)) {
     switch (step) {

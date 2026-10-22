@@ -168,6 +168,56 @@ CREATE TABLE `detail_pemberian_obat` (
   KEY `status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
 
+DROP TABLE IF EXISTS `detail_periksa_lab`;
+CREATE TABLE `detail_periksa_lab` (
+  `no_rawat` varchar(17) NOT NULL,
+  `kd_jenis_prw` varchar(15) NOT NULL,
+  `tgl_periksa` date NOT NULL,
+  `jam` time NOT NULL,
+  `id_template` int(11) NOT NULL,
+  `nilai` varchar(200) NOT NULL,
+  `nilai_rujukan` varchar(30) NOT NULL,
+  `keterangan` varchar(60) NOT NULL,
+  `bagian_rs` double NOT NULL,
+  `bhp` double NOT NULL,
+  `bagian_perujuk` double NOT NULL,
+  `bagian_dokter` double NOT NULL,
+  `bagian_laborat` double NOT NULL,
+  `kso` double DEFAULT NULL,
+  `menejemen` double DEFAULT NULL,
+  `biaya_item` double NOT NULL,
+  PRIMARY KEY (`no_rawat`,`kd_jenis_prw`,`tgl_periksa`,`jam`,`id_template`),
+  KEY `id_template` (`id_template`),
+  KEY `kd_jenis_prw` (`kd_jenis_prw`),
+  KEY `tgl_periksa` (`tgl_periksa`),
+  KEY `jam` (`jam`),
+  KEY `nilai` (`nilai`),
+  KEY `nilai_rujukan` (`nilai_rujukan`),
+  KEY `keterangan` (`keterangan`),
+  KEY `biaya_item` (`biaya_item`),
+  KEY `menejemen` (`menejemen`),
+  KEY `kso` (`kso`),
+  KEY `bagian_rs` (`bagian_rs`),
+  KEY `bhp` (`bhp`),
+  KEY `bagian_perujuk` (`bagian_perujuk`),
+  KEY `bagian_dokter` (`bagian_dokter`),
+  KEY `bagian_laborat` (`bagian_laborat`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
+
+DROP TABLE IF EXISTS `diagnosa_pasien`;
+CREATE TABLE `diagnosa_pasien` (
+  `no_rawat` varchar(17) NOT NULL,
+  `kd_penyakit` varchar(15) NOT NULL,
+  `status` enum('Ralan','Ranap') NOT NULL,
+  `prioritas` tinyint(4) NOT NULL,
+  `status_penyakit` enum('Lama','Baru') DEFAULT NULL,
+  PRIMARY KEY (`no_rawat`,`kd_penyakit`,`status`),
+  KEY `kd_penyakit` (`kd_penyakit`),
+  KEY `status` (`status`),
+  KEY `prioritas` (`prioritas`),
+  KEY `no_rawat` (`no_rawat`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
+
 DROP TABLE IF EXISTS `dokter`;
 CREATE TABLE `dokter` (
   `kd_dokter` varchar(20) NOT NULL,
@@ -207,6 +257,16 @@ CREATE TABLE `dpjp_ranap` (
   `kd_dokter` varchar(20) NOT NULL,
   PRIMARY KEY (`no_rawat`,`kd_dokter`),
   KEY `dpjp_ranap_ibfk_2` (`kd_dokter`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
+
+DROP TABLE IF EXISTS `hasil_radiologi`;
+CREATE TABLE `hasil_radiologi` (
+  `no_rawat` varchar(17) NOT NULL,
+  `tgl_periksa` date NOT NULL,
+  `jam` time NOT NULL,
+  `hasil` text NOT NULL,
+  PRIMARY KEY (`no_rawat`,`tgl_periksa`,`jam`),
+  KEY `no_rawat` (`no_rawat`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
 
 DROP TABLE IF EXISTS `jns_perawatan`;
@@ -276,6 +336,36 @@ CREATE TABLE `jns_perawatan_inap` (
   KEY `menejemen` (`menejemen`),
   KEY `status` (`status`),
   KEY `total_byrdrpr` (`total_byrdrpr`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
+
+DROP TABLE IF EXISTS `jns_perawatan_lab`;
+CREATE TABLE `jns_perawatan_lab` (
+  `kd_jenis_prw` varchar(15) NOT NULL,
+  `nm_perawatan` varchar(80) DEFAULT NULL,
+  `bagian_rs` double DEFAULT NULL,
+  `bhp` double NOT NULL,
+  `tarif_perujuk` double NOT NULL,
+  `tarif_tindakan_dokter` double NOT NULL,
+  `tarif_tindakan_petugas` double DEFAULT NULL,
+  `kso` double DEFAULT NULL,
+  `menejemen` double DEFAULT NULL,
+  `total_byr` double DEFAULT NULL,
+  `kd_pj` char(3) NOT NULL,
+  `status` enum('0','1') NOT NULL,
+  `kelas` enum('-','Rawat Jalan','Kelas 1','Kelas 2','Kelas 3','Kelas Utama','Kelas VIP','Kelas VVIP') NOT NULL,
+  `kategori` enum('PK','PA','MB') NOT NULL,
+  PRIMARY KEY (`kd_jenis_prw`),
+  KEY `kd_pj` (`kd_pj`),
+  KEY `nm_perawatan` (`nm_perawatan`),
+  KEY `tarif_perujuk` (`tarif_perujuk`),
+  KEY `tarif_tindakan_dokter` (`tarif_tindakan_dokter`),
+  KEY `tarif_tindakan_petugas` (`tarif_tindakan_petugas`),
+  KEY `total_byr` (`total_byr`),
+  KEY `bagian_rs` (`bagian_rs`),
+  KEY `bhp` (`bhp`),
+  KEY `kso` (`kso`),
+  KEY `menejemen` (`menejemen`),
+  KEY `status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
 
 DROP TABLE IF EXISTS `kamar`;
@@ -400,6 +490,61 @@ CREATE TABLE `pasien` (
   KEY `kd_prop` (`kd_prop`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
 
+DROP TABLE IF EXISTS `pemeriksaan_ralan`;
+CREATE TABLE `pemeriksaan_ralan` (
+  `no_rawat` varchar(17) NOT NULL,
+  `tgl_perawatan` date NOT NULL,
+  `jam_rawat` time NOT NULL,
+  `suhu_tubuh` varchar(5) DEFAULT NULL,
+  `tensi` varchar(8) NOT NULL,
+  `nadi` varchar(3) DEFAULT NULL,
+  `respirasi` varchar(3) DEFAULT NULL,
+  `tinggi` varchar(5) DEFAULT NULL,
+  `berat` varchar(5) DEFAULT NULL,
+  `spo2` varchar(3) NOT NULL,
+  `gcs` varchar(10) DEFAULT NULL,
+  `kesadaran` enum('Compos Mentis','Somnolence','Sopor','Coma','Alert','Confusion','Voice','Pain','Unresponsive','Apatis','Delirium') NOT NULL,
+  `keluhan` varchar(2000) DEFAULT NULL,
+  `pemeriksaan` varchar(2000) DEFAULT NULL,
+  `alergi` varchar(80) DEFAULT NULL,
+  `lingkar_perut` varchar(5) DEFAULT NULL,
+  `rtl` varchar(2000) NOT NULL,
+  `penilaian` varchar(2000) NOT NULL,
+  `instruksi` varchar(2000) NOT NULL,
+  `evaluasi` varchar(2000) NOT NULL,
+  `nip` varchar(20) NOT NULL,
+  PRIMARY KEY (`no_rawat`,`tgl_perawatan`,`jam_rawat`),
+  KEY `no_rawat` (`no_rawat`),
+  KEY `nip` (`nip`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
+
+DROP TABLE IF EXISTS `pemeriksaan_ranap`;
+CREATE TABLE `pemeriksaan_ranap` (
+  `no_rawat` varchar(17) NOT NULL,
+  `tgl_perawatan` date NOT NULL,
+  `jam_rawat` time NOT NULL,
+  `suhu_tubuh` varchar(5) DEFAULT NULL,
+  `tensi` varchar(8) NOT NULL,
+  `nadi` varchar(3) DEFAULT NULL,
+  `respirasi` varchar(3) DEFAULT NULL,
+  `tinggi` varchar(5) DEFAULT NULL,
+  `berat` varchar(5) DEFAULT NULL,
+  `spo2` varchar(3) NOT NULL,
+  `gcs` varchar(10) DEFAULT NULL,
+  `kesadaran` enum('Compos Mentis','Somnolence','Sopor','Coma','Alert','Confusion','Voice','Pain','Unresponsive','Apatis','Delirium') NOT NULL,
+  `keluhan` varchar(2000) DEFAULT NULL,
+  `pemeriksaan` varchar(2000) DEFAULT NULL,
+  `alergi` varchar(80) DEFAULT NULL,
+  `penilaian` varchar(2000) NOT NULL,
+  `rtl` varchar(2000) NOT NULL,
+  `instruksi` varchar(2000) NOT NULL,
+  `evaluasi` varchar(2000) NOT NULL,
+  `nip` varchar(20) NOT NULL,
+  PRIMARY KEY (`no_rawat`,`tgl_perawatan`,`jam_rawat`),
+  KEY `no_rawat` (`no_rawat`),
+  KEY `nip` (`nip`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
+
 DROP TABLE IF EXISTS `penjab`;
 CREATE TABLE `penjab` (
   `kd_pj` char(3) NOT NULL,
@@ -410,6 +555,75 @@ CREATE TABLE `penjab` (
   `attn` varchar(60) NOT NULL,
   `status` enum('0','1') NOT NULL,
   PRIMARY KEY (`kd_pj`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
+
+DROP TABLE IF EXISTS `penyakit`;
+CREATE TABLE `penyakit` (
+  `kd_penyakit` varchar(15) NOT NULL,
+  `nm_penyakit` varchar(250) DEFAULT NULL,
+  `ciri_ciri` text DEFAULT NULL,
+  `keterangan` varchar(60) DEFAULT NULL,
+  `kd_ktg` varchar(8) DEFAULT NULL,
+  `status` enum('Menular','Tidak Menular') NOT NULL,
+  `validcode` enum('0','1') NOT NULL,
+  `accpdx` enum('Y','N') NOT NULL,
+  `asterisk` enum('0','1') NOT NULL,
+  `im` enum('0','1') NOT NULL,
+  PRIMARY KEY (`kd_penyakit`),
+  KEY `kd_ktg` (`kd_ktg`),
+  KEY `nm_penyakit` (`nm_penyakit`),
+  KEY `status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
+
+DROP TABLE IF EXISTS `periksa_lab`;
+CREATE TABLE `periksa_lab` (
+  `no_rawat` varchar(17) NOT NULL,
+  `nip` varchar(20) NOT NULL,
+  `kd_jenis_prw` varchar(15) NOT NULL,
+  `tgl_periksa` date NOT NULL,
+  `jam` time NOT NULL,
+  `dokter_perujuk` varchar(20) NOT NULL,
+  `bagian_rs` double NOT NULL,
+  `bhp` double NOT NULL,
+  `tarif_perujuk` double NOT NULL,
+  `tarif_tindakan_dokter` double NOT NULL,
+  `tarif_tindakan_petugas` double NOT NULL,
+  `kso` double DEFAULT NULL,
+  `menejemen` double DEFAULT NULL,
+  `biaya` double NOT NULL,
+  `kd_dokter` varchar(20) NOT NULL,
+  `status` enum('Ralan','Ranap') DEFAULT NULL,
+  `kategori` enum('PA','PK','MB') NOT NULL,
+  PRIMARY KEY (`no_rawat`,`kd_jenis_prw`,`tgl_periksa`,`jam`),
+  KEY `nip` (`nip`),
+  KEY `kd_jenis_prw` (`kd_jenis_prw`),
+  KEY `kd_dokter` (`kd_dokter`),
+  KEY `dokter_perujuk` (`dokter_perujuk`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
+
+DROP TABLE IF EXISTS `petugas`;
+CREATE TABLE `petugas` (
+  `nip` varchar(20) NOT NULL,
+  `nama` varchar(50) DEFAULT NULL,
+  `jk` enum('L','P') DEFAULT NULL,
+  `tmp_lahir` varchar(20) DEFAULT NULL,
+  `tgl_lahir` date DEFAULT NULL,
+  `gol_darah` enum('A','B','O','AB','-') DEFAULT NULL,
+  `agama` varchar(12) DEFAULT NULL,
+  `stts_nikah` enum('BELUM MENIKAH','MENIKAH','JANDA','DUDHA','JOMBLO') DEFAULT NULL,
+  `alamat` varchar(60) DEFAULT NULL,
+  `kd_jbtn` char(4) DEFAULT NULL,
+  `no_telp` varchar(13) DEFAULT NULL,
+  `status` enum('0','1') DEFAULT NULL,
+  PRIMARY KEY (`nip`),
+  KEY `kd_jbtn` (`kd_jbtn`),
+  KEY `nama` (`nama`),
+  KEY `nip` (`nip`),
+  KEY `tmp_lahir` (`tmp_lahir`),
+  KEY `tgl_lahir` (`tgl_lahir`),
+  KEY `agama` (`agama`),
+  KEY `stts_nikah` (`stts_nikah`),
+  KEY `alamat` (`alamat`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
 
 DROP TABLE IF EXISTS `poliklinik`;
@@ -608,4 +822,138 @@ CREATE TABLE `resep_obat` (
   PRIMARY KEY (`no_resep`),
   KEY `no_rawat` (`no_rawat`),
   KEY `kd_dokter` (`kd_dokter`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
+
+DROP TABLE IF EXISTS `resume_pasien`;
+CREATE TABLE `resume_pasien` (
+  `no_rawat` varchar(17) NOT NULL,
+  `kd_dokter` varchar(20) NOT NULL,
+  `keluhan_utama` text NOT NULL,
+  `jalannya_penyakit` text NOT NULL,
+  `pemeriksaan_penunjang` text NOT NULL,
+  `hasil_laborat` text NOT NULL,
+  `diagnosa_utama` varchar(80) NOT NULL,
+  `kd_diagnosa_utama` varchar(10) NOT NULL,
+  `diagnosa_sekunder` varchar(80) NOT NULL,
+  `kd_diagnosa_sekunder` varchar(10) NOT NULL,
+  `diagnosa_sekunder2` varchar(80) NOT NULL,
+  `kd_diagnosa_sekunder2` varchar(10) NOT NULL,
+  `diagnosa_sekunder3` varchar(80) NOT NULL,
+  `kd_diagnosa_sekunder3` varchar(10) NOT NULL,
+  `diagnosa_sekunder4` varchar(80) NOT NULL,
+  `kd_diagnosa_sekunder4` varchar(10) NOT NULL,
+  `prosedur_utama` varchar(80) NOT NULL,
+  `kd_prosedur_utama` varchar(8) NOT NULL,
+  `prosedur_sekunder` varchar(80) NOT NULL,
+  `kd_prosedur_sekunder` varchar(8) NOT NULL,
+  `prosedur_sekunder2` varchar(80) NOT NULL,
+  `kd_prosedur_sekunder2` varchar(8) NOT NULL,
+  `prosedur_sekunder3` varchar(80) NOT NULL,
+  `kd_prosedur_sekunder3` varchar(8) NOT NULL,
+  `kondisi_pulang` enum('Hidup','Meninggal') NOT NULL,
+  `obat_pulang` text NOT NULL,
+  PRIMARY KEY (`no_rawat`),
+  KEY `kd_dokter` (`kd_dokter`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
+
+DROP TABLE IF EXISTS `resume_pasien_ranap`;
+CREATE TABLE `resume_pasien_ranap` (
+  `no_rawat` varchar(17) NOT NULL,
+  `kd_dokter` varchar(20) NOT NULL,
+  `diagnosa_awal` varchar(100) NOT NULL,
+  `alasan` varchar(100) NOT NULL,
+  `keluhan_utama` text NOT NULL,
+  `pemeriksaan_fisik` text NOT NULL,
+  `jalannya_penyakit` text NOT NULL,
+  `pemeriksaan_penunjang` text NOT NULL,
+  `hasil_laborat` text NOT NULL,
+  `tindakan_dan_operasi` text NOT NULL,
+  `obat_di_rs` text NOT NULL,
+  `diagnosa_utama` varchar(80) NOT NULL,
+  `kd_diagnosa_utama` varchar(10) NOT NULL,
+  `diagnosa_sekunder` varchar(80) NOT NULL,
+  `kd_diagnosa_sekunder` varchar(10) NOT NULL,
+  `diagnosa_sekunder2` varchar(80) NOT NULL,
+  `kd_diagnosa_sekunder2` varchar(10) NOT NULL,
+  `diagnosa_sekunder3` varchar(80) NOT NULL,
+  `kd_diagnosa_sekunder3` varchar(10) NOT NULL,
+  `diagnosa_sekunder4` varchar(80) NOT NULL,
+  `kd_diagnosa_sekunder4` varchar(10) NOT NULL,
+  `prosedur_utama` varchar(80) NOT NULL,
+  `kd_prosedur_utama` varchar(8) NOT NULL,
+  `prosedur_sekunder` varchar(80) NOT NULL,
+  `kd_prosedur_sekunder` varchar(8) NOT NULL,
+  `prosedur_sekunder2` varchar(80) NOT NULL,
+  `kd_prosedur_sekunder2` varchar(8) NOT NULL,
+  `prosedur_sekunder3` varchar(80) NOT NULL,
+  `kd_prosedur_sekunder3` varchar(8) NOT NULL,
+  `alergi` varchar(100) NOT NULL,
+  `diet` text NOT NULL,
+  `lab_belum` text NOT NULL,
+  `edukasi` text NOT NULL,
+  `cara_keluar` enum('Atas Izin Dokter','Pindah RS','Pulang Atas Permintaan Sendiri','Lainnya') NOT NULL,
+  `ket_keluar` varchar(50) DEFAULT NULL,
+  `keadaan` enum('Membaik','Sembuh','Keadaan Khusus','Meninggal') NOT NULL,
+  `ket_keadaan` varchar(50) DEFAULT NULL,
+  `dilanjutkan` enum('Kembali Ke RS','RS Lain','Dokter Luar','Puskesmes','Lainnya') NOT NULL,
+  `ket_dilanjutkan` varchar(50) DEFAULT NULL,
+  `kontrol` datetime DEFAULT NULL,
+  `obat_pulang` text NOT NULL,
+  PRIMARY KEY (`no_rawat`),
+  KEY `kd_dokter` (`kd_dokter`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=DYNAMIC;
+
+DROP TABLE IF EXISTS `setting`;
+CREATE TABLE `setting` (
+  `nama_instansi` varchar(60) NOT NULL DEFAULT '',
+  `alamat_instansi` varchar(150) DEFAULT NULL,
+  `kabupaten` varchar(30) DEFAULT NULL,
+  `propinsi` varchar(30) DEFAULT NULL,
+  `kontak` varchar(50) NOT NULL,
+  `email` varchar(50) NOT NULL,
+  `aktifkan` enum('Yes','No') NOT NULL,
+  `kode_ppk` varchar(15) DEFAULT NULL,
+  `kode_ppkinhealth` varchar(15) DEFAULT NULL,
+  `kode_ppkkemenkes` varchar(15) DEFAULT NULL,
+  `wallpaper` longblob DEFAULT NULL,
+  `logo` longblob NOT NULL,
+  PRIMARY KEY (`nama_instansi`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
+
+DROP TABLE IF EXISTS `template_laboratorium`;
+CREATE TABLE `template_laboratorium` (
+  `kd_jenis_prw` varchar(15) NOT NULL,
+  `id_template` int(11) NOT NULL AUTO_INCREMENT,
+  `Pemeriksaan` varchar(200) NOT NULL,
+  `satuan` varchar(20) NOT NULL,
+  `nilai_rujukan_ld` varchar(30) NOT NULL,
+  `nilai_rujukan_la` varchar(30) NOT NULL,
+  `nilai_rujukan_pd` varchar(30) NOT NULL,
+  `nilai_rujukan_pa` varchar(30) NOT NULL,
+  `bagian_rs` double NOT NULL,
+  `bhp` double NOT NULL,
+  `bagian_perujuk` double NOT NULL,
+  `bagian_dokter` double NOT NULL,
+  `bagian_laborat` double NOT NULL,
+  `kso` double DEFAULT NULL,
+  `menejemen` double DEFAULT NULL,
+  `biaya_item` double NOT NULL,
+  `urut` int(4) DEFAULT NULL,
+  PRIMARY KEY (`id_template`),
+  KEY `kd_jenis_prw` (`kd_jenis_prw`),
+  KEY `Pemeriksaan` (`Pemeriksaan`),
+  KEY `satuan` (`satuan`),
+  KEY `nilai_rujukan_ld` (`nilai_rujukan_ld`),
+  KEY `nilai_rujukan_la` (`nilai_rujukan_la`),
+  KEY `nilai_rujukan_pd` (`nilai_rujukan_pd`),
+  KEY `nilai_rujukan_pa` (`nilai_rujukan_pa`),
+  KEY `bagian_rs` (`bagian_rs`),
+  KEY `bhp` (`bhp`),
+  KEY `bagian_perujuk` (`bagian_perujuk`),
+  KEY `bagian_dokter` (`bagian_dokter`),
+  KEY `bagian_laborat` (`bagian_laborat`),
+  KEY `kso` (`kso`),
+  KEY `menejemen` (`menejemen`),
+  KEY `biaya_item` (`biaya_item`),
+  KEY `urut` (`urut`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;

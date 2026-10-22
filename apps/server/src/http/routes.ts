@@ -29,6 +29,8 @@
  *   POST   /api/fixes/:id/approve        approve and run it (write user, one transaction)
  *   POST   /api/fixes/:id/reject         reject it
  *   POST   /api/fixes/:id/rollback       restore the rows it changed
+ *   POST   /api/documents                make a patient document (riwayat, cppt, resume) without the AI
+ *   GET    /api/documents/:id            the document's HTML (?download=1 to save it)
  *   GET    /api/favorites                saved questions
  *   POST   /api/favorites                save the question and SQL behind a chat result
  *   DELETE /api/favorites/:id            remove one
@@ -43,6 +45,7 @@ import {
   AskRequest,
   AuditKind,
   ChangePasswordRequest,
+  CreateDocumentRequest,
   CreateFavoriteRequest,
   CreateFixRequest,
   CreateTicketRequest,
@@ -57,7 +60,7 @@ import {
   UpdateUserRequest,
   type User,
 } from "@simrs/shared";
-import { FixStore, kartuPasien, KhanzaRead, planFix, ResultStore, runTool } from "@simrs/tools";
+import { dokumenPasien, FixStore, kartuPasien, KhanzaRead, planFix, ResultStore, runTool } from "@simrs/tools";
 import { Effect, Layer, Option, Schema } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { Agent } from "../agent/Agent.ts";
@@ -480,6 +483,60 @@ const FixRoutes = Layer.mergeAll(
   ),
 );
 
+/** Documents are self-contained HTML: no scripts, nothing loaded from elsewhere, framed only by the app. */
+const DOCUMENT_HEADERS: Readonly<Record<string, string>> = {
+  "content-security-policy":
+    "default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
+  "x-frame-options": "SAMEORIGIN",
+  "x-content-type-options": "nosniff",
+  "referrer-policy": "no-referrer",
+  "cache-control": "no-store",
+};
+
+const DocumentRoutes = Layer.mergeAll(
+  route(
+    "POST",
+    "/api/documents",
+    authed(
+      handled(
+        Effect.gen(function* () {
+          const input = yield* body(CreateDocumentRequest);
+          const user = yield* CurrentUser;
+          return yield* runTool(dokumenPasien, input, { sessionId: `ui:${user.username}`, actor: user.username }).pipe(
+            Effect.map((out) => json(out.document, 201)),
+            Effect.catch((e) =>
+              Effect.succeed(
+                errorResponse(e._tag === "ToolInputError" ? 400 : e._tag === "ToolError" ? 404 : 502, e.message),
+              ),
+            ),
+          );
+        }),
+      ),
+    ),
+  ),
+
+  route(
+    "GET",
+    "/api/documents/:id",
+    authed(
+      Effect.gen(function* () {
+        const stored = yield* (yield* ResultStore).getDocument(yield* id);
+        if (!stored) return errorResponse(404, "Dokumen tidak ditemukan.");
+        const download = (yield* searchParams).get("download") === "1";
+        if (download) {
+          const user = yield* CurrentUser;
+          yield* (yield* Auth).logEvent("document_downloaded", user.username, `${stored.info.judul}: ${stored.info.subjek}`);
+        }
+        const fileName = `${stored.info.jenis}-${stored.info.subjek.replaceAll(/[^A-Za-z0-9]+/g, "-").replaceAll(/^-|-$/g, "")}.html`;
+        return HttpServerResponse.text(stored.html, {
+          contentType: "text/html; charset=utf-8",
+          headers: { ...DOCUMENT_HEADERS, ...(download ? { "content-disposition": `attachment; filename="${fileName}"` } : {}) },
+        });
+      }),
+    ),
+  ),
+);
+
 const DataRoutes = Layer.mergeAll(
   route("GET", "/api/favorites", authed(Effect.gen(function* () {
       return json(yield* (yield* ResultStore).listFavorites);
@@ -608,4 +665,4 @@ const WebRoutes = route(
   }),
 );
 
-export const Routes = Layer.mergeAll(AuthRoutes, TicketRoutes, FixRoutes, DataRoutes, WebRoutes);
+export const Routes = Layer.mergeAll(AuthRoutes, TicketRoutes, FixRoutes, DocumentRoutes, DataRoutes, WebRoutes);

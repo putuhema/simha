@@ -18,7 +18,7 @@ import type {
   ToolStep,
   Transcript,
 } from "@simrs/shared";
-import { KhanzaRead } from "@simrs/tools";
+import { KhanzaRead, toDocumentInfo, type DocumentRow } from "@simrs/tools";
 import { Context, Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 
@@ -153,6 +153,9 @@ const make = Effect.gen(function* () {
         FROM tool_calls WHERE ${sql.in("session_id", ids)} ORDER BY started_at`;
       const blocks = yield* sql<{ session_id: string; block_json: string }>`
         SELECT session_id, block_json FROM render_blocks WHERE ${sql.in("session_id", ids)} ORDER BY created_at`;
+      const documents = yield* sql<DocumentRow & { session_id: string }>`
+        SELECT id, kind, title, subject, summary, actor, created_at, session_id FROM documents
+        WHERE ${sql.in("session_id", ids)} ORDER BY created_at`;
       const fixes = yield* sql<{ id: string; run_id: string }>`
         SELECT id, run_id FROM fixes WHERE ${sql.in("run_id", ids)} ORDER BY created_at`;
 
@@ -184,6 +187,7 @@ const make = Effect.gen(function* () {
             finishedAt: r.finished_at,
             steps: steps.filter((s) => s.session_id === r.id).map(toStep),
             blocks: blocks.filter((b) => b.session_id === r.id).map((b) => JSON.parse(b.block_json) as RenderBlock),
+            documents: documents.filter((d) => d.session_id === r.id).map(toDocumentInfo),
             fixIds: fixes.filter((f) => f.run_id === r.id).map((f) => f.id),
           }),
         ),

@@ -4,6 +4,7 @@
 import { Schema } from "effect";
 import { diagnosaPindahKamar } from "./diagnose/diagnosaPindahKamar.ts";
 import { diagnosaTindakan } from "./diagnose/diagnosaTindakan.ts";
+import { dokumenPasien } from "./documents/dokumenPasien.ts";
 import type { FixStore } from "./fixes/FixStore.ts";
 import { jalankanQueryBaca } from "./info/jalankanQueryBaca.ts";
 import { lihatSkema } from "./info/lihatSkema.ts";
@@ -64,4 +65,5 @@ export const defaultRegistry: ToolRegistry = makeRegistry([
   lihatSkema,
   jalankanQueryBaca,
   tampilkan,
+  dokumenPasien,
 ] as unknown as ReadonlyArray<AnyTool>);

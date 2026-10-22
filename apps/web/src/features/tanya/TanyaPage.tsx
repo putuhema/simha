@@ -8,6 +8,7 @@ import { History, MessageSquarePlus, Play, SendHorizontal, Square, Star, Trash2 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Markdown } from "../../components/agent/Markdown.tsx";
 import { StepList } from "../../components/agent/StepList.tsx";
+import { DocumentCard } from "../../components/blocks/DocumentCard.tsx";
 import { RenderBlockView } from "../../components/blocks/RenderBlockView.tsx";
 import { Button } from "../../components/ui/Button.tsx";
 import { Panel } from "../../components/ui/Card.tsx";
@@ -23,6 +24,7 @@ import { ChevronRight } from "lucide-react";
 
 const EXAMPLES = [
   "Berapa pasien yang daftar hari ini?",
+  "Buatkan riwayat pasien RM 000002",
   "10 obat paling banyak dipakai minggu ini",
   "Jumlah kunjungan per poli 7 hari terakhir",
   "Pasien BPJS vs umum hari ini",
@@ -50,6 +52,9 @@ const Turn = ({ turn, onSaved }: { readonly turn: RunView; readonly onSaved: () 
     ) : null}
     {turn.blocks.map((block) => (
       <RenderBlockView key={block.id} block={block} onSaved={onSaved} />
+    ))}
+    {turn.documents.map((document) => (
+      <DocumentCard key={document.id} document={document} />
     ))}
     {turn.text ? <Markdown text={turn.text} className={turn.status === "running" ? "text-ink-2" : ""} /> : null}
     {turn.status === "error" ? <ErrorText>{turn.error}</ErrorText> : null}

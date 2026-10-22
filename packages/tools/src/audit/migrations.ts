@@ -230,10 +230,30 @@ const auth = Effect.gen(function* () {
   yield* sql`ALTER TABLE tickets ADD COLUMN created_by TEXT`;
 });
 
+const documents = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  // Patient documents (riwayat, CPPT, resume) as generated, so what was printed can be shown again.
+  yield* sql`
+    CREATE TABLE documents (
+      id            TEXT PRIMARY KEY,
+      kind          TEXT NOT NULL CHECK (kind IN ('riwayat', 'cppt', 'resume')),
+      title         TEXT NOT NULL,
+      subject       TEXT NOT NULL,
+      summary       TEXT NOT NULL,
+      session_id    TEXT,
+      tool_call_id  TEXT REFERENCES tool_calls (id),
+      actor         TEXT,
+      html          TEXT NOT NULL,
+      created_at    TEXT NOT NULL
+    )`;
+  yield* sql`CREATE INDEX documents_session ON documents (session_id, created_at)`;
+});
+
 export const auditMigrations = {
   "0001_init": init,
   "0002_agent": agent,
   "0003_fixes": fixes,
   "0004_tanya_data": tanyaData,
   "0005_auth": auth,
+  "0006_documents": documents,
 };
