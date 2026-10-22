@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:" />
+    <title>SIMRS Harness · Pengaturan koneksi</title>
+    <link rel="stylesheet" href="setup.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="logo.svg" alt="" width="40" height="40" />
+        <h1>Sambungkan SIMRS Harness</h1>
+        <p class="muted">Pilih server yang dipakai aplikasi ini. Bisa diubah lagi dari menu <b>Aplikasi → Pengaturan koneksi</b>.</p>
+      </header>
+
+      <pre id="error" class="error" hidden></pre>
+
+      <form id="form">
+        <label class="choice">
+          <input type="radio" name="mode" value="remote" />
+          <span>
+            <b>Server di jaringan rumah sakit</b>
+            <small>Disarankan. Semua PC IT memakai satu server dan satu audit log.</small>
+          </span>
+        </label>
+        <div class="detail" data-for="remote">
+          <label for="serverUrl">Alamat server</label>
+          <div class="row">
+            <input id="serverUrl" placeholder="http://10.0.0.5:8787" autocomplete="off" spellcheck="false" />
+            <button type="button" id="test" class="secondary">Tes</button>
+          </div>
+          <p id="testResult" class="muted small"></p>
+        </div>
+
+        <label class="choice">
+          <input type="radio" name="mode" value="local" />
+          <span>
+            <b>Jalankan server di komputer ini</b>
+            <small>Untuk satu PC saja. Koneksi Khanza DB dan AI diatur di file <code>.env</code>.</small>
+          </span>
+        </label>
+        <div class="detail" data-for="local">
+          <label for="port">Port</label>
+          <div class="row">
+            <input id="port" type="number" min="1024" max="65535" />
+            <button type="button" id="openConfig" class="secondary">Buka file .env</button>
+          </div>
+          <p class="muted small">File: <code id="envFile">…</code></p>
+        </div>
+
+        <footer>
+          <span id="saveResult" class="muted small"></span>
+          <button type="submit" id="save">Simpan & sambungkan</button>
+        </footer>
+      </form>
+
+      <section class="khanza">
+        <h2>Buka Khanza dari aplikasi</h2>
+        <p class="muted small">File yang biasa dipakai untuk membuka SIMRS Khanza di PC ini (mis. <code>SIMRS-Khanza.bat</code>).</p>
+        <div class="row">
+          <code id="launcher" class="path">Belum dipilih</code>
+          <button type="button" id="chooseLauncher" class="secondary">Pilih file…</button>
+        </div>
+      </section>
+      <p class="muted small version" id="version"></p>
+    </main>
+    <script src="setup.js"></script>
+  </body>
+</html>

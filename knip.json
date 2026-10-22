@@ -5,10 +5,20 @@
       "entry": [
         "*.ts"
       ]
+    },
+    "apps/desktop": {
+      "entry": [
+        "src/main.ts",
+        "src/preload.ts",
+        "src/setup/setup.js",
+        "scripts/*.mjs"
+      ]
     }
   },
   "ignoreBinaries": [
     "mariadbd",
-    "mariadb-install-db"
+    "mariadb-install-db",
+    "java",
+    "javaw"
   ]
 }

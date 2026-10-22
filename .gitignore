@@ -13,3 +13,6 @@ data/
 .DS_Store
 test-results/
 playwright-report/
+
+# Desktop app build output
+apps/desktop/build/

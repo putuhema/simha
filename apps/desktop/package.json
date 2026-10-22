@@ -3,10 +3,22 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": {
-    ".": "./src/index.ts"
-  },
   "scripts": {
-    "typecheck": "tsc -p ."
-  }
+    "typecheck": "tsc -p .",
+    "build": "pnpm --filter @simrs/web build && node scripts/build.mjs",
+    "dev": "node scripts/dev.mjs",
+    "dist:win": "pnpm build && electron-builder --win nsis --x64",
+    "dist:dir": "pnpm build && electron-builder --dir"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "electron": "^45.0.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "description": "SIMRS Harness desktop app: the harness UI in a window, with Buka di Khanza.",
+  "author": "SIMRS Harness",
+  "main": "build/main.cjs"
 }

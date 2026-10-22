@@ -90,7 +90,7 @@ const tanyaRoute = createRoute({
   component: TanyaPage,
 });
 
-const TABS: ReadonlyArray<SettingsTab> = ["ai", "audit", "pengguna", "akun"];
+const TABS: ReadonlyArray<SettingsTab> = ["ai", "audit", "pengguna", "akun", "desktop"];
 const pengaturanRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/pengaturan",

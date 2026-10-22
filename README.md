@@ -170,6 +170,33 @@ What the server checks:
 - **Edit.** **Edit** saves a corrected proposal, which is checked again, and rejects the original.
 - **Rollback.** The server refuses if the rows changed since the fix ran. Otherwise it restores the before-image in one transaction.
 
+### 6. Desktop app (Windows)
+
+`apps/desktop` wraps the UI in an Electron window and adds **Buka di Khanza**.
+
+**Build the installer** (on any OS; the result is unsigned, so Windows SmartScreen asks once):
+
+```bash
+pnpm --filter @simrs/desktop dist:win    # apps/desktop/release/SIMRS-Harness-Setup-<version>.exe
+```
+
+**First start.** The app asks which server to use:
+
+- **Server di jaringan RS** (recommended): enter the address of the server from step 4, e.g. `http://10.0.0.5:8787`. Run that server with `SERVER_HOST=0.0.0.0` so other PCs can reach it. All IT PCs then share one audit log.
+- **Jalankan server di komputer ini**: the app runs the server itself with its built-in Node, so the PC needs no Node.js. Its settings are in `%APPDATA%\SIMRS Harness\.env` (created from `.env.example` on first start; **Buka file .env** opens the folder). The audit DB is `%APPDATA%\SIMRS Harness\data\audit.sqlite` and the server log is `logs\server.log` next to it. If the server does not start, the reason is shown on the setup page.
+
+Change it later from the menu **Aplikasi → Pengaturan koneksi** or **Pengaturan → Desktop**.
+
+**Buka di Khanza.** Choose the file that starts Khanza on that PC once (usually its `.bat`), in **Pengaturan → Desktop** or the first time you click the button. The button is on the patient card, on documents, and under chat answers that mention a no. rawat or no. RM. It:
+
+1. copies the no. rawat (or no. RM) to the clipboard;
+2. brings the open Khanza window to the front (a `java`/`javaw` window titled "Khanza…" or "SIM …"), or starts the `.bat` if Khanza is not open;
+3. tells you to paste the number into Khanza's search.
+
+Khanza cannot yet be told to open a specific form; see "Khanza bridge" in `docs/PLAN.md`.
+
+**Develop:** `pnpm --filter @simrs/desktop dev` builds the UI bundle and starts the app. While developing it uses the repo's `.env`. Set `SIMRS_DESKTOP_DATA_DIR` to keep settings and the audit DB in another folder.
+
 ### HTTP API
 
 The UI uses the same API. Everything except `/api/health`, `/api/auth/state`, `/api/auth/login` and `/api/auth/setup` needs a login cookie:
@@ -312,7 +339,7 @@ TypeScript files run directly with Node 24 (type stripping), so there is no buil
 apps/
   server/     Effect HTTP server: API, agent loop, approval flow, SSE streaming
   web/        React + TanStack Router UI
-  desktop/    Electron shell
+  desktop/    Electron app: window, setup page, local server, Buka di Khanza, Windows installer
 packages/
   shared/     Effect Schemas for API contracts, render blocks, ticket/fix types
   tools/      Neutral tool registry + handlers + SQL guards

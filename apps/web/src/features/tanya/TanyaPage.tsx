@@ -10,10 +10,12 @@ import { useEffect, useRef, useState } from "react";
 import { StreamingMarkdown } from "../../components/agent/Markdown.tsx";
 import { PendingLine, pendingStep, StepList } from "../../components/agent/StepList.tsx";
 import { DocumentCard } from "../../components/blocks/DocumentCard.tsx";
+import { OpenInKhanza } from "../../components/desktop/OpenInKhanza.tsx";
 import { RenderBlockView } from "../../components/blocks/RenderBlockView.tsx";
 import type { Health } from "../../components/layout/Sidebar.tsx";
 import { ErrorText } from "../../components/ui/Field.tsx";
 import { Spinner } from "../../components/ui/Spinner.tsx";
+import { khanzaTarget } from "../../lib/desktop.ts";
 import type { RunView } from "../../lib/run.ts";
 import { useApi } from "../../lib/useApi.ts";
 import { bumpFavorites } from "../../stores/refresh.ts";
@@ -99,8 +101,9 @@ const Turn = ({ turn }: { readonly turn: RunView }) => {
       {turn.status === "error" ? <ErrorText>{turn.error}</ErrorText> : null}
       {turn.status === "stopped" ? <p className="text-[13px] text-ink-3">Dihentikan.</p> : null}
       {turn.status === "done" && turn.text ? (
-        <div className="-mt-2 flex animate-fade-in items-center gap-1">
+        <div className="-mt-2 flex animate-fade-in items-center gap-1.5">
           <CopyButton text={turn.text} />
+          <OpenInKhanza copy={khanzaTarget(turn.text, turn.question, JSON.stringify(turn.steps.map((s) => s.input)))} />
         </div>
       ) : null}
     </article>

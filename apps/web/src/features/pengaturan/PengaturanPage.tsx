@@ -1,12 +1,14 @@
 import { Tabs } from "@base-ui/react/tabs";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useAuth } from "../../stores/auth.ts";
+import { desktop } from "../../lib/desktop.ts";
 import { Account } from "./Account.tsx";
 import { AuditLog } from "./AuditLog.tsx";
+import { DesktopSettings } from "./DesktopSettings.tsx";
 import { LlmSettingsForm } from "./LlmSettingsForm.tsx";
 import { Users } from "./Users.tsx";
 
-export type SettingsTab = "ai" | "audit" | "pengguna" | "akun";
+export type SettingsTab = "ai" | "audit" | "pengguna" | "akun" | "desktop";
 
 const tabClass =
   "relative px-3 py-2 text-[13.5px] text-ink-2 outline-none hover:text-ink data-[active]:font-medium data-[active]:text-ink focus-visible:ring-2 focus-visible:ring-teal";
@@ -35,6 +37,11 @@ export const PengaturanPage = () => {
             <Tabs.Tab value="akun" className={tabClass}>
               Akun
             </Tabs.Tab>
+            {desktop ? (
+              <Tabs.Tab value="desktop" className={tabClass}>
+                Desktop
+              </Tabs.Tab>
+            ) : null}
             <Tabs.Indicator className="absolute bottom-[-1px] left-[var(--active-tab-left)] h-0.5 w-[var(--active-tab-width)] bg-teal transition-all duration-200" />
           </Tabs.List>
           <Tabs.Panel value="ai">
@@ -51,6 +58,11 @@ export const PengaturanPage = () => {
           <Tabs.Panel value="akun">
             <Account />
           </Tabs.Panel>
+          {desktop ? (
+            <Tabs.Panel value="desktop">
+              <DesktopSettings />
+            </Tabs.Panel>
+          ) : null}
         </Tabs.Root>
       </div>
     </div>

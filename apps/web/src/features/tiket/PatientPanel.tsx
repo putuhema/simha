@@ -7,6 +7,7 @@ import { BedDouble, FileText, Stethoscope, UserRound } from "lucide-react";
 import { useState } from "react";
 import { Markdown } from "../../components/agent/Markdown.tsx";
 import { DocumentCard } from "../../components/blocks/DocumentCard.tsx";
+import { OpenInKhanza } from "../../components/desktop/OpenInKhanza.tsx";
 import { Button } from "../../components/ui/Button.tsx";
 import { Panel } from "../../components/ui/Card.tsx";
 import { Dialog } from "../../components/ui/Dialog.tsx";
@@ -135,6 +136,7 @@ export const PatientPanel = ({ rm, summary }: { readonly rm: string | undefined;
               </Row>
             </dl>
             <DocumentButtons rm={card.data.pasien.no_rkm_medis} noRawat={visit?.no_rawat} />
+            <OpenInKhanza copy={visit?.no_rawat ?? card.data.pasien.no_rkm_medis} className="mt-3" />
           </div>
         ) : null}
       </Panel>

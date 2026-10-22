@@ -13,6 +13,7 @@ import {
   KeyRound,
   LogOut,
   MessageSquare,
+  MonitorCog,
   PanelLeftClose,
   PanelLeftOpen,
   Search,
@@ -26,6 +27,7 @@ import {
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "../../lib/api.ts";
 import { cn } from "../../lib/cn.ts";
+import { desktop } from "../../lib/desktop.ts";
 import { useApi } from "../../lib/useApi.ts";
 import { useAuth } from "../../stores/auth.ts";
 import { bumpFavorites, useVersions } from "../../stores/refresh.ts";
@@ -84,7 +86,7 @@ const UserMenu = ({ compact, health, onNavigate }: { readonly compact: boolean; 
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   if (!user) return null;
-  const go = (tab: "ai" | "audit" | "akun") => {
+  const go = (tab: "ai" | "audit" | "akun" | "desktop") => {
     onNavigate();
     void navigate({ to: "/pengaturan", search: { tab } });
   };
@@ -134,6 +136,11 @@ const UserMenu = ({ compact, health, onNavigate }: { readonly compact: boolean; 
             <Menu.Item className={menuItem} onClick={() => go("akun")}>
               <KeyRound className="size-4 text-ink-2" /> Akun & password
             </Menu.Item>
+            {desktop ? (
+              <Menu.Item className={menuItem} onClick={() => go("desktop")}>
+                <MonitorCog className="size-4 text-ink-2" /> Desktop & Khanza
+              </Menu.Item>
+            ) : null}
             <Menu.Separator className="my-1 h-px bg-line-2" />
             <Menu.Item className={cn(menuItem, "text-red data-[highlighted]:bg-red-soft")} onClick={() => void logout()}>
               <LogOut className="size-4" /> Keluar

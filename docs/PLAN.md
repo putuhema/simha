@@ -25,7 +25,8 @@ Each one ends with tests passing and a stop for you to test.
 - **M5. Web UI. ✅ Done.** Tiket, Tanya Data (charts, tables, favorites), Pengaturan (provider, audit log). Login. Playwright smoke tests.
 - **M5.1. Patient documents. ✅ Done.** Riwayat pasien, CPPT / SOAP and resume medis as printable HTML from Khanza data (`dokumenPasien`), from the patient card or the agent.
 - **M5.2. Routine data checks and agent test set.** Scheduled checks for known data problems with "Buat tiket"; fixed scenarios with known answers to score each AI provider/model.
-- **M6. Desktop.** Electron app wrapping the UI, can start the local server, Windows installer.
+- **M6. Desktop. ✅ Done.** Electron app wrapping the UI (remote server or a local server it starts), setup page, "Buka di Khanza", Windows installer.
+- **M6.1. Khanza bridge.** A small patch to Khanza so the desktop app can open a given form for a given no. rawat (see M6 notes).
 - **M7. MCP.** Same tools over stdio and streamable HTTP, README section for Claude Desktop / Claude Code.
 
 ## M1 notes
@@ -114,6 +115,14 @@ Each one ends with tests passing and a stop for you to test.
 - **The AI never writes document content.** The server fills a fixed template, and the AI only asks for the document and may add a labelled summary in the chat. Every value is escaped (tested with `<script>` in a SOAP note). Documents are served with `default-src 'none'`, previewed in a sandboxed frame, stored in the audit DB (migration `0006_documents`), and downloads are logged.
 - **Privacy.** When masking is on (any external AI), free-text clinical fields are replaced with "[catatan klinis tidak dikirim ke AI]" before anything is sent. Diagnoses, vitals and lab numbers still go.
 - **No resume in Khanza.** The resume becomes a draft from the first CPPT entry, the diagnoses, tindakan and drugs. It is clearly marked, with empty fields left for the doctor.
+
+## M6 notes
+
+- **Two modes.** *Remote*: the window loads a harness server on the hospital network (recommended: one audit log). *Local*: the app runs the bundled server (`build/server/main.mjs`, one esbuild file, no `node_modules`) with Electron's Node (`ELECTRON_RUN_AS_NODE`); config in `%APPDATA%\SIMRS Harness\.env`, audit DB and log in the same folder. The server needs no native modules (SQLite is `node:sqlite`).
+- **Bridge.** The UI gets `window.simrsDesktop` from the preload: `info`, `openKhanza(copy)`, `chooseKhanzaLauncher`, `openSetup`. The main process only answers the window it created, and only for the harness origin or the setup page; setup functions are refused for the UI. Only strings up to 64 characters go to the clipboard. Links to other sites open in the normal browser.
+- **Buka di Khanza.** On Windows it first looks for a running Khanza window (PowerShell: a `java`/`javaw` process whose title matches `Khanza|^SIM `) and brings it to the front, so Khanza is not opened twice. Otherwise it runs the chosen `.bat`/`.cmd`/`.exe`/`.jar` from its own folder. Not yet tried on a hospital PC: check the window-title match against your Khanza build.
+- **Khanza bridge (M6.1, planned).** Khanza forms already accept a visit: `RMDataResumePasienRanap.setNoRm(no_rawat, date)`, and `DlgKamarInap` opens forms this way (749 `setNoRm(` calls). The patch: one new class that, after login, listens on `127.0.0.1` with a token for `{form, noRawat}`, opens only forms on a fixed list on the Swing thread (`isCek()` keeps Khanza's own access rights), and brings them to the front; plus one line in the login handler. It needs a Khanza build we maintain (re-apply after each Khanza update) and testing on a hospital PC.
+- **Not done yet.** Code signing (SmartScreen warns on first install), auto-update, and the Khanza bridge.
 
 ## Decisions and questions
 

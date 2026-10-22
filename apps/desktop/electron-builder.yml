@@ -1,0 +1,41 @@
+# Windows installer for SIMRS Harness (pnpm --filter @simrs/desktop dist:win).
+appId: id.simrs.harness
+productName: SIMRS Harness
+copyright: SIMRS Harness
+directories:
+  output: release
+  buildResources: resources
+# Only the built files go into the app; there are no runtime node_modules.
+files:
+  - package.json
+  - build/main.cjs
+  - build/preload.cjs
+  - build/setup/**
+extraResources:
+  - from: build/server
+    to: server
+    filter: ["main.mjs", "system-prompt.md"]
+  - from: ../web/dist
+    to: web
+  - from: ../../.env.example
+    to: env.example
+  - from: ../../docs
+    to: docs
+    filter: ["khanza_notes.md", "schema.md"]
+asar: true
+npmRebuild: false
+win:
+  target: nsis
+  icon: resources/icon.png
+  # Editing the .exe needs Wine when building on macOS/Linux; not needed on Windows.
+  signAndEditExecutable: false
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  shortcutName: SIMRS Harness
+  artifactName: SIMRS-Harness-Setup-${version}.${ext}
+mac:
+  target: dir
+  icon: resources/icon.png

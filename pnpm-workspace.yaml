@@ -16,3 +16,7 @@ catalog:
 onlyBuiltDependencies:
   - esbuild
   - electron
+
+# One @types/node for the whole repo (electron-builder pulls a newer one, which splits vitest into copies).
+overrides:
+  "@types/node": "catalog:"
