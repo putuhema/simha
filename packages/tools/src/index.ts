@@ -14,6 +14,7 @@ export type { ServerFlavor, ServerInfo } from "./khanza/server.ts";
 export { diagnosaPindahKamar } from "./diagnose/diagnosaPindahKamar.ts";
 export { diagnosaTindakan } from "./diagnose/diagnosaTindakan.ts";
 export { dokumenPasien } from "./documents/dokumenPasien.ts";
+export { buatDraftResume } from "./drafts/draftTools.ts";
 export { checkFix, FIX_ALLOW_LIST, FixRejected, selectByKeys, sqlLiteral } from "./fixes/guard.ts";
 export type { CheckedFix, FixKind, FixParam } from "./fixes/guard.ts";
 export { FixStore, FixStoreLive } from "./fixes/FixStore.ts";

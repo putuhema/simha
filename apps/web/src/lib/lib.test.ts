@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { chartOption } from "../components/blocks/chart-options.ts";
 import { rmFromSteps, rmFromText, splitAnswer } from "./answer.ts";
 import { fileNameFor, toCsv } from "./csv.ts";
-import { noRawatIn, noRmIn } from "./desktop.ts";
+import { formMentioned, noRawatIn, noRmIn } from "./desktop.ts";
 import { formatRelative } from "./format.ts";
 import { applyEvent, emptyRun } from "./run.ts";
 import { parseSseChunk } from "./sse.ts";
@@ -192,5 +192,13 @@ describe("Khanza targets", () => {
     expect(noRawatIn(null, "tidak ada", '{"noRawat":"2026/10/23/000001"}')).toBe("2026/10/23/000001");
     expect(noRmIn("RM 000002 · SITI AMINAH")).toBe("000002");
     expect(noRawatIn("RM 000002")).toBeNull();
+  });
+
+  it("only offers Khanza for answers about a form Khanza has", () => {
+    expect(formMentioned("Buka menu resume medis rawat inap di Khanza, cari 2024/02/21/000213.")).toBe("resume");
+    expect(formMentioned("Catatan CPPT terakhir ada di kunjungan ini; resume belum ada.")).toBe("soap");
+    expect(formMentioned("Lihat riwayat perawatan pasien RM 018412.")).toBe("riwayat");
+    expect(formMentioned("Jumlah kunjungan per poli 7 hari terakhir: IGD 412.")).toBeNull();
+    expect(formMentioned("Pasien RM 000002 punya 2 kamar aktif.")).toBeNull();
   });
 });

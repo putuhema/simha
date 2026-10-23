@@ -1,5 +1,5 @@
 /**
- * Runs one read tool (or lihatSkema / jalankanQueryBaca) against the Khanza database in .env and prints the JSON
+ * Runs one read tool (or lihatSkema / jalankanQueryBaca / buatDraftResume) against the Khanza database in .env and prints the JSON
  * result, for trying tools before the server exists. The call and its queries
  * are written to the audit log (AUDIT_DB_PATH, default data/audit.sqlite).
  *
@@ -16,6 +16,7 @@ import {
   jalankanQueryBaca,
   KhanzaReadLive,
   lihatSkema,
+  buatDraftResume,
   readTools,
   ResultStoreLive,
   runTool,
@@ -26,7 +27,7 @@ import type { KhanzaRead, ResultStore, SchemaDocs, Tool } from "@simrs/tools";
 import { Console, Effect, Layer } from "effect";
 
 type AnyReadTool = Tool<unknown, unknown, KhanzaRead | ResultStore | SchemaDocs>;
-const tools = [...readTools, lihatSkema, jalankanQueryBaca] as unknown as ReadonlyArray<AnyReadTool>;
+const tools = [...readTools, lihatSkema, jalankanQueryBaca, buatDraftResume] as unknown as ReadonlyArray<AnyReadTool>;
 
 const [name, json = "{}"] = process.argv.slice(2);
 

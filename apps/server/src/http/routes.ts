@@ -31,6 +31,8 @@
  *   POST   /api/fixes/:id/rollback       restore the rows it changed
  *   POST   /api/documents                make a patient document (riwayat, cppt, resume) without the AI
  *   GET    /api/documents/:id            the document's HTML (?download=1 to save it)
+ *   GET    /api/drafts/:id               a form draft (resume medis) in its latest state
+ *   PATCH  /api/drafts/:id               change fields of a draft (checked against Khanza's limits)
  *   GET    /api/favorites                saved questions
  *   POST   /api/favorites                save the question and SQL behind a chat result
  *   DELETE /api/favorites/:id            remove one
@@ -56,8 +58,10 @@ import {
   RejectFixRequest,
   SetupRequest,
   TicketStatus,
+  UpdateDraftRequest,
   UpdateLlmSettingsRequest,
   UpdateUserRequest,
+  formProblems,
   type User,
 } from "@simrs/shared";
 import { dokumenPasien, FixStore, kartuPasien, KhanzaRead, planFix, ResultStore, runTool } from "@simrs/tools";
@@ -537,6 +541,41 @@ const DocumentRoutes = Layer.mergeAll(
   ),
 );
 
+/** Form drafts (resume medis): read and edited in the draft card; filled into Khanza by the desktop app. */
+const DraftRoutes = Layer.mergeAll(
+  route(
+    "GET",
+    "/api/drafts/:id",
+    authed(
+      Effect.gen(function* () {
+        const draft = yield* (yield* ResultStore).getDraft(yield* id);
+        return draft ? json(draft) : errorResponse(404, "Draf tidak ditemukan.");
+      }),
+    ),
+  ),
+  route(
+    "PATCH",
+    "/api/drafts/:id",
+    authed(
+      handled(
+        Effect.gen(function* () {
+          const input = yield* body(UpdateDraftRequest);
+          const store = yield* ResultStore;
+          const draftId = yield* id;
+          const current = yield* store.getDraft(draftId);
+          if (!current) return errorResponse(404, "Draf tidak ditemukan.");
+          const values = Object.fromEntries(Object.entries(input.fields).map(([k, v]) => [k, v.trim()]));
+          const problems = formProblems(current.form, values);
+          if (problems.length > 0) return errorResponse(400, problems.join(" "));
+          const user = yield* CurrentUser;
+          const draft = yield* store.updateDraft(draftId, values, "user", user.username);
+          return draft ? json(draft) : errorResponse(404, "Draf tidak ditemukan.");
+        }),
+      ),
+    ),
+  ),
+);
+
 const DataRoutes = Layer.mergeAll(
   route("GET", "/api/favorites", authed(Effect.gen(function* () {
       return json(yield* (yield* ResultStore).listFavorites);
@@ -665,4 +704,4 @@ const WebRoutes = route(
   }),
 );
 
-export const Routes = Layer.mergeAll(AuthRoutes, TicketRoutes, FixRoutes, DocumentRoutes, DataRoutes, WebRoutes);
+export const Routes = Layer.mergeAll(AuthRoutes, TicketRoutes, FixRoutes, DocumentRoutes, DraftRoutes, DataRoutes, WebRoutes);

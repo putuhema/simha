@@ -249,6 +249,29 @@ const documents = Effect.gen(function* () {
   yield* sql`CREATE INDEX documents_session ON documents (session_id, created_at)`;
 });
 
+const formDrafts = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  // Drafts of Khanza forms (resume medis): filled from data, by the AI and by the user, then put into
+  // Khanza's own form by the desktop app. Never written to Khanza by the harness.
+  yield* sql`
+    CREATE TABLE form_drafts (
+      id            TEXT PRIMARY KEY,
+      form          TEXT NOT NULL,
+      no_rawat      TEXT NOT NULL,
+      subject       TEXT NOT NULL,
+      existing      INTEGER NOT NULL DEFAULT 0,
+      fields_json   TEXT NOT NULL,
+      sources_json  TEXT NOT NULL,
+      session_id    TEXT,
+      tool_call_id  TEXT REFERENCES tool_calls (id),
+      created_by    TEXT,
+      created_at    TEXT NOT NULL,
+      updated_by    TEXT,
+      updated_at    TEXT NOT NULL
+    )`;
+  yield* sql`CREATE INDEX form_drafts_session ON form_drafts (session_id, created_at)`;
+});
+
 export const auditMigrations = {
   "0001_init": init,
   "0002_agent": agent,
@@ -256,4 +279,5 @@ export const auditMigrations = {
   "0004_tanya_data": tanyaData,
   "0005_auth": auth,
   "0006_documents": documents,
+  "0007_form_drafts": formDrafts,
 };

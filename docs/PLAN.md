@@ -26,6 +26,7 @@ Each one ends with tests passing and a stop for you to test.
 - **M5.1. Patient documents. ✅ Done.** Riwayat pasien, CPPT / SOAP and resume medis as printable HTML from Khanza data (`dokumenPasien`), from the patient card or the agent.
 - **M5.2. Routine data checks and agent test set.** Scheduled checks for known data problems with "Buat tiket"; fixed scenarios with known answers to score each AI provider/model.
 - **M6. Desktop. ✅ Done.** Electron app wrapping the UI (remote server or a local server it starts), setup page, "Buka di Khanza", Windows installer.
+- **M6.2. Resume drafts. ✅ Done.** The AI drafts the resume medis rawat inap from Khanza data, asks for the rest, and "Isi di Khanza" fills Khanza's own form (see M6.2 notes).
 - **M6.1. Khanza bridge. ✅ Done.** `HarnessBridge.java` in the hospital's Khanza build (applied with `integrations/khanza-bridge/apply.mjs`): "Buka di Khanza" opens resume, CPPT/SOAP or riwayat for the visit in the running Khanza (see M6.1 notes).
 - **M7. MCP.** Same tools over stdio and streamable HTTP, README section for Claude Desktop / Claude Code.
 
@@ -133,6 +134,14 @@ Each one ends with tests passing and a stop for you to test.
 - **Order.** Checks (rights, visit exists) run on the Swing thread and are answered right away; the form then opens like a menu click, including Khanza's own warnings (e.g. "User login bukan dokter"), which no longer block the answer.
 - **Tested** against the real Khanza code and the local `sik` database (stand-in login): all five forms open on the requested visit; wrong token, unknown form, missing right and unknown visit are refused with a message; the info file is removed at logout. Not yet tested: a real login in the built Khanza, and on a Windows PC.
 - **Later:** billing ranap/ralan and SEP (Khanza runs extra prompts and depot logic before opening them).
+
+## M6.2 notes: resume drafts
+
+- **Draft** (`packages/tools/src/drafts`, table `form_drafts`, migration `0007_form_drafts`): one row per draft, fields keyed by `resume_pasien_ranap` column, with the source of each value (`data`, `khanza`, `ai`, `user`). Field definitions, limits and choices in `packages/shared/src/forms.ts`, used by the server (isiDraft, PATCH /api/drafts/:id), the card and the desktop app's checks.
+- **Filled by the server, not the AI**: `buatDraftResume` reads Khanza (diagnosa_pasien/prosedur_pasien status Ranap by priority, first doctor CPPT, latest allergy, lab, radiology, tindakan, obat, kamar_inap diagnosa_awal/stts_pulang, permintaan_ranap.diagnosa). An existing resume is loaded instead (`existing`, Khanza's Ganti). The AI sees which fields are filled; clinical text is masked by key for external providers.
+- **Card**: grouped like Khanza's form, source badges, required fields, length counters; saved on blur. One card per draft in the conversation (latest state; later AI updates replace it in place). Kept in transcripts.
+- **Khanza** (`HarnessBridge`, command `fill`): opens RMDataResumePasienRanap like `open`, selects the saved row first when there is one (so Ganti works), then sets the 39 fields by name (text, choice only when listed, date picker); never saves. Values travel base64 in one line. Tested with the real Khanza code on local data: new visit (Simpan) and existing resume (Ganti).
+- **Next forms**: resume ralan, CPPT entries.
 
 ## Decisions and questions
 

@@ -101,6 +101,37 @@ export const DocumentInfo = Schema.Struct({
 });
 export type DocumentInfo = typeof DocumentInfo.Type;
 
+// --- Form drafts (filled in Khanza by the desktop app) ---------------------------------
+
+/** Where a field's value came from: Khanza data, an existing Khanza entry, the AI (from the chat), or typed by the user. */
+export const FieldSource = Schema.Literals(["data", "khanza", "ai", "user"]);
+export type FieldSource = typeof FieldSource.Type;
+
+/**
+ * A draft of a Khanza form (e.g. resume medis rawat inap) for one visit.
+ * The server fills what Khanza data shows; the AI adds what the user tells it;
+ * the user edits it. It is never saved to Khanza by the harness: the desktop
+ * app opens Khanza's own form filled with it, and the user clicks Simpan there.
+ */
+export const FormDraft = Schema.Struct({
+  id: Schema.String,
+  form: Schema.Literals(["resume_ranap"]),
+  noRawat: Schema.String,
+  /** "RM 018412 · TN.WARNI · 2024/02/21/000213" */
+  subjek: Schema.String,
+  /** A resume already exists in Khanza: filling it means Khanza's Ganti, not Simpan. */
+  existing: Schema.Boolean,
+  fields: Schema.Record(Schema.String, Schema.String),
+  sources: Schema.Record(Schema.String, FieldSource),
+  createdBy: Schema.NullOr(Schema.String),
+  updatedAt: Schema.String,
+});
+export type FormDraft = typeof FormDraft.Type;
+
+/** PATCH /api/drafts/:id: fields the user changed in the draft card. */
+export const UpdateDraftRequest = Schema.Struct({ fields: Schema.Record(Schema.String, Schema.String) });
+export type UpdateDraftRequest = typeof UpdateDraftRequest.Type;
+
 /** POST /api/documents: make a document without the AI (buttons on the patient card). */
 export const CreateDocumentRequest = Schema.Struct({
   jenis: DocumentKind,
@@ -193,6 +224,9 @@ export const RenderEvent = Schema.TaggedStruct("render", {
 /** A patient document was made (from the `dokumenPasien` tool). */
 export const DocumentEvent = Schema.TaggedStruct("document", { callId: Schema.String, document: DocumentInfo });
 
+/** A form draft was made or changed (buatDraftResume / isiDraft); replaces an earlier draft with the same id. */
+export const DraftEvent = Schema.TaggedStruct("draft", { callId: Schema.String, draft: FormDraft });
+
 /** Last event of a successful run. */
 export const RunDone = Schema.TaggedStruct("done", {
   runId: Schema.String,
@@ -204,7 +238,19 @@ export const RunDone = Schema.TaggedStruct("done", {
 /** Last event of a failed run. */
 export const RunError = Schema.TaggedStruct("error", { message: Schema.String });
 
-export const AgentEvent = Schema.Union([RunStarted, TextDelta, ReasoningDelta, ToolInputDelta, ToolStarted, ToolFinished, RenderEvent, DocumentEvent, RunDone, RunError]);
+export const AgentEvent = Schema.Union([
+  RunStarted,
+  TextDelta,
+  ReasoningDelta,
+  ToolInputDelta,
+  ToolStarted,
+  ToolFinished,
+  RenderEvent,
+  DocumentEvent,
+  DraftEvent,
+  RunDone,
+  RunError,
+]);
 export type AgentEvent = typeof AgentEvent.Type;
 
 // --- Errors -------------------------------------------------------------------
@@ -390,6 +436,8 @@ export const RunTranscript = Schema.Struct({
   steps: Schema.Array(ToolStep),
   blocks: Schema.Array(RenderBlock),
   documents: Schema.Array(DocumentInfo),
+  /** Drafts made in this run, in their latest state. */
+  drafts: Schema.Array(FormDraft),
   fixIds: Schema.Array(Schema.String),
 });
 export type RunTranscript = typeof RunTranscript.Type;

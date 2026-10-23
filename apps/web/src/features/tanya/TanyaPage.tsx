@@ -4,18 +4,20 @@
  * SQL). Threads and favorites live in the sidebar.
  */
 import { Collapsible } from "@base-ui/react/collapsible";
+import type { FormDraft } from "@simrs/shared";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { Check, ChevronRight, Copy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { StreamingMarkdown } from "../../components/agent/Markdown.tsx";
 import { PendingLine, pendingStep, StepList } from "../../components/agent/StepList.tsx";
 import { DocumentCard } from "../../components/blocks/DocumentCard.tsx";
+import { DraftCard } from "../../components/blocks/DraftCard.tsx";
 import { OpenInKhanza } from "../../components/desktop/OpenInKhanza.tsx";
 import { RenderBlockView } from "../../components/blocks/RenderBlockView.tsx";
 import type { Health } from "../../components/layout/Sidebar.tsx";
 import { ErrorText } from "../../components/ui/Field.tsx";
 import { Spinner } from "../../components/ui/Spinner.tsx";
-import { noRawatIn, noRmIn } from "../../lib/desktop.ts";
+import { formMentioned, noRawatIn, noRmIn, type KhanzaForm } from "../../lib/desktop.ts";
 import type { RunView } from "../../lib/run.ts";
 import { useApi } from "../../lib/useApi.ts";
 import { bumpFavorites } from "../../stores/refresh.ts";
@@ -54,7 +56,23 @@ const CopyButton = ({ text }: { readonly text: string }) => {
   );
 };
 
-const Turn = ({ turn }: { readonly turn: RunView }) => {
+/**
+ * "Buka di Khanza" under an answer only when the answer is about a form Khanza has (resume, CPPT/SOAP,
+ * riwayat) and names its visit or patient; not when the turn already shows a card with its own button.
+ */
+const khanzaButtonFor = (turn: RunView): { form: KhanzaForm; noRawat: string | null; noRm: string | null } | null => {
+  if (turn.documents.length > 0 || turn.drafts.length > 0) return null;
+  const form = formMentioned(turn.text);
+  if (!form) return null;
+  const inputs = JSON.stringify(turn.steps.map((s) => s.input));
+  const noRawat = noRawatIn(turn.text, turn.question, inputs);
+  const noRm = noRmIn(turn.text, turn.question, inputs);
+  if (form === "riwayat" ? !noRawat && !noRm : !noRawat) return null;
+  return { form, noRawat, noRm };
+};
+
+const Turn = ({ turn, drafts }: { readonly turn: RunView; readonly drafts: ReadonlyArray<FormDraft> }) => {
+  const khanza = turn.status === "done" ? khanzaButtonFor(turn) : null;
   const running = turn.status === "running";
   // Steps are open while the AI works and fold away when the answer is in.
   const [stepsOpen, setStepsOpen] = useState(running);
@@ -92,6 +110,9 @@ const Turn = ({ turn }: { readonly turn: RunView }) => {
           <RenderBlockView block={block} onSaved={bumpFavorites} />
         </div>
       ))}
+      {drafts.map((draft) => (
+        <DraftCard key={draft.id} draft={draft} />
+      ))}
       {turn.documents.map((document) => (
         <div key={document.id} className="animate-rise">
           <DocumentCard document={document} />
@@ -103,10 +124,7 @@ const Turn = ({ turn }: { readonly turn: RunView }) => {
       {turn.status === "done" && turn.text ? (
         <div className="-mt-2 flex animate-fade-in items-center gap-1.5">
           <CopyButton text={turn.text} />
-          <OpenInKhanza
-            noRawat={noRawatIn(turn.text, turn.question, JSON.stringify(turn.steps.map((s) => s.input)))}
-            noRm={noRmIn(turn.text, turn.question, JSON.stringify(turn.steps.map((s) => s.input)))}
-          />
+          {khanza ? <OpenInKhanza noRawat={khanza.noRawat} noRm={khanza.noRm} defaultForm={khanza.form} /> : null}
         </div>
       ) : null}
     </article>
@@ -177,6 +195,18 @@ export const TanyaPage = () => {
     if (id && id !== c) void navigate({ to: "/tanya", search: { c: id }, replace: true });
   };
 
+  // Each draft shows once, in the turn that made it, in its latest state (later turns may change it).
+  const draftsByTurn = new Map<string, Array<FormDraft>>();
+  const latest = new Map<string, FormDraft>();
+  for (const t of turns) for (const d of t.drafts) latest.set(d.id, d);
+  const placed = new Set<string>();
+  for (const t of turns) {
+    for (const d of t.drafts) {
+      if (placed.has(d.id)) continue;
+      placed.add(d.id);
+      draftsByTurn.set(t.key, [...(draftsByTurn.get(t.key) ?? []), latest.get(d.id) ?? d]);
+    }
+  }
   const model = turns.findLast((t) => t.model)?.model ?? (health.data ? `${health.data.llm.provider} · ${health.data.llm.model}` : null);
   const empty = turns.length === 0 && !loading;
 
@@ -190,7 +220,7 @@ export const TanyaPage = () => {
             <div className="mx-auto w-full max-w-3xl space-y-10 px-4 pt-8 pb-10 sm:px-6">
               {loading ? <Spinner className="text-ink-3" /> : null}
               {turns.map((turn) => (
-                <Turn key={turn.key} turn={turn} />
+                <Turn key={turn.key} turn={turn} drafts={draftsByTurn.get(turn.key) ?? []} />
               ))}
             </div>
           )}

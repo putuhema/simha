@@ -12,6 +12,7 @@
     "dist:mac": "pnpm build && electron-builder --mac dir"
   },
   "devDependencies": {
+    "@simrs/shared": "workspace:*",
     "@types/node": "catalog:",
     "@xterm/addon-fit": "0.11.0",
     "@xterm/xterm": "6.0.0",

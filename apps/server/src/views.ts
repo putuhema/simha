@@ -9,6 +9,7 @@
  * (unmasked, cut at 50,000 characters).
  */
 import type {
+  FormDraft,
   AuditKind,
   AuditPage,
   ConversationSummary,
@@ -105,6 +106,31 @@ interface AuditFilter {
   readonly offset: number;
 }
 
+interface DraftRow {
+  readonly id: string;
+  readonly form: string;
+  readonly no_rawat: string;
+  readonly subject: string;
+  readonly existing: number;
+  readonly fields_json: string;
+  readonly sources_json: string;
+  readonly created_by: string | null;
+  readonly updated_at: string;
+  readonly session_id: string;
+}
+
+const toDraft = (r: DraftRow): FormDraft => ({
+  id: r.id,
+  form: r.form as FormDraft["form"],
+  noRawat: r.no_rawat,
+  subjek: r.subject,
+  existing: r.existing === 1,
+  fields: JSON.parse(r.fields_json) as FormDraft["fields"],
+  sources: JSON.parse(r.sources_json) as FormDraft["sources"],
+  createdBy: r.created_by,
+  updatedAt: r.updated_at,
+});
+
 const make = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   const read = yield* KhanzaRead;
@@ -156,6 +182,9 @@ const make = Effect.gen(function* () {
       const documents = yield* sql<DocumentRow & { session_id: string }>`
         SELECT id, kind, title, subject, summary, actor, created_at, session_id FROM documents
         WHERE ${sql.in("session_id", ids)} ORDER BY created_at`;
+      const drafts = yield* sql<DraftRow>`
+        SELECT id, form, no_rawat, subject, existing, fields_json, sources_json, created_by, updated_at, session_id
+        FROM form_drafts WHERE ${sql.in("session_id", ids)} ORDER BY created_at`;
       const fixes = yield* sql<{ id: string; run_id: string }>`
         SELECT id, run_id FROM fixes WHERE ${sql.in("run_id", ids)} ORDER BY created_at`;
 
@@ -188,6 +217,7 @@ const make = Effect.gen(function* () {
             steps: steps.filter((s) => s.session_id === r.id).map(toStep),
             blocks: blocks.filter((b) => b.session_id === r.id).map((b) => JSON.parse(b.block_json) as RenderBlock),
             documents: documents.filter((d) => d.session_id === r.id).map(toDocumentInfo),
+            drafts: drafts.filter((d) => d.session_id === r.id).map(toDraft),
             fixIds: fixes.filter((f) => f.run_id === r.id).map((f) => f.id),
           }),
         ),

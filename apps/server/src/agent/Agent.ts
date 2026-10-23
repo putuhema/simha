@@ -10,7 +10,7 @@
  * fake test adapter.
  */
 import { LlmClient, type ChatMessage, type LlmEvent, type ToolCall } from "@simrs/llm";
-import type { AgentEvent, DocumentInfo, RenderBlock, Ticket } from "@simrs/shared";
+import type { AgentEvent, DocumentInfo, FormDraft, RenderBlock, Ticket } from "@simrs/shared";
 import {
   AuditLog,
   defaultRegistry,
@@ -127,6 +127,7 @@ const make = Effect.gen(function* () {
         forModel: tool.forModel ? tool.forModel(result) : result,
         block: tool.kind === "render" ? (result as { readonly block?: RenderBlock }).block : undefined,
         document: tool.kind === "render" ? (result as { readonly document?: DocumentInfo }).document : undefined,
+        draft: tool.kind === "render" ? (result as { readonly draft?: FormDraft }).draft : undefined,
         durationMs,
       };
     });
@@ -229,6 +230,7 @@ const make = Effect.gen(function* () {
               );
               if (outcome.ok && outcome.block) yield* emit({ _tag: "render", callId: call.id, block: outcome.block });
               if (outcome.ok && outcome.document) yield* emit({ _tag: "document", callId: call.id, document: outcome.document });
+              if (outcome.ok && outcome.draft) yield* emit({ _tag: "draft", callId: call.id, draft: outcome.draft });
               yield* append({
                 role: "tool",
                 toolCallId: call.id,

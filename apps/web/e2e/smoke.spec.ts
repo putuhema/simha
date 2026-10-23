@@ -158,6 +158,45 @@ test("works in a narrow window without sideways scrolling", async () => {
   await page.setViewportSize({ width: 1440, height: 900 });
 });
 
+test("the AI drafts a resume medis that the user edits, and the draft is kept", async () => {
+  await page.getByRole("button", { name: "Percakapan baru" }).first().click();
+  await page.getByLabel("Pertanyaan").fill("Buat resume untuk 2026/10/21/000002");
+  await page.getByLabel("Pertanyaan").press("Enter");
+
+  const card = page.getByTestId("draft-card");
+  await expect(card).toContainText("Resume medis rawat inap");
+  await expect(card).toContainText("RM 000002 · SITI AMINAH · 2026/10/21/000002");
+  await expect(card).toContainText("wajib belum: Jalannya penyakit selama perawatan");
+  await expect(card.locator('[data-field="keluhan_utama"] textarea')).toHaveValue("BAB cair 6x sejak kemarin, mual, lemas.");
+  await expect(card.locator('[data-field="keluhan_utama"]')).toContainText("dari data Khanza");
+  await expect(page.getByRole("listitem").filter({ hasText: "Jalannya penyakit (wajib)" })).toBeVisible();
+  // Outside the desktop app there is no Khanza to fill.
+  await expect(card).toContainText("aplikasi desktop");
+
+  // The user edits a field in the card (saved on blur).
+  const allergy = card.locator('[data-field="alergi"] input');
+  await allergy.fill("Udang");
+  const saved = page.waitForResponse((r) => r.url().includes("/api/drafts/") && r.request().method() === "PATCH");
+  await allergy.press("Tab");
+  expect((await saved).ok()).toBe(true);
+
+  // Answers in the chat go into the same card.
+  await page.getByLabel("Pertanyaan").fill("Jalannya penyakit: rehidrasi IV dua hari, diare berkurang. Pulang membaik, kontrol 28 Oktober jam 9.");
+  await page.getByLabel("Pertanyaan").press("Enter");
+  await expect(page.getByText("Sudah saya masukkan ke draf.")).toBeVisible();
+  await expect(page.getByTestId("draft-card")).toHaveCount(1);
+  await expect(card.locator('[data-field="jalannya_penyakit"] textarea')).toHaveValue("Rehidrasi IV dua hari, diare berkurang.");
+  await expect(card.locator('[data-field="keadaan"] select')).toHaveValue("Membaik");
+  await expect(card.locator('[data-field="jalannya_penyakit"]')).toContainText("dari jawaban di chat");
+  await expect(card).not.toContainText("wajib belum");
+
+  // Reopening the conversation shows the draft as it is now.
+  await page.reload();
+  await expect(page.getByTestId("draft-card")).toHaveCount(1);
+  await expect(card.locator('[data-field="alergi"] input')).toHaveValue("Udang");
+  await expect(card.locator('[data-field="kontrol"] input')).toHaveValue("2026-10-28T09:00");
+});
+
 test("logout returns to the login page", async () => {
   await page.getByTestId("user-menu").first().click();
   await page.getByRole("menuitem", { name: "Keluar" }).click();

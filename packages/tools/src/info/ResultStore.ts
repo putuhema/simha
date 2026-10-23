@@ -5,7 +5,7 @@
  * Query results are kept so `tampilkan` shows exactly the rows the database
  * returned (the AI never copies data into a chart), with the SQL that ran.
  */
-import type { DocumentInfo, Favorite, RenderBlock, RenderType } from "@simrs/shared";
+import type { DocumentInfo, Favorite, FieldSource, FormDraft, RenderBlock, RenderType } from "@simrs/shared";
 import { Context, Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 
@@ -34,6 +34,18 @@ export interface StoredBlock {
 type NewFavorite = Omit<Favorite, "id" | "createdAt">;
 
 const now = () => new Date().toISOString();
+
+interface DraftRow {
+  readonly id: string;
+  readonly form: string;
+  readonly no_rawat: string;
+  readonly subject: string;
+  readonly existing: number;
+  readonly fields_json: string;
+  readonly sources_json: string;
+  readonly created_by: string | null;
+  readonly updated_at: string;
+}
 
 interface FavoriteRow {
   readonly id: string;
@@ -77,6 +89,18 @@ export const toDocumentInfo = (r: DocumentRow): DocumentInfo => ({
   ringkas: r.summary,
   dibuatOleh: r.actor,
   dibuatPada: r.created_at,
+});
+
+const toDraft = (r: DraftRow): FormDraft => ({
+  id: r.id,
+  form: r.form as FormDraft["form"],
+  noRawat: r.no_rawat,
+  subjek: r.subject,
+  existing: r.existing === 1,
+  fields: JSON.parse(r.fields_json) as Record<string, string>,
+  sources: JSON.parse(r.sources_json) as Record<string, FieldSource>,
+  createdBy: r.created_by,
+  updatedAt: r.updated_at,
 });
 
 const make = Effect.gen(function* () {
@@ -220,7 +244,50 @@ const make = Effect.gen(function* () {
       Effect.orDie,
     );
 
+  const saveDraft = (draft: FormDraft, origin: { readonly toolCallId: string | null; readonly sessionId: string | null }) =>
+    sql`INSERT INTO form_drafts ${sql.insert({
+      id: draft.id,
+      form: draft.form,
+      no_rawat: draft.noRawat,
+      subject: draft.subjek,
+      existing: draft.existing ? 1 : 0,
+      fields_json: JSON.stringify(draft.fields),
+      sources_json: JSON.stringify(draft.sources),
+      session_id: origin.sessionId,
+      tool_call_id: origin.toolCallId,
+      created_by: draft.createdBy,
+      created_at: draft.updatedAt,
+      updated_by: draft.createdBy,
+      updated_at: draft.updatedAt,
+    })}`.pipe(Effect.asVoid, Effect.orDie);
+
+  const getDraft = (id: string) =>
+    sql<DraftRow>`SELECT * FROM form_drafts WHERE id = ${id}`.pipe(
+      Effect.map(([r]) => (r ? toDraft(r) : undefined)),
+      Effect.orDie,
+    );
+
+  /** Sets some fields (empty string = clear) and records where they came from. */
+  const updateDraft = (id: string, values: Readonly<Record<string, string>>, source: FieldSource, actor: string | null) =>
+    Effect.gen(function* () {
+      const draft = yield* getDraft(id);
+      if (!draft) return undefined;
+      const fields = { ...draft.fields, ...values };
+      const sources = { ...draft.sources };
+      for (const [key, value] of Object.entries(values)) {
+        if (value === "") delete sources[key];
+        else sources[key] = source;
+      }
+      const updatedAt = now();
+      yield* sql`UPDATE form_drafts SET fields_json = ${JSON.stringify(fields)}, sources_json = ${JSON.stringify(sources)},
+        updated_by = ${actor}, updated_at = ${updatedAt} WHERE id = ${id}`;
+      return { ...draft, fields, sources, updatedAt } satisfies FormDraft;
+    }).pipe(Effect.orDie);
+
   return {
+    saveDraft,
+    getDraft,
+    updateDraft,
     saveDocument,
     getDocument,
     saveResult,

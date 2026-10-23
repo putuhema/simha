@@ -165,3 +165,12 @@ INSERT INTO databarang (kode_brng, nama_brng, kode_satbesar, kode_sat, dasar, is
 INSERT INTO detail_pemberian_obat (tgl_perawatan, jam, no_rawat, kode_brng, h_beli, biaya_obat, jml, total, status, no_batch, no_faktur) VALUES
   ('2026-10-21', '09:30:00', '2026/10/21/000002', 'B001', 300, 500, 6, 3000, 'Ranap', '-', '-'),
   ('2026-10-21', '09:30:00', '2026/10/21/000002', 'B002', 600, 1000, 4, 4000, 'Ranap', '-', '-');
+
+INSERT INTO icd9 (kode, deskripsi_panjang, deskripsi_pendek, validcode, accpdx, im) VALUES
+  ('99.18', 'Injection or infusion of electrolytes', 'Inject/infuse electrolytes', '1', 'Y', '0');
+
+INSERT INTO prosedur_pasien (no_rawat, kode, status, prioritas, jumlah) VALUES
+  ('2026/10/21/000002', '99.18', 'Ranap', 1, '1');
+
+INSERT INTO permintaan_ranap (no_rawat, tanggal, kd_kamar, diagnosa, catatan) VALUES
+  ('2026/10/21/000002', '2026-10-21', 'MEL-02', 'GEA dengan dehidrasi sedang', 'Rawat untuk rehidrasi IV');

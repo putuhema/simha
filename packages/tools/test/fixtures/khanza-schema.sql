@@ -269,6 +269,17 @@ CREATE TABLE `hasil_radiologi` (
   KEY `no_rawat` (`no_rawat`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
 
+DROP TABLE IF EXISTS `icd9`;
+CREATE TABLE `icd9` (
+  `kode` varchar(8) NOT NULL,
+  `deskripsi_panjang` varchar(350) DEFAULT NULL,
+  `deskripsi_pendek` varchar(40) DEFAULT NULL,
+  `validcode` enum('0','1') NOT NULL,
+  `accpdx` enum('Y','N') NOT NULL,
+  `im` enum('0','1') NOT NULL,
+  PRIMARY KEY (`kode`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
+
 DROP TABLE IF EXISTS `jns_perawatan`;
 CREATE TABLE `jns_perawatan` (
   `kd_jenis_prw` varchar(15) NOT NULL,
@@ -601,6 +612,17 @@ CREATE TABLE `periksa_lab` (
   KEY `dokter_perujuk` (`dokter_perujuk`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
 
+DROP TABLE IF EXISTS `permintaan_ranap`;
+CREATE TABLE `permintaan_ranap` (
+  `no_rawat` varchar(17) NOT NULL,
+  `tanggal` date NOT NULL,
+  `kd_kamar` varchar(15) NOT NULL,
+  `diagnosa` varchar(50) DEFAULT NULL,
+  `catatan` varchar(50) DEFAULT NULL,
+  PRIMARY KEY (`no_rawat`) USING BTREE,
+  KEY `kd_kamar` (`kd_kamar`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
+
 DROP TABLE IF EXISTS `petugas`;
 CREATE TABLE `petugas` (
   `nip` varchar(20) NOT NULL,
@@ -637,6 +659,17 @@ CREATE TABLE `poliklinik` (
   KEY `nm_poli` (`nm_poli`),
   KEY `registrasi` (`registrasi`),
   KEY `registrasilama` (`registrasilama`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
+
+DROP TABLE IF EXISTS `prosedur_pasien`;
+CREATE TABLE `prosedur_pasien` (
+  `no_rawat` varchar(17) NOT NULL,
+  `kode` varchar(8) NOT NULL,
+  `status` enum('Ralan','Ranap') NOT NULL,
+  `prioritas` tinyint(4) NOT NULL,
+  `jumlah` varchar(3) NOT NULL,
+  PRIMARY KEY (`no_rawat`,`kode`,`status`),
+  KEY `kode` (`kode`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
 
 DROP TABLE IF EXISTS `rawat_inap_dr`;
@@ -915,6 +948,7 @@ CREATE TABLE `setting` (
   `kode_ppk` varchar(15) DEFAULT NULL,
   `kode_ppkinhealth` varchar(15) DEFAULT NULL,
   `kode_ppkkemenkes` varchar(15) DEFAULT NULL,
+  `kode_apotek` varchar(15) DEFAULT NULL,
   `wallpaper` longblob DEFAULT NULL,
   `logo` longblob NOT NULL,
   PRIMARY KEY (`nama_instansi`)

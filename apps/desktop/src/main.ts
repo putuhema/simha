@@ -26,7 +26,8 @@ import {
   type WebContents,
 } from "electron";
 import path from "node:path";
-import { isLauncher, openKhanza, type KhanzaExit } from "./khanza.ts";
+import { FORM_FIELDS, formProblems } from "@simrs/shared/forms";
+import { fillKhanza, isLauncher, openKhanza, type KhanzaExit } from "./khanza.ts";
 import { parseTarget, pingBridge } from "./khanza-bridge.ts";
 import { createTerminal, killAllTerminals, killTerminal, resizeTerminal, startFolder, writeTerminal, type TerminalKind } from "./pty.ts";
 import { checkServer, ensureEnvFile, serverLogTail, startLocalServer, stopLocalServer } from "./server.ts";
@@ -277,6 +278,19 @@ const registerIpc = () => {
     // Only short identifiers (no. rawat, no. RM) go to the clipboard, and only known forms to Khanza.
     const text = typeof copy === "string" && copy.length > 0 && copy.length <= 64 ? copy : null;
     return openKhanza(loadSettings().khanzaLauncher, text, { logFile: khanzaLog(), onEarlyExit: reportKhanzaExit }, parseTarget(target));
+  });
+  ipcMain.handle("desktop:fillKhanza", (event, input: unknown) => {
+    if (!fromApp(event)) return refuse();
+    // Only a known form, a real no. rawat and values within Khanza's limits go to Khanza.
+    const { form, noRawat, fields } = (input ?? {}) as { form?: unknown; noRawat?: unknown; fields?: unknown };
+    if (form !== "resume_ranap" || typeof noRawat !== "string" || !/^\d{4}\/\d{2}\/\d{2}\/\d{6}$/.test(noRawat)) {
+      return { status: "error", message: "Permintaan tidak valid." };
+    }
+    if (fields === null || typeof fields !== "object") return { status: "error", message: "Isi form tidak valid." };
+    const values = Object.fromEntries(Object.entries(fields).filter(([, v]) => typeof v === "string" && v !== "")) as Record<string, string>;
+    const problems = formProblems(form, values);
+    if (problems.length > 0 || Object.keys(values).length > FORM_FIELDS[form].length) return { status: "error", message: problems.join(" ") };
+    return fillKhanza(loadSettings().khanzaLauncher, { logFile: khanzaLog(), onEarlyExit: reportKhanzaExit }, { form, noRawat, fields: values });
   });
   ipcMain.handle("desktop:khanzaBridge", async (event) => (fromApp(event) ? { user: await pingBridge() } : refuse()));
   ipcMain.handle("desktop:chooseKhanzaLauncher", (event) => (fromApp(event) ? chooseLauncher() : refuse()));

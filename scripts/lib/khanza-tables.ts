@@ -239,4 +239,22 @@ export const KHANZA_TABLES: ReadonlyArray<ExpectedTable> = [
     columns: ["no_rawat", "tgl_periksa", "jam", "hasil"],
     extra: true,
   },
+  {
+    name: "prosedur_pasien",
+    purpose: "Procedures (ICD-9-CM) of a visit, by priority (resume medis)",
+    columns: ["no_rawat", "kode", "status", "prioritas"],
+    extra: true,
+  },
+  {
+    name: "icd9",
+    purpose: "ICD-9-CM procedure names",
+    columns: ["kode", "deskripsi_panjang", "deskripsi_pendek"],
+    extra: true,
+  },
+  {
+    name: "permintaan_ranap",
+    purpose: "Inpatient admission request: reason for admission (resume medis 'alasan')",
+    columns: ["no_rawat", "tanggal", "kd_kamar", "diagnosa", "catatan"],
+    extra: true,
+  },
 ];

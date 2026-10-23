@@ -50,6 +50,27 @@ const respond = (request: ChatRequest): ReturnType<typeof fakeTurn> => {
   const results = toolResults(request);
   const step = results.length;
 
+  // Resume medis: start a draft, ask for what is missing; a follow-up with answers fills the draft.
+  if (/buat resume/i.test(question)) {
+    if (step === 0) return fakeTurn("", [{ name: "buatDraftResume", args: { noRawat: "2026/10/21/000002" } }]);
+    return fakeTurn("Draf resume sudah saya isi dari data Khanza. Yang belum ada:\n1. Jalannya penyakit (wajib)\n2. Keadaan pulang\n3. Tanggal kontrol");
+  }
+  if (/jalannya penyakit:/i.test(question)) {
+    if (step === 0) {
+      const earlier = request.messages.flatMap((m) =>
+        m.role === "tool" && m.name === "buatDraftResume" ? [JSON.parse(m.content) as { draftId: string }] : [],
+      );
+      const draftId = earlier.at(-1)?.draftId ?? "";
+      return fakeTurn("", [
+        {
+          name: "isiDraft",
+          args: { draftId, isian: { jalannya_penyakit: "Rehidrasi IV dua hari, diare berkurang.", keadaan: "Membaik", kontrol: "2026-10-28 09:00" } },
+        },
+      ]);
+    }
+    return fakeTurn("Sudah saya masukkan ke draf. Periksa kartunya, lalu klik Isi di Khanza dan Simpan di Khanza.");
+  }
+
   if (/riwayat/i.test(question)) {
     if (step === 0) return fakeTurn("", [{ name: "dokumenPasien", args: { jenis: "riwayat", noRkmMedis: "000002" } }]);
     return fakeTurn("Ringkasan AI (periksa kembali): satu kunjungan rawat inap dengan diare akut.");

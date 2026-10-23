@@ -7,6 +7,7 @@
  * removes it at logout. One request per connection, one tab-separated line:
  *   TOKEN \t ping                    -> "OK <user>"
  *   TOKEN \t open \t FORM \t VALUE   -> "OK" or "ERR <reason>"
+ *   TOKEN \t fill \t FORM \t NO_RAWAT \t key=base64;...   -> "OK baru" / "OK ganti" or "ERR <reason>"
  * Khanza checks the user's own access rights before opening anything.
  */
 import { readFile } from "node:fs/promises";
@@ -104,6 +105,22 @@ export const openForm = async (target: BridgeTarget): Promise<OpenFormResult | n
   const reply = await request(["open", target.form, target.value]);
   if (reply === null) return null;
   if (reply === "OK") return { ok: true };
+  return { ok: false, message: reply.replace(/^ERR\s*/, "") || "Khanza menolak permintaan." };
+};
+
+export type FillFormResult = { readonly ok: true; readonly mode: "baru" | "ganti" } | { readonly ok: false; readonly message: string };
+
+/**
+ * Asks Khanza to open its form for the visit filled with `fields` (it never saves; the user clicks Simpan
+ * or Ganti in Khanza). Values travel base64-encoded so newlines and tabs are kept. Null when no bridge answers.
+ */
+export const fillForm = async (form: string, noRawat: string, fields: Readonly<Record<string, string>>): Promise<FillFormResult | null> => {
+  const payload = Object.entries(fields)
+    .map(([key, value]) => `${key}=${Buffer.from(value, "utf8").toString("base64")}`)
+    .join(";");
+  const reply = await request(["fill", form, noRawat, payload], 20_000);
+  if (reply === null) return null;
+  if (reply.startsWith("OK")) return { ok: true, mode: reply.includes("ganti") ? "ganti" : "baru" };
   return { ok: false, message: reply.replace(/^ERR\s*/, "") || "Khanza menolak permintaan." };
 };
 

@@ -195,6 +195,10 @@ Change it later from the menu **Aplikasi → Pengaturan koneksi** or **Pengatura
 
 **Open a form directly (Khanza bridge).** With a Khanza build that includes `HarnessBridge` (see below), the button opens the form itself in the running Khanza: **Resume medis**, **CPPT / SOAP** (ranap or ralan, picked from the visit) or **Riwayat perawatan**. Documents open their own form (a resume opens the resume); the arrow next to the button lists the others. If Khanza is not open yet, it is started and the form opens after you log in. Khanza checks the logged-in user's own access rights, so the button never opens more than the Khanza menu would. **Pengaturan → Desktop** shows whether the bridge is active and which Khanza user is logged in.
 
+**Resume medis with the AI ("Isi di Khanza").** Ask in Tanya Data, e.g. *"buat resume untuk 2026/10/22/000021"*. The AI calls `buatDraftResume`: the server fills a draft of Khanza's *Resume Pasien Ranap* from Khanza data (diagnoses and procedures by priority, first CPPT entry, vital signs, lab, radiology, tindakan, medicines, discharge status), or starts from the resume already in Khanza, and shows it as an editable card. The AI then asks for what the data cannot answer (jalannya penyakit, keadaan pulang, kontrol, edukasi…) and stores your answers in the same card (`isiDraft`); you can also edit any field in the card. Every value is checked against Khanza's own limits and choices. **Isi di Khanza** (desktop app) opens Khanza's resume form for that visit with everything filled in; check it and click **Simpan** (or **Ganti** when a resume already exists: its row is selected for you). The harness never saves the resume itself, so Khanza's own rules apply (e.g. only a doctor login may save). Clinical text taken from Khanza is shown in the card but is not sent to an external AI provider (masked by field name); your answers in the chat are.
+
+Under an answer, **Buka di Khanza** appears only when the answer is about a form Khanza has (resume, CPPT/SOAP, riwayat) and names the visit or patient.
+
 **Adding the bridge to your Khanza build.** In the Khanza source folder (your own fork):
 
 ```bash

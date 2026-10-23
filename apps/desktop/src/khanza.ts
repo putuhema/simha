@@ -17,7 +17,7 @@ import { execFile, spawn } from "node:child_process";
 import { closeSync, mkdirSync, openSync, writeSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import path from "node:path";
-import { FORM_LABELS, openForm, waitForBridge, type BridgeTarget } from "./khanza-bridge.ts";
+import { fillForm, FORM_LABELS, openForm, waitForBridge, type BridgeTarget } from "./khanza-bridge.ts";
 
 /** Khanza stopping sooner than this after a start means something went wrong. */
 const EARLY_EXIT_SECONDS = 15;
@@ -195,4 +195,42 @@ export const openKhanza = async (
     if ((await openForm(target))?.ok) await focusRunningKhanza(launcher);
   });
   return { status: "launched", copied: copy, pendingForm: FORM_LABELS[target.form] };
+};
+
+export type KhanzaFillResult =
+  | { readonly status: "filled"; readonly mode: "baru" | "ganti" }
+  | { readonly status: "waiting_login" }
+  | { readonly status: "bridge_missing" }
+  | { readonly status: "not_configured" }
+  | { readonly status: "error"; readonly message: string };
+
+/**
+ * "Isi di Khanza": opens Khanza's form for the visit, filled with the draft (Khanza does not save; the user
+ * checks and clicks Simpan/Ganti there). If Khanza is not running it is started and filled after login.
+ */
+export const fillKhanza = async (
+  launcher: string | null,
+  options: LaunchOptions,
+  request: { readonly form: string; readonly noRawat: string; readonly fields: Readonly<Record<string, string>> },
+): Promise<KhanzaFillResult> => {
+  const filled = await fillForm(request.form, request.noRawat, request.fields);
+  if (filled?.ok) {
+    await focusRunningKhanza(launcher);
+    return { status: "filled", mode: filled.mode };
+  }
+  if (filled) return { status: "error", message: filled.message };
+  if (await focusRunningKhanza(launcher)) return { status: "bridge_missing" };
+  if (!launcher) return { status: "not_configured" };
+  try {
+    await stat(launcher);
+    await launch(launcher, options);
+  } catch (error) {
+    return { status: "error", message: `Khanza tidak bisa dibuka: ${error instanceof Error ? error.message : String(error)}` };
+  }
+  const id = ++pendingRequest;
+  void waitForBridge(LOGIN_WAIT_MS, () => id !== pendingRequest).then(async (ready) => {
+    if (!ready || id !== pendingRequest) return;
+    if ((await fillForm(request.form, request.noRawat, request.fields))?.ok) await focusRunningKhanza(launcher);
+  });
+  return { status: "waiting_login" };
 };

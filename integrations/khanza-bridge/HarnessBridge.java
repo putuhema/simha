@@ -41,6 +41,11 @@ import rekammedis.RMRiwayatPerawatan;
  *
  *   TOKEN \t ping                    -> "OK <user>"
  *   TOKEN \t open \t FORM \t VALUE   -> "OK" or "ERR <reason>"
+ *   TOKEN \t fill \t resume_ranap \t NO_RAWAT \t key=base64;...  -> "OK baru" / "OK ganti" / "ERR"
+ *
+ * "fill" opens Resume Pasien Ranap for the visit with the given values put
+ * into its fields (an existing resume is selected first, like before Ganti).
+ * It never saves: the user checks the form and clicks Simpan or Ganti.
  *
  * FORM: resume / soap (ranap or ralan, from the visit), resume_ranap,
  * resume_ralan, soap_ranap, soap_ralan (VALUE = no. rawat), riwayat (VALUE =
@@ -55,7 +60,36 @@ public final class HarnessBridge {
 
     private static final Pattern NO_RAWAT = Pattern.compile("\\d{4}/\\d{2}/\\d{2}/\\d{6}");
     private static final Pattern NO_RM = Pattern.compile("[0-9A-Za-z.-]{1,15}");
-    private static final int MAX_LINE = 512;
+    /** A filled resume (base64 values) can be a few kB; anything far larger is not ours. */
+    private static final int MAX_LINE = 256 * 1024;
+
+    /** resume_pasien_ranap column -> field of RMDataResumePasienRanap (what its Simpan reads). */
+    private static final java.util.Map<String, String> RESUME_RANAP_FIELDS = new java.util.LinkedHashMap<String, String>();
+
+    static {
+        String[][] pairs = {
+            {"diagnosa_awal", "DiagnosaAwal"}, {"alasan", "Alasan"}, {"keluhan_utama", "KeluhanUtama"},
+            {"pemeriksaan_fisik", "PemeriksaanFisik"}, {"jalannya_penyakit", "JalannyaPenyakit"},
+            {"pemeriksaan_penunjang", "PemeriksaanRad"}, {"hasil_laborat", "HasilLaborat"},
+            {"tindakan_dan_operasi", "TindakanSelamaDiRS"}, {"obat_di_rs", "ObatSelamaDiRS"},
+            {"diagnosa_utama", "DiagnosaUtama"}, {"kd_diagnosa_utama", "KodeDiagnosaUtama"},
+            {"diagnosa_sekunder", "DiagnosaSekunder1"}, {"kd_diagnosa_sekunder", "KodeDiagnosaSekunder1"},
+            {"diagnosa_sekunder2", "DiagnosaSekunder2"}, {"kd_diagnosa_sekunder2", "KodeDiagnosaSekunder2"},
+            {"diagnosa_sekunder3", "DiagnosaSekunder3"}, {"kd_diagnosa_sekunder3", "KodeDiagnosaSekunder3"},
+            {"diagnosa_sekunder4", "DiagnosaSekunder4"}, {"kd_diagnosa_sekunder4", "KodeDiagnosaSekunder4"},
+            {"prosedur_utama", "ProsedurUtama"}, {"kd_prosedur_utama", "KodeProsedurUtama"},
+            {"prosedur_sekunder", "ProsedurSekunder1"}, {"kd_prosedur_sekunder", "KodeProsedurSekunder1"},
+            {"prosedur_sekunder2", "ProsedurSekunder2"}, {"kd_prosedur_sekunder2", "KodeProsedurSekunder2"},
+            {"prosedur_sekunder3", "ProsedurSekunder3"}, {"kd_prosedur_sekunder3", "KodeProsedurSekunder3"},
+            {"alergi", "Alergi"}, {"diet", "Diet"}, {"lab_belum", "LabBelum"}, {"edukasi", "Edukasi"},
+            {"cara_keluar", "CaraKeluar"}, {"ket_keluar", "KetKeluar"}, {"keadaan", "Keadaan"},
+            {"ket_keadaan", "KetKeadaanPulang"}, {"dilanjutkan", "DIlanjutkan"}, {"ket_dilanjutkan", "KetDilanjutkan"},
+            {"kontrol", "Kontrol"}, {"obat_pulang", "ObatPulang"},
+        };
+        for (String[] pair : pairs) {
+            RESUME_RANAP_FIELDS.put(pair[0], pair[1]);
+        }
+    }
 
     private static ServerSocket server;
     private static Thread acceptor;
@@ -174,6 +208,9 @@ public final class HarnessBridge {
         if (parts[1].equals("ping")) {
             return "OK " + akses.getkode();
         }
+        if (parts[1].equals("fill") && parts.length == 5) {
+            return fill(parts[2], parts[3].trim(), parts[4]);
+        }
         if (!parts[1].equals("open") || parts.length != 4) {
             return "ERR Perintah tidak dikenal.";
         }
@@ -200,6 +237,117 @@ public final class HarnessBridge {
             return task.get(10, TimeUnit.SECONDS);
         } catch (Exception e) {
             return "ERR Khanza sedang sibuk (ada jendela yang menunggu jawaban?), coba lagi.";
+        }
+    }
+
+    /** Decodes "key=base64;..." into known resume fields. */
+    private static java.util.Map<String, String> decodeFields(String payload) {
+        java.util.Map<String, String> values = new java.util.LinkedHashMap<String, String>();
+        if (payload.trim().isEmpty()) {
+            return values;
+        }
+        for (String item : payload.split(";")) {
+            int eq = item.indexOf('=');
+            String key = eq > 0 ? item.substring(0, eq) : item;
+            if (!RESUME_RANAP_FIELDS.containsKey(key)) {
+                throw new IllegalArgumentException("Field " + key + " tidak ada di Resume Pasien Ranap.");
+            }
+            try {
+                values.put(key, new String(java.util.Base64.getDecoder().decode(item.substring(eq + 1)), StandardCharsets.UTF_8));
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Isi field " + key + " rusak.");
+            }
+        }
+        return values;
+    }
+
+    private static String fill(final String form, final String noRawat, final String payload) {
+        if (!form.equals("resume_ranap")) {
+            return "ERR Form " + form + " belum bisa diisi dari SIMRS Harness.";
+        }
+        FutureTask<String> task = new FutureTask<String>(() -> {
+            try {
+                final java.util.Map<String, String> values = decodeFields(payload);
+                final String checked = check("resume_ranap", noRawat);
+                final boolean existing = !new sekuel().cariIsi(
+                        "select resume_pasien_ranap.no_rawat from resume_pasien_ranap where resume_pasien_ranap.no_rawat=?", checked).equals("");
+                SwingUtilities.invokeLater(new Runnable() {
+                    @Override
+                    public void run() {
+                        fillResumeRanap(checked, values, existing);
+                    }
+                });
+                return existing ? "OK ganti" : "OK baru";
+            } catch (IllegalArgumentException e) {
+                return "ERR " + e.getMessage();
+            }
+        });
+        SwingUtilities.invokeLater(task);
+        try {
+            return task.get(10, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            return "ERR Khanza sedang sibuk (ada jendela yang menunggu jawaban?), coba lagi.";
+        }
+    }
+
+    /** Opens the resume form for the visit and puts the values into its fields; the user saves. */
+    private static void fillResumeRanap(String noRawat, java.util.Map<String, String> values, boolean existing) {
+        RMDataResumePasienRanap f = new RMDataResumePasienRanap(null, false);
+        f.isCek();
+        fit(f);
+        f.setNoRm(noRawat, new Date());
+        f.tampil();
+        if (existing) {
+            selectSaved(f, noRawat);
+        }
+        for (java.util.Map.Entry<String, String> entry : values.entrySet()) {
+            setField(f, RESUME_RANAP_FIELDS.get(entry.getKey()), entry.getValue());
+        }
+        show(f);
+    }
+
+    /** Selects the saved resume in the form's table and loads it (what a click on the row does), so Ganti works. */
+    private static void selectSaved(RMDataResumePasienRanap f, String noRawat) {
+        try {
+            java.lang.reflect.Field tableField = RMDataResumePasienRanap.class.getDeclaredField("tbObat");
+            tableField.setAccessible(true);
+            javax.swing.JTable table = (javax.swing.JTable) tableField.get(f);
+            for (int row = 0; row < table.getRowCount(); row++) {
+                if (noRawat.equals(String.valueOf(table.getValueAt(row, 0)))) {
+                    table.setRowSelectionInterval(row, row);
+                    java.lang.reflect.Method getData = RMDataResumePasienRanap.class.getDeclaredMethod("getData");
+                    getData.setAccessible(true);
+                    getData.invoke(f);
+                    return;
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("SIMRS Harness: resume tersimpan tidak bisa dipilih: " + e);
+        }
+    }
+
+    /** Sets one field of a Khanza form by its variable name: text, choice (only a listed one) or date. */
+    private static void setField(Object form, String name, String value) {
+        try {
+            java.lang.reflect.Field field = form.getClass().getDeclaredField(name);
+            field.setAccessible(true);
+            Object control = field.get(form);
+            // The date picker is a combo box too, so it is checked first.
+            if (control instanceof widget.Tanggal) {
+                String pattern = value.length() > 10 ? "yyyy-MM-dd HH:mm" : "yyyy-MM-dd";
+                ((widget.Tanggal) control).setDate(new SimpleDateFormat(pattern).parse(value.substring(0, Math.min(value.length(), 16))));
+            } else if (control instanceof javax.swing.text.JTextComponent) {
+                ((javax.swing.text.JTextComponent) control).setText(value);
+            } else if (control instanceof javax.swing.JComboBox) {
+                javax.swing.JComboBox<?> combo = (javax.swing.JComboBox<?>) control;
+                for (int i = 0; i < combo.getItemCount(); i++) {
+                    if (value.equals(String.valueOf(combo.getItemAt(i)))) {
+                        combo.setSelectedIndex(i);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("SIMRS Harness: field " + name + " tidak bisa diisi: " + e);
         }
     }
 

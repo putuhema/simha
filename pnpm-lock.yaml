@@ -56,6 +56,9 @@ importers:
 
   apps/desktop:
     devDependencies:
+      '@simrs/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@types/node':
         specifier: ^24.19.2
         version: 24.19.2

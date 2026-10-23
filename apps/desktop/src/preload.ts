@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld("simrsDesktop", {
   /** Open a Khanza form for a visit (bridge), or bring Khanza to the front / start it; copies `copy`. */
   openKhanza: (copy?: string | null, target?: { form: string; value: string } | null) =>
     ipcRenderer.invoke("desktop:openKhanza", copy ?? null, target ?? null),
+  /** Open Khanza's form for the visit filled with a draft (Khanza does not save it; the user does). */
+  fillKhanza: (request: { form: string; noRawat: string; fields: Record<string, string> }) => ipcRenderer.invoke("desktop:fillKhanza", request),
   /** Is a logged-in Khanza with the bridge running? `user` is its login, or null. */
   khanzaBridge: () => ipcRenderer.invoke("desktop:khanzaBridge"),
   /** Pick the file that starts Khanza on this PC; resolves with the saved path or null. */
