@@ -191,6 +191,9 @@ const createWindow = () => {
     title: "SIMRS Harness",
     backgroundColor: "#fffdf8",
     autoHideMenuBar: process.platform !== "darwin",
+    // macOS: no title bar; the window buttons sit in the sidebar's top corner
+    // and the page marks where the window can be dragged.
+    ...(process.platform === "darwin" ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 16, y: 18 } } : {}),
   });
   appView = new WebContentsView({ webPreferences: secureWebPreferences("preload.cjs") });
   appView.setBackgroundColor("#fffdf8");

@@ -6,6 +6,8 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 
 contextBridge.exposeInMainWorld("simrsDesktop", {
+  /** "darwin", "win32"…: the page adjusts its layout (macOS has no title bar). */
+  platform: process.platform,
   /** App version, platform and connection settings. */
   info: () => ipcRenderer.invoke("desktop:info"),
   /** Bring Khanza to the front (or start it) and copy `copy` to the clipboard. */

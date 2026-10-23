@@ -24,6 +24,8 @@ body {
   padding: 32px 16px;
 }
 main { width: 100%; max-width: 560px; }
+/* macOS has no title bar: the top of the page drags the window. */
+body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 36px; -webkit-app-region: drag; }
 header { text-align: center; margin-bottom: 20px; }
 h1 { font-size: 24px; margin: 12px 0 4px; letter-spacing: -0.01em; }
 h2 { font-size: 15px; margin: 0 0 2px; }

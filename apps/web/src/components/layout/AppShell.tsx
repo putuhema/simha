@@ -63,7 +63,7 @@ export const AppShell = () => {
           aria-label="Sidebar"
           className={cn(
             "hidden h-full shrink-0 overflow-hidden border-r border-line-2 bg-paper transition-[width] duration-200 ease-out md:block",
-            open ? "w-[268px]" : "w-[60px]",
+            open ? "w-[268px]" : "w-[var(--rail-width,60px)]",
           )}
         >
           {open ? (
@@ -71,7 +71,7 @@ export const AppShell = () => {
               <SidebarPanel {...shared} onNavigate={() => undefined} onClose={toggle} closeLabel="Tutup sidebar" />
             </div>
           ) : (
-            <div key="rail" className="h-full w-[60px] animate-fade-in">
+            <div key="rail" className="h-full w-[var(--rail-width,60px)] animate-fade-in">
               <SidebarRail {...shared} />
             </div>
           )}
@@ -96,7 +96,9 @@ export const AppShell = () => {
           </aside>
         </div>
 
-        <main className="flex h-full min-w-0 flex-1 flex-col">
+        <main className="relative flex h-full min-w-0 flex-1 flex-col">
+          {/* Desktop app on macOS: the top edge drags the window (there is no title bar). */}
+          <div className="drag absolute inset-x-0 top-0 z-10 hidden h-3 [:root[data-desktop=darwin]_&]:block" />
           <div className="flex h-12 shrink-0 items-center gap-1 border-b border-line-2 px-2 md:hidden">
             <TipButton label="Buka menu" onClick={() => setDrawer(true)} className="grid size-9 place-items-center rounded-lg text-ink-2 hover:bg-paper-2">
               <MenuIcon className="size-5" />

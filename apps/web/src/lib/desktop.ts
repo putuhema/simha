@@ -25,6 +25,8 @@ export interface KhanzaExit {
 }
 
 interface DesktopBridge {
+  /** "darwin", "win32"… */
+  readonly platform: string;
   readonly info: () => Promise<DesktopInfo>;
   readonly openKhanza: (copy?: string | null) => Promise<KhanzaResult>;
   readonly chooseKhanzaLauncher: () => Promise<string | null>;

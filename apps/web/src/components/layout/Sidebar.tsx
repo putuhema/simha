@@ -221,8 +221,8 @@ export const SidebarPanel = ({ health, healthError, stats, onNavigate, onClose, 
 
   return (
     <div className="flex h-full w-full flex-col">
-      <div className="flex h-12 shrink-0 items-center gap-2 pr-2 pl-3">
-        <Link to="/tanya" onClick={onNavigate} className="flex min-w-0 items-center gap-2">
+      <div className="drag flex h-12 shrink-0 items-center gap-2 pr-2 pl-[var(--titlebar-inset,12px)]">
+        <Link to="/tanya" onClick={onNavigate} className="no-drag flex min-w-0 items-center gap-2">
           <img src="/favicon.svg" alt="" className="size-6" />
           <span className="truncate font-display text-[16px] font-semibold tracking-tight">SIMRS Harness</span>
         </Link>
@@ -230,7 +230,7 @@ export const SidebarPanel = ({ health, healthError, stats, onNavigate, onClose, 
           label={closeLabel}
           shortcut={shortcutLabel("S")}
           onClick={onClose}
-          className="ml-auto grid size-8 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-paper-2 hover:text-ink"
+          className="no-drag ml-auto grid size-8 place-items-center rounded-lg text-ink-3 transition-colors hover:bg-paper-2 hover:text-ink"
         >
           <PanelLeftClose className="size-[18px]" />
         </TipButton>
@@ -354,6 +354,7 @@ export const SidebarRail = ({ health, healthError, stats }: Pick<PanelProps, "he
   const icon = "relative grid size-10 place-items-center rounded-lg text-ink-2 transition-colors hover:bg-paper-2 hover:text-ink";
   return (
     <div className="flex h-full w-full flex-col items-center gap-1 py-1.5">
+      <div className="drag -mt-1.5 h-[var(--rail-inset,0px)] w-full shrink-0" />
       <TipButton label="Buka sidebar" shortcut={shortcutLabel("S")} side="right" onClick={toggle} className={icon}>
         <PanelLeftOpen className="size-[18px]" />
       </TipButton>

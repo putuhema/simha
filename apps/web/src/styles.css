@@ -94,7 +94,23 @@
   }
 }
 
+/* Desktop app: parts of the page that drag the window, and the controls inside them. */
+@utility drag {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+@utility no-drag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
 @layer base {
+  /* macOS desktop app has no title bar: room for the red/yellow/green buttons. */
+  :root[data-desktop="darwin"] {
+    --titlebar-inset: 84px;
+    --rail-inset: 32px;
+    --rail-width: 80px;
+  }
   html,
   body,
   #root {
