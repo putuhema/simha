@@ -1,6 +1,6 @@
 /**
  * Serves the built web UI from WEB_DIST_DIR, with index.html for every
- * non-file path (client-side routes such as /tiket or /tanya). Files are read
+ * non-file path (client-side routes such as /tanya or /pengaturan). Files are read
  * from that folder only.
  */
 import { Effect } from "effect";

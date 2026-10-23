@@ -1,7 +1,7 @@
 import type { HTMLAttributes, ReactNode } from "react";
 import { cn } from "../../lib/cn.ts";
 
-export const Card = ({ className, ...props }: HTMLAttributes<HTMLDivElement>) => (
+const Card = ({ className, ...props }: HTMLAttributes<HTMLDivElement>) => (
   <div className={cn("rounded-lg border border-line bg-card shadow-[0_1px_0_rgb(23_32_30/0.04)]", className)} {...props} />
 );
 

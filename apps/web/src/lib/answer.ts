@@ -1,5 +1,5 @@
 /**
- * Splits a ticket answer into the sections the system prompt asks for:
+ * Splits an investigation answer into the sections the prompt asks for:
  * **Yang dicek**, **Diagnosis**, **Saran perbaikan**. Text before the first
  * section is the summary. Missing sections are empty.
  */

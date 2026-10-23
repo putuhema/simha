@@ -3,7 +3,7 @@
  * log, a scripted fake AI provider and the throwaway Khanza test DB.
  */
 import { fakeTurn, type ChatRequest } from "@simha/llm";
-import type { AgentEvent, Ticket } from "@simha/shared";
+import type { AgentEvent, Transcript } from "@simha/shared";
 import { describe, expect, it } from "vitest";
 import { MAX_STEPS } from "../src/agent/Agent.ts";
 import { makeTestApp, readEvents, testDb } from "./harness.ts";
@@ -13,7 +13,7 @@ const lastToolMessages = (request: ChatRequest) => request.messages.filter((m) =
 const tags = (events: ReadonlyArray<AgentEvent>) => events.map((e) => e._tag);
 
 describe.skipIf(testDb === null)("agent over HTTP", () => {
-  it("investigates a ticket with tools and streams every step", async () => {
+  it("investigates a complaint with tools and streams every step", async () => {
     const app = makeTestApp([
       fakeTurn("Saya cek kunjungan pasien.", [{ name: "kunjunganAktif", args: { noRkmMedis: "000002" } }]),
       fakeTurn("", [{ name: "riwayatKamar", args: { noRawat: "2026/10/21/000002" } }]),
@@ -24,16 +24,10 @@ describe.skipIf(testDb === null)("agent over HTTP", () => {
       },
     ]);
     try {
-      const created = await app.call("POST", "/tickets", {
-        nurseName: "Ns. Ayu",
-        unit: "Mawar",
-        complaint: "Pasien RM 000002 tidak bisa dipindah ke kamar Mawar",
+      const response = await app.call("POST", "/ask", {
+        mode: "investigasi",
+        question: "Pasien RM 000002 tidak bisa dipindah ke kamar Mawar",
       });
-      expect(created.status).toBe(201);
-      const ticket = (await created.json()) as Ticket;
-      expect(ticket.status).toBe("open");
-
-      const response = await app.call("POST", `/tickets/${ticket.id}/investigate`);
       expect(response.headers.get("content-type")).toContain("text/event-stream");
       const events = await readEvents(response);
 
@@ -52,18 +46,21 @@ describe.skipIf(testDb === null)("agent over HTTP", () => {
       expect(events.at(-1)).toMatchObject({ _tag: "done", text: "Diagnosis: ada dua kamar aktif.", steps: 3 });
       expect(events[0]).toMatchObject({ _tag: "run_started", provider: "fake", model: "fake-model" });
 
-      // The model saw the complaint and the tool list.
+      // The model saw the complaint, the investigation format and the tool list.
       const first = app.fake.requests[0];
       expect(first?.messages[0]).toMatchObject({ role: "user" });
       expect(first?.messages[0]?.role === "user" && first.messages[0].text).toContain("tidak bisa dipindah");
+      expect(first?.messages[0]?.role === "user" && first.messages[0].text).toContain("[Mode: investigasi keluhan]");
       // ...and where the registration data ends, so "7 hari terakhir" does not hit an empty range.
       expect(first?.messages[0]?.role === "user" && first.messages[0].text).toMatch(
         /data registrasi terakhir di database: \d{4}-\d{2}-\d{2}/,
       );
       expect(first?.tools.map((t) => t.name)).toContain("riwayatKamar");
 
-      const after = (await (await app.call("GET", `/tickets/${ticket.id}`)).json()) as Ticket;
-      expect(after.status).toBe("diagnosed");
+      const started = events[0];
+      if (started?._tag !== "run_started") throw new Error("expected run_started");
+      const transcript = (await (await app.call("GET", `/conversations/${started.conversationId}`)).json()) as Transcript;
+      expect(transcript.runs[0]).toMatchObject({ mode: "investigasi", status: "ok" });
     } finally {
       await app.dispose();
     }
@@ -196,13 +193,15 @@ describe.skipIf(testDb === null)("agent over HTTP", () => {
     }
   });
 
-  it("stops a model that never stops calling tools", async () => {
+  it("stops a model that never stops calling tools and forces a final answer", async () => {
     const loop = fakeTurn("", [{ name: "statusKamar", args: { kdKamar: "MEL-01" } }]);
-    const app = makeTestApp(Array.from({ length: MAX_STEPS + 5 }, () => loop));
+    const app = makeTestApp([...Array.from({ length: MAX_STEPS - 1 }, () => loop), fakeTurn("Jawaban akhir.")]);
     try {
       const events = await readEvents(await app.call("POST", "/ask", { question: "Ulangi terus" }));
-      expect(events.at(-1)).toMatchObject({ _tag: "done", stopReason: "max_steps", steps: MAX_STEPS });
+      expect(events.at(-1)).toMatchObject({ _tag: "done", text: "Jawaban akhir.", stopReason: "max_steps", steps: MAX_STEPS });
       expect(app.fake.requests).toHaveLength(MAX_STEPS);
+      // The last turn is asked to answer without tools.
+      expect(app.fake.requests.at(-1)?.tools).toEqual([]);
     } finally {
       await app.dispose();
     }
@@ -211,13 +210,10 @@ describe.skipIf(testDb === null)("agent over HTTP", () => {
   it("rejects invalid request bodies with 400", async () => {
     const app = makeTestApp([]);
     try {
-      const missing = await app.call("POST", "/tickets", { nurseName: "Ns. Ayu" });
-      expect(missing.status).toBe(400);
-      expect(((await missing.json()) as { error: string }).error).toMatch(/unit|complaint/);
       const empty = await app.call("POST", "/ask", { question: "" });
       expect(empty.status).toBe(400);
-      const notFound = await app.call("POST", "/tickets/nope/investigate");
-      expect(notFound.status).toBe(404);
+      const badMode = await app.call("POST", "/ask", { question: "Halo", mode: "salah" });
+      expect(badMode.status).toBe(400);
     } finally {
       await app.dispose();
     }

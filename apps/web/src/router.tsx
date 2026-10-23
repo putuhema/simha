@@ -1,6 +1,6 @@
 /**
- * Routes: /tanya?c=… (home), /tiket?id=…, /pengaturan?tab=…. The root shows the
- * login or first-run setup page until someone is logged in.
+ * Routes: /tanya?c=… (home), /pengaturan?tab=…. The root shows the login or
+ * first-run setup page until someone is logged in.
  */
 import { createRootRoute, createRoute, createRouter, Outlet, redirect } from "@tanstack/react-router";
 import { RefreshCw } from "lucide-react";
@@ -53,7 +53,6 @@ const page = (load: () => Promise<ComponentType>) => {
     </Suspense>
   );
 };
-const TiketPage = page(() => import("./features/tiket/TiketPage.tsx").then((m) => m.TiketPage));
 const TanyaPage = page(() => import("./features/tanya/TanyaPage.tsx").then((m) => m.TanyaPage));
 const PengetahuanPage = page(() => import("./features/pengetahuan/PengetahuanPage.tsx").then((m) => m.PengetahuanPage));
 const PengaturanPage = page(() => import("./features/pengaturan/PengaturanPage.tsx").then((m) => m.PengaturanPage));
@@ -70,16 +69,6 @@ const indexRoute = createRoute({
 });
 
 const text = (value: unknown) => (typeof value === "string" && value !== "" ? value : undefined);
-
-const tiketRoute = createRoute({
-  getParentRoute: () => shellRoute,
-  path: "/tiket",
-  validateSearch: (search: Record<string, unknown>): { id?: string } => {
-    const id = text(search["id"]);
-    return id ? { id } : {};
-  },
-  component: TiketPage,
-});
 
 const tanyaRoute = createRoute({
   getParentRoute: () => shellRoute,
@@ -118,7 +107,7 @@ const notFoundRoute = createRoute({
 
 export const router = createRouter({
   routeTree: rootRoute.addChildren([
-    shellRoute.addChildren([indexRoute, tiketRoute, tanyaRoute, pengetahuanRoute, pengaturanRoute, notFoundRoute]),
+    shellRoute.addChildren([indexRoute, tanyaRoute, pengetahuanRoute, pengaturanRoute, notFoundRoute]),
   ]),
   defaultPreload: false,
 });

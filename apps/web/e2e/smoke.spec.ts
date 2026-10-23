@@ -1,8 +1,8 @@
 /**
  * The main flows through the real UI, in order (one shared server):
- * first-run setup, a ticket from complaint to approved fix and rollback,
- * Tanya Data with a chart and a favorite, settings and audit log, a narrow
- * window, and logout.
+ * first-run setup, a complaint from investigation to approved fix and
+ * rollback, Tanya Data with a chart and a favorite, settings and audit log, a
+ * narrow window, and logout.
  */
 import { expect, test, type Page } from "@playwright/test";
 
@@ -53,25 +53,27 @@ test("the sidebar collapses to an icon rail and back", async () => {
   await expect(sidebar.getByRole("button", { name: "Percakapan baru" })).toBeVisible();
 });
 
-test("a ticket is investigated, the fix approved and rolled back", async () => {
-  await page.getByRole("link", { name: /^Tiket/ }).click();
-  await page.getByRole("button", { name: "Tiket baru" }).click();
-  await page.getByLabel("Nama perawat").fill("Ns. Ayu");
-  await page.getByLabel("Unit / bangsal").fill("Mawar");
-  await page.getByLabel("Keluhan").fill("Pasien RM 000002 tidak bisa dipindah ke kamar MAW-03");
-  await page.getByRole("button", { name: "Buat & selidiki" }).click();
+test("a complaint is investigated, the fix approved and rolled back", async () => {
+  await page.getByRole("button", { name: "Percakapan baru" }).first().click();
+  await page.getByRole("button", { name: "Investigasi" }).click();
+  await page.getByLabel("Pertanyaan").fill("Pasien RM 000002 tidak bisa dipindah ke kamar MAW-03");
+  await page.getByLabel("Pertanyaan").press("Enter");
 
   const steps = page.getByTestId("step");
   await expect(steps).toHaveCount(3);
   await expect(steps.nth(1)).toHaveAttribute("data-mark", "warn");
-  await expect(page.getByText("Khanza menolak pindah kamar baru")).toHaveCount(2); // diagnosis + AI summary
-  await expect(page.getByTestId("patient-card")).toContainText("SITI AMINAH");
-  await expect(page.getByTestId("patient-card")).toContainText("dr. Andi Fiktif");
+  await expect(page.getByText("Khanza menolak pindah kamar baru")).toHaveCount(1);
+
+  const turn = page.getByTestId("tanya-turn").last();
+  await turn.getByRole("button", { name: "Kartu pasien" }).click();
+  const patient = page.getByRole("dialog").last().getByTestId("patient-card");
+  await expect(patient).toContainText("SITI AMINAH");
+  await expect(patient).toContainText("dr. Andi Fiktif");
+  await page.keyboard.press("Escape");
 
   const fix = page.getByTestId("fix-card");
   await expect(fix).toHaveAttribute("data-status", "pending");
   await expect(fix).toContainText("akan mengubah 1 baris");
-  await expect(page.getByText("Perbaikan menunggu persetujuan").locator("..")).toContainText("1");
 
   await fix.getByRole("button", { name: "Setujui" }).click();
   await page.getByTestId("confirm-approve").click();
@@ -232,21 +234,32 @@ test("digital files show image previews and a PDF link", async () => {
 });
 
 test("the patient card makes CPPT / SOAP without the AI", async () => {
-  await page.getByRole("link", { name: /^Tiket/ }).click();
-  await page.getByRole("button", { name: /Ns. Ayu/ }).click();
-  await page.getByTestId("patient-card").getByRole("button", { name: "CPPT / SOAP" }).click();
-  const dialog = page.getByRole("dialog");
+  await page.getByRole("button", { name: "Percakapan baru" }).first().click();
+  await page.getByLabel("Pertanyaan").fill("Riwayat pasien RM 000002");
+  await page.getByLabel("Pertanyaan").press("Enter");
+
+  const turn = page.getByTestId("tanya-turn").last();
+  await turn.getByRole("button", { name: "Kartu pasien" }).click();
+  const patient = page.getByRole("dialog").last().getByTestId("patient-card");
+  await patient.getByRole("button", { name: "CPPT / SOAP" }).click();
+  const dialog = page.getByRole("dialog").last();
   await expect(dialog).toContainText("2026/10/21/000002");
   const doc = dialog.frameLocator("iframe");
   await expect(doc.getByText("BAB cair 6x sejak kemarin, mual, lemas.")).toBeVisible();
   await expect(doc.getByText("Ns. Rina Fiktif")).toBeVisible();
   await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
 });
 
 test("the patient card shows radiology images from PACS", async () => {
-  await page.getByRole("link", { name: /^Tiket/ }).click();
-  await page.getByRole("button", { name: /Ns. Ayu/ }).click();
-  await page.getByTestId("patient-card").getByRole("button", { name: "Radiologi" }).click();
+  await page.getByRole("button", { name: "Percakapan baru" }).first().click();
+  await page.getByLabel("Pertanyaan").fill("Radiologi pasien RM 000002");
+  await page.getByLabel("Pertanyaan").press("Enter");
+
+  const turn = page.getByTestId("tanya-turn").last();
+  await turn.getByRole("button", { name: "Kartu pasien" }).click();
+  const patient = page.getByRole("dialog").last().getByTestId("patient-card");
+  await patient.getByRole("button", { name: "Radiologi" }).click();
   const study = page.getByTestId("pacs-study");
   await expect(study).toContainText("THORAX PA");
   await expect(study).toContainText("2 seri · 3 gambar");
@@ -263,6 +276,7 @@ test("the patient card shows radiology images from PACS", async () => {
   await page.keyboard.press("Escape");
   await expect(viewer).toHaveCount(0);
   await expect(study).toBeVisible();
+  await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
 });
 
@@ -281,8 +295,11 @@ test("settings test the AI connection and show the audit log", async () => {
 test("works in a narrow window without sideways scrolling", async () => {
   await page.setViewportSize({ width: 400, height: 800 });
   await page.getByRole("button", { name: "Buka menu" }).click();
-  await page.getByRole("link", { name: /^Tiket/ }).click();
-  await page.getByRole("button", { name: /Ns. Ayu/ }).click();
+  await page.getByRole("button", { name: "Tutup menu" }).click();
+  await page.getByRole("button", { name: "Percakapan baru" }).first().click();
+  await page.getByRole("button", { name: "Investigasi" }).click();
+  await page.getByLabel("Pertanyaan").fill("Pasien RM 000002 tidak bisa dipindah ke kamar MAW-03");
+  await page.getByLabel("Pertanyaan").press("Enter");
   await expect(page.getByTestId("fix-card")).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);

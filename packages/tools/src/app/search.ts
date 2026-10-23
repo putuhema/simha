@@ -43,6 +43,43 @@ const escapeRegExp = (text: string) => text.replaceAll(/[.*+?^${}()|[\]\\]/g, "\
 /** True when `needle` starts a word: "sep" matches "SEP VClaim" but not "resep". */
 const startsWord = (text: string, needle: string) => new RegExp(`(^|[^a-z0-9_])${escapeRegExp(needle)}`).test(text);
 
+/**
+ * Affix stripping, only as far as a question word has to meet a menu label:
+ * "perpindahan" → "pindah", "permintaan" → "minta", "mengubah" → "ubah".
+ *
+ * It tries every plausible reading instead of guessing one, because Indonesian
+ * assimilation hides the root: "meminta" is me- + "minta" (the p disappears),
+ * so the longest-prefix reading ("mem" + "inta") is wrong. A word never shrinks
+ * below 4 letters, so short labels ("SEP", "IGD") keep their exact meaning.
+ */
+const PREFIXES = ["meny", "meng", "mem", "men", "me", "peny", "peng", "pem", "pen", "per", "ber", "ter", "di", "ke"];
+const SUFFIXES = ["kannya", "annya", "nya", "kan", "an", "i"];
+
+/** The word and the roots it could come from. */
+const variantsOf = (word: string): ReadonlyArray<string> => {
+  if (word.length < 4) return [word];
+  const found = new Set<string>([word]);
+  const bases = [word, ...SUFFIXES.filter((s) => word.endsWith(s) && word.length - s.length >= 4).map((s) => word.slice(0, -s.length))];
+  for (const base of bases) {
+    found.add(base);
+    for (const prefix of PREFIXES) {
+      if (base.startsWith(prefix) && base.length - prefix.length >= 4) found.add(base.slice(prefix.length));
+    }
+  }
+  return [...found];
+};
+
+/** Comparable roots of a text, so "perpindahan kamar" can meet "Pindah Kamar". */
+const stemsOf = (text: string): ReadonlySet<string> => {
+  const found = new Set<string>();
+  for (const word of norm(text).split(" ")) for (const variant of variantsOf(word)) found.add(variant);
+  return found;
+};
+
+/** True when `word` and the text share a root, e.g. "meminta" and "Permintaan". */
+const sharesStem = (word: string, stems: ReadonlySet<string>): boolean =>
+  word.length >= 4 && variantsOf(word).some((variant) => variant.length >= 4 && stems.has(variant));
+
 /** Table names are written with `_` in the schema, but staff type "kamar inap". */
 const tablePhrase = (name: string) => norm(name).replaceAll("_", " ");
 
@@ -74,7 +111,9 @@ const score = (haystack: string, phrase: string, words: ReadonlyArray<string>): 
   const text = ` ${norm(haystack)} `;
   let total = 0;
   if (phrase.length >= 3 && startsWord(text, phrase)) total += 8;
-  for (const word of words) if (startsWord(text, word)) total += 2;
+  const stems = stemsOf(text);
+  const matches = (word: string) => startsWord(text, word) || (word.length >= 5 && sharesStem(word, stems));
+  for (const word of words) if (matches(word)) total += 2;
   if (words.length > 1 && words.every((word) => startsWord(text, word))) total += 3;
   return total;
 };
@@ -96,11 +135,14 @@ const best = <A>(items: ReadonlyArray<A>, scoreOf: (item: A) => number, limit: n
 /** Synonyms whose term appears word-for-word in the query (so "SEP" never matches "resep"). */
 const matchingSynonyms = (query: string, synonyms: ReadonlyArray<AppSynonym>): AppSynonym[] => {
   const words = norm(query).split(" ").filter(Boolean);
+  const stems = stemsOf(query);
   return synonyms.filter((synonym) =>
     synonym.terms.some((term) => {
       const termWords = norm(term).split(" ").filter(Boolean);
       if (termWords.length === 0 || (termWords[0] ?? "").length < 3) return false;
       if (termWords.every((word) => words.includes(word))) return true;
+      // The same word with another affix: "perpindahan kamar" also means "pindah kamar".
+      if (termWords.every((word) => words.includes(word) || sharesStem(word, stems))) return true;
       return termWords.length === 1 && (termWords[0] ?? "").length >= 4 && words.some((word) => word.startsWith(termWords[0] ?? ""));
     }),
   );

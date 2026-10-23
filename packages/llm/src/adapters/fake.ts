@@ -16,9 +16,12 @@ export type FakeTurn =
   /** The provider call fails with this message. */
   | { readonly fail: string };
 
+/** Unique across turns: a real provider never repeats a tool call id in one conversation. */
+let callSeq = 0;
+
 /** Builds a turn that writes `text` and calls the given tools. */
 export const fakeTurn = (text: string, toolCalls: ReadonlyArray<Omit<ToolCall, "id"> & { id?: string }> = []): Array<LlmEvent> => {
-  const calls = toolCalls.map((c, i) => ({ id: c.id ?? `fake_${i}`, name: c.name, args: c.args }));
+  const calls = toolCalls.map((c) => ({ id: c.id ?? `fake_${callSeq++}`, name: c.name, args: c.args }));
   return [
     ...(text === "" ? [] : [{ type: "text_delta" as const, text }]),
     ...calls.map((call) => ({ type: "tool_call" as const, call })),

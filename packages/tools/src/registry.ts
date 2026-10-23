@@ -7,6 +7,7 @@ import { cariAplikasiKhanza } from "./app/cariAplikasiKhanza.ts";
 import type { Berkas } from "./berkas/Berkas.ts";
 import { berkasDigital } from "./berkas/berkasDigital.ts";
 import { diagnosaPindahKamar } from "./diagnose/diagnosaPindahKamar.ts";
+import { diagnosaPulang } from "./diagnose/diagnosaPulang.ts";
 import { diagnosaTindakan } from "./diagnose/diagnosaTindakan.ts";
 import { dokumenPasien } from "./documents/dokumenPasien.ts";
 import { buatDraftResume, isiDraft } from "./drafts/draftTools.ts";
@@ -69,6 +70,7 @@ export const makeRegistry = <R>(tools: ReadonlyArray<AnyTool<R>>): ToolRegistry<
 export const defaultRegistry: ToolRegistry = makeRegistry([
   ...readTools,
   diagnosaPindahKamar,
+  diagnosaPulang,
   diagnosaTindakan,
   usulkanPerbaikan,
   lihatSkema,

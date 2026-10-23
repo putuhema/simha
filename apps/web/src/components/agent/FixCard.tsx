@@ -7,17 +7,16 @@ import { Collapsible } from "@base-ui/react/collapsible";
 import type { Fix, FixDetail } from "@simha/shared";
 import { Check, ChevronRight, Pencil, RotateCcw, X } from "lucide-react";
 import { useState } from "react";
-import { DataTable } from "../../components/blocks/DataTable.tsx";
-import { SqlSlip } from "../../components/blocks/SqlSlip.tsx";
-import { Badge } from "../../components/ui/Badge.tsx";
-import { Button } from "../../components/ui/Button.tsx";
-import { Dialog } from "../../components/ui/Dialog.tsx";
-import { ErrorText, Field, Input, Textarea } from "../../components/ui/Field.tsx";
-import { Spinner } from "../../components/ui/Spinner.tsx";
+import { DataTable } from "../blocks/DataTable.tsx";
+import { SqlSlip } from "../blocks/SqlSlip.tsx";
+import { Badge } from "../ui/Badge.tsx";
+import { Button } from "../ui/Button.tsx";
+import { Dialog } from "../ui/Dialog.tsx";
+import { ErrorText, Field, Input, Textarea } from "../ui/Field.tsx";
+import { Spinner } from "../ui/Spinner.tsx";
 import { api, errorMessage } from "../../lib/api.ts";
 import { formatDateTime } from "../../lib/format.ts";
 import { useApi } from "../../lib/useApi.ts";
-import { bumpStats } from "../../stores/refresh.ts";
 
 const STATUS: Readonly<Record<Fix["status"], { readonly label: string; readonly tone: "amber" | "teal" | "ok" | "red" | "neutral" }>> = {
   pending: { label: "Menunggu persetujuan", tone: "amber" },
@@ -76,7 +75,6 @@ export const FixCard = ({ fixId, onChanged }: { readonly fixId: string; readonly
       setDialog(null);
       await detail.reload();
       onChanged();
-      bumpStats();
     } catch (e) {
       setError(errorMessage(e));
       await detail.reload();

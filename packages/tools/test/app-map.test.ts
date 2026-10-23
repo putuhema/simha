@@ -7,6 +7,7 @@
 import * as NodePath from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadAppDocs } from "../src/app/AppDocs.ts";
+import { searchApp } from "../src/app/search.ts";
 
 const dir = NodePath.resolve(import.meta.dirname, "../../../docs/khanza-app");
 const docs = await loadAppDocs(NodePath.join(dir, "index.json"), NodePath.resolve(import.meta.dirname, "../../.."));
@@ -56,5 +57,20 @@ describe("docs/khanza-app", () => {
       for (const menu of synonym.menus) expect(paths.has(menu), `${synonym.terms[0]}: ${menu}`).toBe(true);
       for (const form of synonym.forms) expect(forms.has(form), `${synonym.terms[0]}: ${form}`).toBe(true);
     }
+  });
+});
+
+describe("searchApp on the real map", () => {
+  it("matches an affixed word to the label it was built from", () => {
+    // "meminta" and "Permintaan" share the root "minta": no synonym entry involved.
+    const found = searchApp(docs, "meminta rawat inap", "menu");
+    expect(found.menus.some((menu) => menu.path === "A/Permintaan Rawat Inap")).toBe(true);
+  });
+
+  it("reaches a synonym through another affix", () => {
+    // "perpindahan" is not in synonyms.json; the entry is "pindah kamar".
+    const found = searchApp(docs, "perpindahan kamar", "semua", docs.synonyms);
+    expect(found.menus.some((menu) => menu.path === "A/Rawat Inap")).toBe(true);
+    expect(found.forms.some((form) => form.name === "DlgKamarInap")).toBe(true);
   });
 });

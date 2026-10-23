@@ -5,8 +5,10 @@
  * read-only chip states what the agent may do with the database.
  */
 import { Menu } from "@base-ui/react/menu";
+import type { AgentMode } from "@simha/shared";
 import { ArrowUp, Plus, ShieldAlert, ShieldCheck, Square } from "lucide-react";
 import { useLayoutEffect, useRef, type FormEvent } from "react";
+import { cn } from "../../lib/cn.ts";
 
 const MAX_HEIGHT = 220;
 
@@ -20,6 +22,8 @@ export const Composer = ({
   model,
   readOnly,
   examples,
+  mode,
+  onModeChange,
 }: {
   readonly value: string;
   readonly onChange: (value: string) => void;
@@ -30,6 +34,8 @@ export const Composer = ({
   readonly model: string | null;
   readonly readOnly?: boolean | undefined;
   readonly examples?: ReadonlyArray<string> | undefined;
+  readonly mode: AgentMode;
+  readonly onModeChange: (mode: AgentMode) => void;
 }) => {
   const box = useRef<HTMLTextAreaElement>(null);
 
@@ -56,6 +62,31 @@ export const Composer = ({
       onClick={() => box.current?.focus()}
       className="rounded-[22px] border border-line bg-card transition-colors focus-within:border-ink-3/45"
     >
+      <div className="flex items-center gap-2 px-3 pt-2.5">
+        <span className="text-[9.5px] font-medium tracking-[0.12em] text-ink-3 uppercase">Mode</span>
+        <div className="flex items-center gap-0.5 rounded-md border border-line-2 bg-paper/50 p-0.5" role="group" aria-label="Mode jawaban">
+          {([["tanya", "Tanya data"], ["investigasi", "Investigasi"]] as const).map(([option, label]) => (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={mode === option}
+              onClick={(e) => {
+                e.stopPropagation();
+                onModeChange(option);
+              }}
+              className={cn(
+                "rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
+                mode === option ? "bg-card text-ink shadow-[0_1px_2px_rgb(26_31_30/0.08)]" : "text-ink-3 hover:text-ink-2",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {mode === "investigasi" ? (
+          <span className="hidden truncate text-[11px] text-ink-3 sm:inline">AI mencari penyebab dan mengusulkan perbaikan</span>
+        ) : null}
+      </div>
       <textarea
         ref={box}
         rows={1}
@@ -67,7 +98,7 @@ export const Composer = ({
         }}
         placeholder={placeholder}
         aria-label="Pertanyaan"
-        className="quiet-scroll block w-full resize-none bg-transparent px-4 pt-3.5 pb-1 text-[14.5px] leading-relaxed outline-none placeholder:text-ink-3"
+        className="quiet-scroll block w-full resize-none bg-transparent px-4 pt-2 pb-1 text-[14.5px] leading-relaxed outline-none placeholder:text-ink-3"
       />
       <div className="flex items-center gap-1.5 px-2.5 pb-2.5">
         {examples && examples.length > 0 ? (

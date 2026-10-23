@@ -69,8 +69,8 @@ describe.skipIf(testDb === null)("Tanya Data over HTTP", () => {
         sql: `${perPoliSql}\nLIMIT 501`,
         asumsi: "bulan ini = 1–31 Okt 2026, semua jenis rawat",
         baris: [
+          { poli: "Poli Umum", jumlah: 3 },
           { poli: "Poli Gigi", jumlah: 2 },
-          { poli: "Poli Umum", jumlah: 2 },
         ],
       });
 

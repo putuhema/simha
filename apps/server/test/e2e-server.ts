@@ -7,8 +7,9 @@
  *   node apps/server/test/e2e-server.ts        (E2E_PORT, default 8799)
  *
  * Scripted answers:
- * - a ticket mentioning "RM 000002": checks the visit and the room move,
+ * - a complaint mentioning "RM 000002": checks the visit and the room move,
  *   finds two active rooms and proposes closing the old one;
+ * - "tidak bisa pulang": runs diagnosaPulang on the closed-registration case;
  * - "per poli": a bar chart of visits per clinic;
  * - "hari ini": the number of registrations today;
  * - "riwayat": the history document of RM 000002;
@@ -130,6 +131,25 @@ const respond = (request: ChatRequest): ReturnType<typeof fakeTurn> => {
           ].join("\n"),
         );
     }
+  }
+
+  // A discharge complaint: the registration is already closed while the room is active.
+  if (/tidak bisa pulang|tidak bisa dipulangkan/i.test(question)) {
+    if (step === 0) return fakeTurn("", [{ name: "diagnosaPulang", args: { noRawat: "2026/10/23/000006" } }]);
+    return fakeTurn(
+      [
+        "**Yang dicek**",
+        "- Registrasi 2026/10/23/000006: rawat inap, stts 'Sudah' padahal kamar ICU-01 masih aktif.",
+        "- Kamar: satu baris aktif, tidak ada duplikat.",
+        "- Billing: nota inap belum dibuat.",
+        "",
+        "**Diagnosis**",
+        "Registrasi sudah ditutup padahal pasien masih menempati kamar. Ini membuat pasien tidak muncul sebagai pasien rawat inap aktif, sehingga proses pulang tidak bisa dilanjutkan.",
+        "",
+        "**Saran perbaikan**",
+        "Kembalikan `reg_periksa.stts` menjadi 'Dirawat' untuk kunjungan ini, lalu ulangi proses pulang. Perbaikan data menunggu persetujuan.",
+      ].join("\n"),
+    );
   }
 
   if (/per poli/i.test(question)) {

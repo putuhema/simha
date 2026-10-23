@@ -3,7 +3,7 @@
  * agent events. Also converts a stored run (transcript) to the same shape, so
  * live and reloaded answers render with the same components.
  */
-import type { AgentEvent, BerkasDigital, DocumentInfo, FormDraft, RadiologyGallery, RenderBlock, RunTranscript } from "@simha/shared";
+import type { AgentEvent, AgentMode, BerkasDigital, DocumentInfo, FormDraft, RadiologyGallery, RenderBlock, RunTranscript } from "@simha/shared";
 import { request } from "./api.ts";
 import { readEventStream } from "./sse.ts";
 import type { StepView } from "./steps.ts";
@@ -13,6 +13,8 @@ type RunStatus = "running" | "done" | "error" | "stopped";
 export interface RunView {
   readonly key: string;
   readonly question: string;
+  /** tanya (Tanya Data) or investigasi (a complaint). */
+  readonly mode: AgentMode;
   readonly status: RunStatus;
   readonly runId: string | null;
   readonly conversationId: string | null;
@@ -20,6 +22,8 @@ export interface RunView {
   readonly askedBy: string | null;
   /** All answer text so far (while streaming); the final answer when done. */
   readonly text: string;
+  /** end_turn for a normal answer, max_steps or time_budget when it was cut short. */
+  readonly stopReason: string | null;
   readonly steps: ReadonlyArray<StepView>;
   readonly blocks: ReadonlyArray<RenderBlock>;
   readonly documents: ReadonlyArray<DocumentInfo>;
@@ -40,15 +44,17 @@ export interface RunView {
   readonly reasoning: string;
 }
 
-export const emptyRun = (question: string, key: string = crypto.randomUUID()): RunView => ({
+export const emptyRun = (question: string, mode: AgentMode = "tanya", key: string = crypto.randomUUID()): RunView => ({
   key,
   question,
+  mode,
   status: "running",
   runId: null,
   conversationId: null,
   model: null,
   askedBy: null,
   text: "",
+  stopReason: null,
   steps: [],
   blocks: [],
   documents: [],
@@ -96,12 +102,15 @@ export const applyEvent = (run: RunView, event: AgentEvent): RunView => {
     case "tool_finished": {
       const fixId =
         event.ok && event.name === "usulkanPerbaikan" ? (event.result as { fixId?: string } | undefined)?.fixId : undefined;
+      // Only the newest step with this call id: a provider should not reuse ids,
+      // but if it does, an old finished step must not be overwritten too.
+      const index = run.steps.findLastIndex((s) => s.id === event.callId);
       return {
         ...run,
         waitingSince: Date.now(),
         reasoning: "",
-        steps: run.steps.map((s) =>
-          s.id === event.callId
+        steps: run.steps.map((s, i) =>
+          i === index
             ? { ...s, running: false, output: event.result ?? null, error: event.ok ? null : (event.error ?? "Gagal."), durationMs: event.durationMs }
             : s,
         ),
@@ -124,7 +133,7 @@ export const applyEvent = (run: RunView, event: AgentEvent): RunView => {
     case "berkas":
       return { ...run, berkas: [...run.berkas, event.berkas] };
     case "done":
-      return { ...run, status: "done", text: event.text };
+      return { ...run, status: "done", text: event.text, stopReason: event.stopReason };
     case "error":
       return { ...run, status: "error", error: event.message };
   }
@@ -133,12 +142,14 @@ export const applyEvent = (run: RunView, event: AgentEvent): RunView => {
 export const fromTranscript = (run: RunTranscript): RunView => ({
   key: run.id,
   question: run.question,
+  mode: run.mode,
   status: run.status === "ok" ? "done" : run.status === "interrupted" ? "stopped" : run.status === "running" ? "running" : "error",
   runId: run.id,
   conversationId: null,
   model: `${run.provider} · ${run.model}`,
   askedBy: run.askedBy,
   text: run.finalText ?? "",
+  stopReason: run.stopReason ?? null,
   steps: run.steps.map((s) => ({
     id: s.id,
     name: s.name,

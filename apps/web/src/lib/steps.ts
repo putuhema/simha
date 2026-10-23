@@ -33,6 +33,7 @@ const LABELS: Readonly<Record<string, string>> = {
   isiDraft: "Isi draf resume",
   hasilRadiologi: "Hasil radiologi",
   diagnosaPindahKamar: "Diagnosa pindah kamar",
+  diagnosaPulang: "Diagnosa pulang",
   diagnosaTindakan: "Diagnosa tindakan",
   usulkanPerbaikan: "Usulan perbaikan",
   lihatSkema: "Lihat skema",
@@ -105,6 +106,7 @@ export const stepSummary = (step: StepView): string => {
     case "daftarTindakan":
       return `${count(o["tindakan"])} tindakan`;
     case "diagnosaPindahKamar":
+    case "diagnosaPulang":
     case "diagnosaTindakan": {
       const problems = Number(o["jumlahMasalah"] ?? 0);
       return problems > 0 ? `${problems} masalah ditemukan` : "Tidak ada masalah";

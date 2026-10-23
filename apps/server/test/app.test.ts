@@ -47,7 +47,7 @@ describe.skipIf(testDb === null)("login", () => {
     try {
       await app.sessionFor("it-budi");
       for (const [method, path] of [
-        ["GET", "/api/tickets"],
+        ["GET", "/api/conversations"],
         ["POST", "/api/ask"],
         ["GET", "/api/fixes"],
         ["POST", "/api/fixes/x/approve"],
@@ -60,7 +60,7 @@ describe.skipIf(testDb === null)("login", () => {
 
       expect((await app.callAs("ns-staff", "GET", "/users")).status).toBe(403);
       expect((await app.callAs("ns-staff", "PUT", "/settings/llm", { provider: "fake", model: "x", maskPii: true })).status).toBe(403);
-      expect((await app.callAs("ns-staff", "GET", "/tickets")).status).toBe(200);
+      expect((await app.callAs("ns-staff", "GET", "/conversations")).status).toBe(200);
       expect((await app.call("GET", "/users")).status).toBe(200);
     } finally {
       await app.dispose();
@@ -91,7 +91,7 @@ describe.skipIf(testDb === null)("login", () => {
   it("disabling a user or resetting a password ends their sessions; logout ends one", async () => {
     const app = makeTestApp([]);
     try {
-      expect((await app.callAs("ns-ayu", "GET", "/tickets")).status).toBe(200);
+      expect((await app.callAs("ns-ayu", "GET", "/conversations")).status).toBe(200);
       const users = (await (await app.call("GET", "/users")).json()) as Array<User>;
       const ayu = users.find((u) => u.username === "ns-ayu");
       if (!ayu) throw new Error("no user");
@@ -100,29 +100,29 @@ describe.skipIf(testDb === null)("login", () => {
       expect((await app.call("PATCH", `/users/${self?.id}`, { active: false })).status).toBe(400);
 
       expect((await app.call("PATCH", `/users/${ayu.id}`, { active: false })).status).toBe(200);
-      expect((await app.callAs("ns-ayu", "GET", "/tickets")).status).toBe(401);
+      expect((await app.callAs("ns-ayu", "GET", "/conversations")).status).toBe(401);
       const login = await app.raw("POST", "/api/auth/login", { username: "ns-ayu", password: app.password });
       expect(((await login.json()) as { error: string }).error).toMatch(/dinonaktifkan/);
 
       const logout = await app.call("POST", "/auth/logout");
       expect(logout.status).toBe(204);
       expect(logout.headers.get("set-cookie")).toMatch(/simha_session=;|Max-Age=0|Expires=/i);
-      expect((await app.call("GET", "/tickets")).status).toBe(401);
+      expect((await app.call("GET", "/conversations")).status).toBe(401);
     } finally {
       await app.dispose();
     }
   });
 
-  it("records who created a ticket and who asked", async () => {
+  it("records who asked and in which mode", async () => {
     const app = makeTestApp([fakeTurn("Selesai.")]);
     try {
-      const ticket = (await (
-        await app.callAs("ns-staff", "POST", "/tickets", { nurseName: "Ns. Ayu", unit: "Mawar", complaint: "Tidak bisa pindah kamar" })
-      ).json()) as { id: string; createdBy: string };
-      expect(ticket.createdBy).toBe("ns-staff");
-      await readEvents(await app.callAs("ns-staff", "POST", `/tickets/${ticket.id}/investigate`));
-      const transcript = (await (await app.call("GET", `/tickets/${ticket.id}/transcript`)).json()) as Transcript;
-      expect(transcript.runs[0]).toMatchObject({ askedBy: "ns-staff", kind: "ticket", finalText: "Selesai." });
+      const events = await readEvents(
+        await app.callAs("ns-staff", "POST", "/ask", { question: "Tidak bisa pindah kamar", mode: "investigasi" }),
+      );
+      const started = events[0];
+      if (started?._tag !== "run_started") throw new Error("expected run_started");
+      const transcript = (await (await app.call("GET", `/conversations/${started.conversationId}`)).json()) as Transcript;
+      expect(transcript.runs[0]).toMatchObject({ askedBy: "ns-staff", mode: "investigasi", finalText: "Selesai." });
     } finally {
       await app.dispose();
     }
@@ -177,9 +177,8 @@ describe.skipIf(testDb === null)("views", () => {
   it("stats count today's registrations and active inpatients from Khanza", async () => {
     const app = makeTestApp([]);
     try {
-      await app.call("POST", "/tickets", { nurseName: "Ns. A", unit: "IGD", complaint: "x" });
       const stats = (await (await app.call("GET", "/stats")).json()) as Stats;
-      expect(stats).toMatchObject({ tiketTerbuka: 1, perbaikanMenunggu: 0, khanzaError: null });
+      expect(stats).toMatchObject({ perbaikanMenunggu: 0, khanzaError: null });
       expect(typeof stats.registrasiHariIni).toBe("number");
       expect(stats.pasienRawatInap).toBeGreaterThanOrEqual(1);
     } finally {

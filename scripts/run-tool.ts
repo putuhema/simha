@@ -1,5 +1,5 @@
 /**
- * Runs one read tool (or lihatSkema / jalankanQueryBaca / buatDraftResume) against the Khanza database in .env and prints the JSON
+ * Runs one read or diagnose tool (or lihatSkema / jalankanQueryBaca / buatDraftResume) against the Khanza database in .env and prints the JSON
  * result, for trying tools before the server exists. The call and its queries
  * are written to the audit log (AUDIT_DB_PATH, default data/audit.sqlite).
  *
@@ -17,6 +17,9 @@ import {
   BerkasLive,
   berkasDigital,
   cariAplikasiKhanza,
+  diagnosaPindahKamar,
+  diagnosaPulang,
+  diagnosaTindakan,
   jalankanQueryBaca,
   KhanzaReadLive,
   lihatSkema,
@@ -33,7 +36,18 @@ import type { AppDocs, Berkas, KhanzaRead, Pacs, ResultStore, SchemaDocs, Tool }
 import { Console, Effect, Layer } from "effect";
 
 type AnyReadTool = Tool<unknown, unknown, KhanzaRead | ResultStore | SchemaDocs | AppDocs | Pacs | Berkas>;
-const tools = [...readTools, lihatSkema, cariAplikasiKhanza, jalankanQueryBaca, buatDraftResume, hasilRadiologi, berkasDigital] as unknown as ReadonlyArray<AnyReadTool>;
+const tools = [
+  ...readTools,
+  diagnosaPindahKamar,
+  diagnosaPulang,
+  diagnosaTindakan,
+  lihatSkema,
+  cariAplikasiKhanza,
+  jalankanQueryBaca,
+  buatDraftResume,
+  hasilRadiologi,
+  berkasDigital,
+] as unknown as ReadonlyArray<AnyReadTool>;
 
 const [name, json = "{}"] = process.argv.slice(2);
 

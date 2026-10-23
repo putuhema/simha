@@ -1,16 +1,15 @@
 /**
- * Tickets, conversations and agent runs, stored in the audit SQLite DB.
+ * Conversations and agent runs, stored in the audit SQLite DB.
  */
 import type { ChatMessage } from "@simha/llm";
-import type { CreateTicketRequest, Ticket, TicketStatus } from "@simha/shared";
+import type { AgentMode } from "@simha/shared";
 import { Context, Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 
 interface RunStart {
   readonly id: string;
   readonly conversationId: string;
-  readonly ticketId: string | null;
-  readonly kind: "ask" | "ticket";
+  readonly mode: AgentMode;
   readonly question: string;
   /** Username of the IT staff member who asked. */
   readonly askedBy: string | null;
@@ -34,28 +33,6 @@ interface RunEnd {
   readonly error: string | null;
 }
 
-interface TicketRow {
-  readonly id: string;
-  readonly nurse_name: string;
-  readonly unit: string;
-  readonly complaint: string;
-  readonly status: TicketStatus;
-  readonly created_by: string | null;
-  readonly created_at: string;
-  readonly updated_at: string;
-}
-
-const toTicket = (r: TicketRow): Ticket => ({
-  id: r.id,
-  createdBy: r.created_by,
-  nurseName: r.nurse_name,
-  unit: r.unit,
-  complaint: r.complaint,
-  status: r.status,
-  createdAt: r.created_at,
-  updatedAt: r.updated_at,
-});
-
 const now = () => new Date().toISOString();
 
 /**
@@ -65,57 +42,18 @@ const now = () => new Date().toISOString();
 const make = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
 
-  const createTicket = (input: CreateTicketRequest, createdBy: string) =>
+  /** The thread to continue, or a new Tanya Data thread. */
+  const conversationFor = (options: { readonly id?: string }) =>
     Effect.gen(function* () {
-      const ticket: Ticket = {
-        id: crypto.randomUUID(),
-        createdBy,
-        ...input,
-        status: "open",
-        createdAt: now(),
-        updatedAt: now(),
-      };
-      yield* sql`INSERT INTO tickets ${sql.insert({
-        id: ticket.id,
-        nurse_name: ticket.nurseName,
-        unit: ticket.unit,
-        complaint: ticket.complaint,
-        status: ticket.status,
-        created_by: createdBy,
-        created_at: ticket.createdAt,
-        updated_at: ticket.updatedAt,
-      })}`;
-      return ticket;
-    }).pipe(Effect.orDie);
-
-  const getTicket = (id: string) =>
-    sql<TicketRow>`SELECT * FROM tickets WHERE id = ${id}`.pipe(
-      Effect.map((rows) => (rows[0] ? toTicket(rows[0]) : undefined)),
-      Effect.orDie,
-    );
-
-  const listTickets = sql<TicketRow>`SELECT * FROM tickets ORDER BY created_at DESC LIMIT 200`.pipe(
-    Effect.map((rows) => rows.map(toTicket)),
-    Effect.orDie,
-  );
-
-  const setTicketStatus = (id: string, status: TicketStatus) =>
-    sql`UPDATE tickets SET status = ${status}, updated_at = ${now()} WHERE id = ${id}`.pipe(Effect.asVoid, Effect.orDie);
-
-  /** The conversation of a ticket, or of an ask thread; created when missing. */
-  const conversationFor = (options: { readonly kind: "ask" | "ticket"; readonly id?: string; readonly ticketId?: string }) =>
-    Effect.gen(function* () {
-      const existing = options.ticketId
-        ? yield* sql<{ id: string }>`SELECT id FROM conversations WHERE ticket_id = ${options.ticketId} AND deleted_at IS NULL`
-        : options.id
-          ? yield* sql<{ id: string }>`SELECT id FROM conversations WHERE id = ${options.id} AND kind = ${options.kind} AND deleted_at IS NULL`
-          : [];
+      const existing = options.id
+        ? yield* sql<{ id: string }>`SELECT id FROM conversations WHERE id = ${options.id} AND deleted_at IS NULL`
+        : [];
       if (existing[0]) return existing[0].id;
       const id = crypto.randomUUID();
       yield* sql`INSERT INTO conversations ${sql.insert({
         id,
-        kind: options.kind,
-        ticket_id: options.ticketId ?? null,
+        kind: "ask",
+        ticket_id: null,
         created_at: now(),
       })}`;
       return id;
@@ -183,8 +121,9 @@ const make = Effect.gen(function* () {
     sql`INSERT INTO agent_runs ${sql.insert({
       id: run.id,
       conversation_id: run.conversationId,
-      ticket_id: run.ticketId,
-      kind: run.kind,
+      ticket_id: null,
+      kind: "ask",
+      mode: run.mode,
       question: run.question,
       asked_by: run.askedBy,
       provider: run.provider,
@@ -217,10 +156,6 @@ const make = Effect.gen(function* () {
     );
 
   return {
-    createTicket,
-    getTicket,
-    listTickets,
-    setTicketStatus,
     conversationFor,
     loadMessages,
     appendMessage,

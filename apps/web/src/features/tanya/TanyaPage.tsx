@@ -7,7 +7,7 @@
  */
 import { Collapsible } from "@base-ui/react/collapsible";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { Check, ChevronRight, Copy, FolderClosed, PanelRightOpen, ShieldCheck } from "lucide-react";
+import { Check, ChevronRight, Copy, FolderClosed, PanelRightOpen, ShieldCheck, UserRound } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnswerFeedback } from "../../components/agent/AnswerFeedback.tsx";
 import { StreamingMarkdown } from "../../components/agent/Markdown.tsx";
@@ -15,8 +15,10 @@ import { PendingLine, pendingStep, StepList } from "../../components/agent/StepL
 import { CardBody, CardIcon, CardsPanel } from "../../components/layout/CardsPanel.tsx";
 import { OpenInKhanza } from "../../components/desktop/OpenInKhanza.tsx";
 import type { Health } from "../../components/layout/Sidebar.tsx";
+import { Dialog } from "../../components/ui/Dialog.tsx";
 import { ErrorText } from "../../components/ui/Field.tsx";
 import { Spinner } from "../../components/ui/Spinner.tsx";
+import { rmFromSteps, rmFromText, splitAnswer } from "../../lib/answer.ts";
 import { cardsFromTurns, cardsOfTurn, type AnswerCard } from "../../lib/cards.ts";
 import { cn } from "../../lib/cn.ts";
 import { formMentioned, noRawatIn, noRmIn, type KhanzaForm } from "../../lib/desktop.ts";
@@ -26,7 +28,15 @@ import { useWideLayout } from "../../lib/useMediaQuery.ts";
 import { useCardsPanel } from "../../stores/cards.ts";
 import { bumpFavorites } from "../../stores/refresh.ts";
 import { useTanya } from "../../stores/tanya.ts";
+import { FixCard } from "../../components/agent/FixCard.tsx";
+import { PatientPanel } from "../../components/patient/PatientPanel.tsx";
 import { Composer } from "./Composer.tsx";
+
+const INVESTIGATE_EXAMPLES = [
+  "Pasien 2026/10/21/000067 tidak bisa dipulangkan",
+  "Pasien RM 000002 tidak bisa dipindah ke kamar MAW-03",
+  "Tindakan RJ001 tidak bisa dihapus di kunjungan 2026/10/01/000003",
+];
 
 const EXAMPLES = [
   "Berapa pasien yang daftar hari ini?",
@@ -120,12 +130,20 @@ const Turn = ({
   const running = turn.status === "running";
   // Text answers have no card to rate, so give them their own 👍/👎.
   const canRateAnswer = turn.status === "done" && turn.text !== "" && turn.runId !== null && turn.blocks.length === 0;
-  // Tool calls stay folded away by default; the trigger still shows progress.
-  const [stepsOpen, setStepsOpen] = useState(false);
+  // An investigation shows its checks; Tanya Data keeps them folded away.
+  const [stepsOpen, setStepsOpen] = useState(turn.mode === "investigasi");
+  const [patientOpen, setPatientOpen] = useState(false);
+  const rm = rmFromSteps(turn.steps) ?? rmFromText(turn.question) ?? rmFromText(turn.text);
+  const diagnosis = splitAnswer(turn.text).diagnosis;
 
   return (
     <article className="space-y-3.5" data-testid="tanya-turn">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-2">
+        {turn.mode === "investigasi" ? (
+          <span className="rounded-full border border-amber/30 bg-amber-soft/50 px-2 py-0.5 font-mono text-[9.5px] font-medium tracking-[0.08em] text-amber uppercase">
+            Investigasi
+          </span>
+        ) : null}
         <div className="max-w-[85%] animate-rise rounded-[20px] rounded-br-md bg-paper-2 px-4 py-2.5 text-[14px] leading-relaxed whitespace-pre-wrap text-ink">
           {turn.question}
         </div>
@@ -169,15 +187,49 @@ const Turn = ({
         )
       ) : null}
 
+      {turn.status === "done" && (turn.stopReason === "time_budget" || turn.stopReason === "max_steps") ? (
+        <p className="rounded-md border border-amber/25 bg-amber-soft/40 px-3 py-2 text-[12.5px] text-amber">
+          Jawaban ini dibuat setelah batas waktu penyelidikan. Periksa data yang masih kurang sebelum mengambil keputusan.
+        </p>
+      ) : null}
+
+      {turn.fixIds.length > 0 ? (
+        <section className="space-y-3" data-testid="turn-fixes">
+          <h3 className="eyebrow">Saran perbaikan data</h3>
+          {turn.fixIds.map((fixId) => (
+            <FixCard key={fixId} fixId={fixId} onChanged={() => undefined} />
+          ))}
+        </section>
+      ) : null}
+
       {turn.status === "error" ? <ErrorText>{turn.error}</ErrorText> : null}
       {turn.status === "stopped" ? <p className="text-[12.5px] text-ink-3">Dihentikan.</p> : null}
       {turn.status === "done" && turn.text ? (
         <div className="flex animate-fade-in flex-wrap items-center gap-1.5">
           <CopyButton text={turn.text} />
           {canRateAnswer && turn.runId !== null ? <AnswerFeedback runId={turn.runId} /> : null}
+          {rm ? (
+            <button
+              type="button"
+              onClick={() => setPatientOpen(true)}
+              className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[11.5px] text-ink-2 transition-colors hover:bg-paper-2 hover:text-ink"
+            >
+              <UserRound className="size-3.5" /> Kartu pasien
+            </button>
+          ) : null}
           {khanza ? <OpenInKhanza noRawat={khanza.noRawat} noRm={khanza.noRm} defaultForm={khanza.form} /> : null}
         </div>
       ) : null}
+
+      <Dialog
+        open={patientOpen}
+        onOpenChange={setPatientOpen}
+        wide
+        title="Kartu pasien"
+        description={rm ? `RM ${rm}` : undefined}
+      >
+        <PatientPanel rm={rm} summary={diagnosis} />
+      </Dialog>
     </article>
   );
 };
@@ -186,24 +238,30 @@ const EmptyState = ({
   composer,
   error,
   readOnly,
+  mode,
   onPick,
 }: {
   readonly composer: ReactNode;
   readonly error: string | null;
   readonly readOnly: boolean | undefined;
+  readonly mode: "tanya" | "investigasi";
   readonly onPick: (question: string) => void;
 }) => (
   <div className="mx-auto flex w-full max-w-[800px] flex-1 animate-fade-in flex-col justify-center px-4 py-10 sm:px-6">
     <div className="mb-7 flex flex-col items-center text-center">
       <div className="flex flex-wrap items-center justify-center gap-2.5">
         <img src="/favicon.svg" alt="" className="size-8 opacity-95" />
-        <h1 className="font-display text-[26px] leading-tight font-semibold tracking-[-0.025em] sm:text-[31px]">Mau cek data apa hari ini?</h1>
+        <h1 className="font-display text-[26px] leading-tight font-semibold tracking-[-0.025em] sm:text-[31px]">
+          {mode === "investigasi" ? "Keluhan apa yang mau diselidiki?" : "Mau cek data apa hari ini?"}
+        </h1>
         <span className="hidden rounded-full border border-teal/20 bg-teal-soft px-2 py-0.5 font-mono text-[9.5px] font-medium tracking-[0.08em] text-teal uppercase sm:inline">
           AI
         </span>
       </div>
       <p className="mt-2.5 max-w-md text-[13px] leading-relaxed text-ink-2">
-        Tanya apa saja tentang data rumah sakit. AI menulis query SELECT sendiri, menjalankannya dengan user read-only, lalu menampilkan hasilnya beserta SQL-nya.
+        {mode === "investigasi"
+          ? "Tempel keluhan perawat. AI memeriksa data Khanza, mencari penyebabnya, dan mengusulkan perbaikan yang harus disetujui dulu."
+          : "Tanya apa saja tentang data rumah sakit. AI menulis query SELECT sendiri, menjalankannya dengan user read-only, lalu menampilkan hasilnya beserta SQL-nya."}
       </p>
     </div>
 
@@ -220,7 +278,7 @@ const EmptyState = ({
       {error ? <ErrorText>{error}</ErrorText> : null}
       {composer}
       <div className="mt-4 flex flex-wrap items-center justify-center gap-1">
-        {EXAMPLES.slice(0, 3).map((example) => (
+        {(mode === "investigasi" ? INVESTIGATE_EXAMPLES : EXAMPLES.slice(0, 3)).map((example) => (
           <button
             key={example}
             type="button"
@@ -238,7 +296,7 @@ const EmptyState = ({
 export const TanyaPage = () => {
   const { c } = useSearch({ from: "/shell/tanya" });
   const navigate = useNavigate();
-  const { turns, running, loading, error, ask, stop, open, conversationId } = useTanya();
+  const { turns, running, loading, error, mode, setMode, ask, stop, open, conversationId } = useTanya();
   const health = useApi<Health>("/api/health");
   const [question, setQuestion] = useState("");
   const scroller = useRef<HTMLDivElement>(null);
@@ -325,8 +383,16 @@ export const TanyaPage = () => {
       running={running}
       model={model}
       readOnly={readOnly}
-      examples={EXAMPLES}
-      placeholder={turns.length ? "Pertanyaan lanjutan, mis. “sekarang per bulan, 3 bulan terakhir”" : "Tanya apa saja tentang data rumah sakit…"}
+      examples={mode === "investigasi" ? INVESTIGATE_EXAMPLES : EXAMPLES}
+      mode={mode}
+      onModeChange={setMode}
+      placeholder={
+        mode === "investigasi"
+          ? "Tempel keluhan perawat, mis. “Pasien RM 000002 tidak bisa dipindah ke kamar MAW-03”…"
+          : turns.length
+            ? "Pertanyaan lanjutan, mis. “sekarang per bulan, 3 bulan terakhir”"
+            : "Tanya apa saja tentang data rumah sakit…"
+      }
     />
   );
 
@@ -336,7 +402,7 @@ export const TanyaPage = () => {
         <div ref={scroller} className="quiet-scroll min-h-0 flex-1 overflow-y-auto">
           <div ref={content} className="flex min-h-full flex-col">
             {empty ? (
-              <EmptyState composer={composer} error={error} readOnly={readOnly} onPick={(q) => void submit(q)} />
+              <EmptyState composer={composer} error={error} readOnly={readOnly} mode={mode} onPick={(q) => void submit(q)} />
             ) : (
               <div className="mx-auto w-full max-w-[800px] space-y-9 px-4 pt-12 pb-10 sm:px-8">
                 {loading ? <Spinner className="text-ink-3" /> : null}

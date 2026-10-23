@@ -5,17 +5,14 @@ import { create } from "zustand";
  * elsewhere (stat row, sidebar lists) fetch it again.
  */
 interface Versions {
-  /** Tickets, runs and fixes (stat row, Tiket badge). */
-  readonly stats: number;
   /** "Percakapan" list in the sidebar. */
   readonly conversations: number;
   /** "Favorit" list in the sidebar. */
   readonly favorites: number;
 }
 
-export const useVersions = create<Versions>(() => ({ stats: 0, conversations: 0, favorites: 0 }));
+export const useVersions = create<Versions>(() => ({ conversations: 0, favorites: 0 }));
 
 const bump = (key: keyof Versions) => useVersions.setState((v) => ({ [key]: v[key] + 1 }));
-export const bumpStats = () => bump("stats");
 export const bumpConversations = () => bump("conversations");
 export const bumpFavorites = () => bump("favorites");

@@ -5,36 +5,16 @@ import { Schema } from "effect";
 
 const NonEmpty = Schema.String.check(Schema.isNonEmpty());
 
-// --- Tickets ---------------------------------------------------------------
+// --- Agent modes -------------------------------------------------------------
 
-export const TicketStatus = Schema.Literals(["open", "investigating", "diagnosed", "closed"]);
-export type TicketStatus = typeof TicketStatus.Type;
-
-export const CreateTicketRequest = Schema.Struct({
-  nurseName: NonEmpty.check(Schema.isMaxLength(100)),
-  unit: NonEmpty.check(Schema.isMaxLength(100)),
-  complaint: NonEmpty.check(Schema.isMaxLength(5_000)),
-});
-export type CreateTicketRequest = typeof CreateTicketRequest.Type;
-
-export const Ticket = Schema.Struct({
-  id: Schema.String,
-  /** Username of the IT staff member who entered it. */
-  createdBy: Schema.NullOr(Schema.String),
-  nurseName: Schema.String,
-  unit: Schema.String,
-  complaint: Schema.String,
-  status: TicketStatus,
-  createdAt: Schema.String,
-  updatedAt: Schema.String,
-});
-export type Ticket = typeof Ticket.Type;
-
-/** Body of POST /tickets/:id/investigate. Empty starts the investigation; `question` asks a follow-up. */
-export const InvestigateRequest = Schema.Struct({
-  question: Schema.optionalKey(NonEmpty.check(Schema.isMaxLength(5_000))),
-});
-export type InvestigateRequest = typeof InvestigateRequest.Type;
+/**
+ * What the AI should do with the question:
+ * - tanya: a question about hospital data (Tanya Data);
+ * - investigasi: a nurse's complaint to investigate, answered with Yang dicek /
+ *   Diagnosis / Saran perbaikan and (when needed) a proposed fix.
+ */
+export const AgentMode = Schema.Literals(["tanya", "investigasi"]);
+export type AgentMode = typeof AgentMode.Type;
 
 // --- Tanya Data -------------------------------------------------------------
 
@@ -42,6 +22,8 @@ export type InvestigateRequest = typeof InvestigateRequest.Type;
 export const AskRequest = Schema.Struct({
   question: NonEmpty.check(Schema.isMaxLength(5_000)),
   conversationId: Schema.optionalKey(Schema.String),
+  /** Defaults to tanya. Investigasi asks the AI for a diagnosis and a fix proposal. */
+  mode: Schema.optionalKey(AgentMode),
 });
 export type AskRequest = typeof AskRequest.Type;
 
@@ -588,7 +570,6 @@ export type ChangePasswordRequest = typeof ChangePasswordRequest.Type;
 export const Stats = Schema.Struct({
   registrasiHariIni: Schema.NullOr(Schema.Number),
   pasienRawatInap: Schema.NullOr(Schema.Number),
-  tiketTerbuka: Schema.Number,
   perbaikanMenunggu: Schema.Number,
   khanzaError: Schema.NullOr(Schema.String),
 });
@@ -613,13 +594,16 @@ export type ToolStep = typeof ToolStep.Type;
 
 export const RunTranscript = Schema.Struct({
   id: Schema.String,
-  kind: Schema.Literals(["ask", "ticket"]),
+  /** tanya or investigasi; older runs were migrated to investigasi. */
+  mode: AgentMode,
   question: Schema.String,
   askedBy: Schema.NullOr(Schema.String),
   provider: Schema.String,
   model: Schema.String,
   status: Schema.String,
   finalText: Schema.NullOr(Schema.String),
+  /** end_turn, tool_use, max_steps or time_budget; null for runs without a stop reason. */
+  stopReason: Schema.NullOr(Schema.String),
   error: Schema.NullOr(Schema.String),
   startedAt: Schema.String,
   finishedAt: Schema.NullOr(Schema.String),
@@ -636,7 +620,7 @@ export const RunTranscript = Schema.Struct({
 });
 export type RunTranscript = typeof RunTranscript.Type;
 
-/** GET /api/conversations/:id and GET /api/tickets/:id/transcript. */
+/** GET /api/conversations/:id. */
 export const Transcript = Schema.Struct({
   conversationId: Schema.NullOr(Schema.String),
   runs: Schema.Array(RunTranscript),

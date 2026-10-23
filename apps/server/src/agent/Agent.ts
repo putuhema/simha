@@ -10,7 +10,7 @@
  * fake test adapter.
  */
 import { LlmClient, type ChatMessage, type LlmEvent, type ToolCall } from "@simha/llm";
-import type { AgentEvent, BerkasDigital, DocumentInfo, FormDraft, RadiologyGallery, RenderBlock, Ticket } from "@simha/shared";
+import type { AgentEvent, AgentMode, BerkasDigital, DocumentInfo, FormDraft, RadiologyGallery, RenderBlock } from "@simha/shared";
 import {
   AuditLog,
   defaultRegistry,
@@ -34,16 +34,37 @@ import { compactHistory, HISTORY_TOKEN_BUDGET } from "./history.ts";
 import { knowledgePrompt, userTurn } from "./knowledge.ts";
 import { SystemPrompt } from "./prompt.ts";
 
-/** Upper bound on model turns per question, so a confused model cannot loop forever. */
-export const MAX_STEPS = 12;
+/** Upper bound on model turns per question, including the forced final answer. */
+export const MAX_STEPS = 8;
 
-type AgentInput = (
-  | { readonly kind: "ask"; readonly question: string; readonly conversationId?: string | undefined }
-  | { readonly kind: "ticket"; readonly ticket: Ticket; readonly question?: string | undefined }
-) & {
+/** After this, the model gets one last turn without tools to answer with what it has. */
+const TIME_BUDGET_MS = 45_000;
+
+type AgentInput = {
+  readonly question: string;
+  /** tanya (Tanya Data) or investigasi (a nurse's complaint). */
+  readonly mode: AgentMode;
+  readonly conversationId?: string | undefined;
   /** Username of the IT staff member asking (audit log). */
   readonly askedBy: string | null;
 };
+
+/** Appended to an investigation question, so the answer has the sections the UI expects. */
+const INVESTIGATE_PROMPT = [
+  "[Mode: investigasi keluhan]",
+  "Selidiki keluhan ini dengan data Khanza. Jawab dengan bagian berikut:",
+  "**Yang dicek** – satu baris per pemeriksaan: apa yang dicek dan apa hasilnya.",
+  "**Diagnosis** – penyebabnya berdasarkan data. Sebutkan tingkat keyakinan bila data belum cukup.",
+  '**Saran perbaikan** – apa yang harus diubah di data atau dilakukan perawat, atau "Tidak perlu perbaikan data". Bila data harus diubah, usulkan dengan `usulkanPerbaikan` dan sebutkan nomor perbaikannya.',
+  "Jangan terus memanggil tool: setelah cukup bukti, berhenti dan tulis jawaban. Bila penyebabnya belum pasti, tetap tulis diagnosis sementara dan data yang masih kurang.",
+].join("\n");
+
+/** The last turn, when the step or time budget is used up. Tools are disabled. */
+const FINAL_INSTRUCTION = [
+  "[Batas waktu/langkah tercapai]",
+  "Jangan memanggil tool lagi. Tulis jawaban akhir sekarang dari data yang sudah ada.",
+  "Bila penyebabnya belum pasti, tulis temuan yang sudah ada, diagnosis sementara, dan data yang masih kurang.",
+].join("\n");
 
 /**
  * Server clock and the newest registration date in Khanza, given to the model
@@ -57,18 +78,12 @@ const contextLine = (now: Date, latestData: string | null): string => {
   return `[Waktu server: ${date}; ${now.toISOString().slice(0, 10)}${data}]`;
 };
 
-/** The user turn sent to the model for a question or a ticket. */
+/** The user turn sent to the model. */
 const userText = (input: AgentInput, now: Date, latestData: string | null): string => {
   const context = contextLine(now, latestData);
-  if (input.kind === "ask") return `${context}\n${input.question}`;
-  if (input.question !== undefined) return `${context}\nPertanyaan lanjutan tentang tiket ini: ${input.question}`;
-  const t = input.ticket;
-  return [
-    context,
-    `Tiket dari perawat ${t.nurseName} (unit ${t.unit}), dibuat ${t.createdAt}:`,
-    `"${t.complaint}"`,
-    "Selidiki keluhan ini dengan data Khanza, lalu berikan diagnosis dan saran perbaikan.",
-  ].join("\n");
+  return input.mode === "investigasi"
+    ? `${context}\n${INVESTIGATE_PROMPT}\n\nKeluhan:\n${input.question}`
+    : `${context}\n${input.question}`;
 };
 
 /** What the model sees from a tool: masked when the provider requires it. */
@@ -149,32 +164,26 @@ const make = Effect.gen(function* () {
       };
     });
 
-  /** Runs one question or ticket investigation and streams its events. */
+  /** Runs one question or investigation and streams its events. */
   const run = (input: AgentInput): Stream.Stream<AgentEvent> =>
     Stream.callback<AgentEvent>((queue) =>
       Effect.gen(function* () {
         const emit = (event: AgentEvent) => Queue.offer(queue, event);
-        const ticketId = input.kind === "ticket" ? input.ticket.id : null;
-        const conversationId = yield* store.conversationFor(
-          input.kind === "ticket" ? { kind: "ticket", ticketId: input.ticket.id } : { kind: "ask", ...(input.conversationId ? { id: input.conversationId } : {}) },
-        );
+        const conversationId = yield* store.conversationFor(input.conversationId ? { id: input.conversationId } : {});
         const runId = crypto.randomUUID();
         const { info } = llm;
-        const question =
-          input.kind === "ask" ? input.question : (input.question ?? `Investigasi tiket: ${input.ticket.complaint}`);
+        const question = input.question;
 
         yield* store.runStarted({
           id: runId,
           conversationId,
-          ticketId,
-          kind: input.kind,
+          mode: input.mode,
           question,
           askedBy: input.askedBy,
           provider: info.provider,
           model: info.model,
           maskPii: info.maskPii,
         });
-        if (input.kind === "ticket") yield* store.setTicketStatus(input.ticket.id, "investigating");
         yield* emit({ _tag: "run_started", runId, conversationId, provider: info.provider, model: info.model });
 
         const history: Array<ChatMessage> = [...(yield* store.loadMessages(conversationId))];
@@ -204,9 +213,58 @@ const make = Effect.gen(function* () {
         let cachedInputTokens = 0;
         let cacheWriteTokens = 0;
         const blocks: Array<RenderBlock> = [];
+        const startedAt = Date.now();
+
+        /**
+         * One last model turn with no tools, so a slow or confused model still
+         * gives an answer instead of ending on "Saya cek dulu…". Returns false
+         * when it produces no text; the run then fails instead of pretending.
+         */
+        const finalTurn = (reason: "time_budget" | "max_steps") =>
+          Effect.gen(function* () {
+            steps++;
+            let text = "";
+            let done: Extract<LlmEvent, { type: "done" }> | undefined;
+            yield* append({ role: "user", text: FINAL_INSTRUCTION });
+            yield* llm.chat({
+              system,
+              messages: [...compactHistory(history, HISTORY_TOKEN_BUDGET)],
+              tools: [],
+              cacheKey: conversationId,
+            }).pipe(
+              Stream.runForEach((event) => {
+                if (event.type === "text_delta") {
+                  text += event.text;
+                  return emit({ _tag: "text_delta", text: event.text });
+                }
+                if (event.type === "reasoning_delta") return emit({ _tag: "reasoning_delta", text: event.text });
+                if (event.type === "done") {
+                  done = event;
+                  return Effect.void;
+                }
+                return Effect.void;
+              }),
+            );
+            inputTokens += done?.usage?.inputTokens ?? 0;
+            outputTokens += done?.usage?.outputTokens ?? 0;
+            cachedInputTokens += done?.usage?.cachedInputTokens ?? 0;
+            cacheWriteTokens += done?.usage?.cacheWriteTokens ?? 0;
+            yield* append({ role: "assistant", text, toolCalls: [] });
+            stopReason = reason;
+            if (text.trim() === "") return false;
+            finalText = text;
+            return true;
+          });
 
         const loop = Effect.gen(function* () {
-          while (steps < MAX_STEPS) {
+          while (true) {
+            const overTime = Date.now() - startedAt >= TIME_BUDGET_MS;
+            if (steps > 0 && (overTime || steps >= MAX_STEPS - 1)) {
+              const answered = yield* finalTurn(overTime ? "time_budget" : "max_steps");
+              if (!answered) return yield* Effect.fail(new Error("AI tidak memberi jawaban akhir dalam batas waktu."));
+              return;
+            }
+
             steps++;
             let text = "";
             const calls: Array<ToolCall> = [];
@@ -283,13 +341,11 @@ const make = Effect.gen(function* () {
               });
             }
           }
-          stopReason = "max_steps";
-          finalText ||= `Berhenti setelah ${MAX_STEPS} langkah tanpa jawaban akhir.`;
         });
 
         /** A successful, self-contained question with a result is worth reusing. */
         const saveKnowledge = Effect.gen(function* () {
-          if (input.kind !== "ask" || followUp || blocks.length === 0) return;
+          if (input.mode !== "tanya" || followUp || blocks.length === 0) return;
           const block = blocks[0];
           if (block === undefined) return;
           if (personalReason(question) !== null) return;
@@ -312,7 +368,7 @@ const make = Effect.gen(function* () {
         }).pipe(Effect.catchCause(() => Effect.void));
 
         const finish = (status: "ok" | "error" | "interrupted", error: string | null) =>
-          Effect.asVoid(Effect.all([
+          Effect.asVoid(
             store.runFinished({
               id: runId,
               status,
@@ -325,8 +381,7 @@ const make = Effect.gen(function* () {
               cacheWriteTokens: cacheWriteTokens || null,
               error,
             }),
-            ticketId === null ? Effect.void : store.setTicketStatus(ticketId, status === "ok" ? "diagnosed" : "open"),
-          ]));
+          );
 
         yield* loop.pipe(
           Effect.matchCauseEffect({

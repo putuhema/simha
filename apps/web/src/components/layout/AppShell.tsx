@@ -4,13 +4,11 @@
  *
  * Shortcuts: ⇧⌘S sidebar, ⇧⌘O new chat, ⌘, settings (Ctrl on Windows/Linux).
  */
-import type { Stats } from "@simha/shared";
 import { Outlet, useNavigate } from "@tanstack/react-router";
 import { Menu as MenuIcon, SquarePen } from "lucide-react";
 import { useEffect } from "react";
 import { cn } from "../../lib/cn.ts";
 import { useApi } from "../../lib/useApi.ts";
-import { useVersions } from "../../stores/refresh.ts";
 import { useSidebar } from "../../stores/sidebar.ts";
 import { KhanzaExitBanner } from "../desktop/KhanzaExitBanner.tsx";
 import { TipButton, TipProvider } from "../ui/Tip.tsx";
@@ -20,16 +18,9 @@ const isWide = () => typeof window !== "undefined" && window.matchMedia("(min-wi
 
 export const AppShell = () => {
   const health = useApi<Health>("/api/health", { refreshMs: 60_000 });
-  const stats = useApi<Stats>("/api/stats", { refreshMs: 60_000 });
-  const statsVersion = useVersions((v) => v.stats);
   const { open, drawer, toggle, setDrawer } = useSidebar();
   const newChat = useNewChat();
   const navigate = useNavigate();
-
-  const reloadStats = stats.reload;
-  useEffect(() => {
-    if (statsVersion > 0) void reloadStats();
-  }, [statsVersion, reloadStats]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -53,7 +44,7 @@ export const AppShell = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, [toggle, setDrawer, newChat, navigate]);
 
-  const shared = { health: health.data, healthError: health.error, stats: stats.data };
+  const shared = { health: health.data, healthError: health.error };
 
   return (
     <TipProvider>

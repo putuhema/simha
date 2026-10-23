@@ -47,7 +47,7 @@ describe("toCsv", () => {
 });
 
 describe("splitAnswer", () => {
-  it("splits the ticket sections, with bold or heading markers", () => {
+  it("splits the investigation sections, with bold or heading markers", () => {
     const text = "Ringkas.\n\n**Yang dicek**\n- a\n\n**Diagnosis**\nDua kamar aktif.\n\n### Saran perbaikan\nTutup MEL-02.";
     expect(splitAnswer(text)).toEqual({ intro: "Ringkas.", checked: "- a", diagnosis: "Dua kamar aktif.", suggestion: "Tutup MEL-02." });
   });
@@ -100,9 +100,23 @@ describe("applyEvent", () => {
       { _tag: "render", callId: "t2", block },
       { _tag: "done", runId: "r1", text: "Selesai.", stopReason: "end_turn", steps: 2 },
     ];
-    const run = events.reduce(applyEvent, emptyRun("Pertanyaan", "k"));
+    const run = events.reduce(applyEvent, emptyRun("Pertanyaan", "tanya", "k"));
     expect(run).toMatchObject({ status: "done", runId: "r1", conversationId: "c1", model: "fake · m", text: "Selesai.", fixIds: ["f1"], blocks: [block] });
     expect(run.steps[0]).toMatchObject({ running: false, error: null, output: { fixId: "f1" } });
+  });
+
+  it("keeps earlier steps when a provider repeats a tool call id", () => {
+    const events: ReadonlyArray<AgentEvent> = [
+      { _tag: "tool_started", callId: "dup", name: "kunjunganAktif", args: {} },
+      { _tag: "tool_finished", callId: "dup", name: "kunjunganAktif", ok: true, result: { n: 1 }, durationMs: 1 },
+      { _tag: "tool_started", callId: "dup", name: "diagnosaPindahKamar", args: {} },
+      { _tag: "tool_finished", callId: "dup", name: "diagnosaPindahKamar", ok: true, result: { jumlahMasalah: 1 }, durationMs: 2 },
+    ];
+    const run = events.reduce(applyEvent, emptyRun("q", "investigasi", "k"));
+    expect(run.steps.map((s) => [s.name, s.output])).toEqual([
+      ["kunjunganAktif", { n: 1 }],
+      ["diagnosaPindahKamar", { jumlahMasalah: 1 }],
+    ]);
   });
 
   it("shows a tool step while the AI is still writing it, then swaps in the real call", () => {
@@ -111,7 +125,7 @@ describe("applyEvent", () => {
       { _tag: "tool_input_delta", draftId: "d0", name: "jalankanQueryBaca", delta: '{"sql":"SELECT nm' },
       { _tag: "tool_input_delta", draftId: "d0", name: "jalankanQueryBaca", delta: '_poli\\n FROM' },
     ];
-    const drafting = events.reduce(applyEvent, emptyRun("q", "k"));
+    const drafting = events.reduce(applyEvent, emptyRun("q", "tanya", "k"));
     expect(drafting.reasoning).toBe("Perlu hitung per poli.");
     expect(drafting.steps).toHaveLength(1);
     expect(drafting.steps[0]).toMatchObject({ id: "d0", running: true, draft: '{"sql":"SELECT nm_poli\\n FROM' });
@@ -221,14 +235,14 @@ describe("formatRelative", () => {
 describe("cardsFromTurns", () => {
   it("collects every result once and keeps a draft's latest state in its first position", () => {
     const first = {
-      ...emptyRun("Kunjungan", "t1"),
+      ...emptyRun("Kunjungan", "tanya", "t1"),
       status: "done" as const,
       blocks: [block({ id: "b1", judul: "Kunjungan per poli" })],
       documents: [documentFixture],
       drafts: [draftFixture({})],
     };
     const second = {
-      ...emptyRun("Pasien", "t2"),
+      ...emptyRun("Pasien", "tanya", "t2"),
       status: "done" as const,
       blocks: [block({ id: "b2", judul: "Pasien daftar hari ini" })],
       drafts: [draftFixture({ fields: { jalannya_penyakit: "Membaik" }, updatedAt: "2026-10-22T01:00:00Z" })],
@@ -255,7 +269,7 @@ describe("cardsFromTurns", () => {
       viewerBase: null,
       studies: [],
     };
-    const run = { ...emptyRun("Radiologi", "t3"), status: "done" as const, radiology: [gallery, gallery] };
+    const run = { ...emptyRun("Radiologi", "tanya", "t3"), status: "done" as const, radiology: [gallery, gallery] };
     const cards = cardsFromTurns([run]);
     expect(cards.map((card) => [card.kind, card.badge, card.summary])).toEqual([
       ["radiology", "Radiologi", "RM 000002"],

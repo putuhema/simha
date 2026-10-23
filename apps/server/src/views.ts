@@ -4,8 +4,8 @@
  * and the audit log.
  *
  * Transcripts are rebuilt from agent_runs, tool_calls, render_blocks and
- * fixes, so a ticket's "Yang dicek AI" steps and a chat's charts look the same
- * after a reload as while they streamed. Tool outputs come from the audit log
+ * fixes, so an investigation's "Yang dicek AI" steps and a chat's charts look
+ * the same after a reload as while they streamed. Tool outputs come from the audit log
  * (unmasked, cut at 50,000 characters).
  */
 import type {
@@ -38,13 +38,14 @@ const parseJson = (json: string | null): unknown => {
 
 interface RunRow {
   readonly id: string;
-  readonly kind: "ask" | "ticket";
+  readonly mode: "tanya" | "investigasi";
   readonly question: string;
   readonly asked_by: string | null;
   readonly provider: string;
   readonly model: string;
   readonly status: string;
   readonly final_text: string | null;
+  readonly stop_reason: string | null;
   readonly error: string | null;
   readonly started_at: string;
   readonly finished_at: string | null;
@@ -69,7 +70,7 @@ const AUDIT: Record<AuditKind, { from: string; time: string; columns: string; se
     from: "agent_runs",
     time: "started_at",
     columns:
-      "id, started_at, kind, question, asked_by, provider, model, mask_pii, status, steps, input_tokens, cached_input_tokens, cache_write_tokens, output_tokens, error",
+      "id, started_at, mode, kind, question, asked_by, provider, model, mask_pii, status, steps, input_tokens, cached_input_tokens, cache_write_tokens, output_tokens, error",
     search: ["question", "asked_by", "model", "provider"],
   },
   tools: {
@@ -162,17 +163,16 @@ const make = Effect.gen(function* () {
 
   const stats = Effect.gen(function* () {
     const khanza = yield* khanzaCounts;
-    const [local] = yield* sql<{ tickets: number; fixes: number }>`
-      SELECT (SELECT COUNT(*) FROM tickets WHERE status <> 'closed') AS tickets,
-             (SELECT COUNT(*) FROM fixes WHERE status = 'pending') AS fixes`;
-    return { ...khanza, tiketTerbuka: local?.tickets ?? 0, perbaikanMenunggu: local?.fixes ?? 0 } satisfies Stats;
+    const [local] = yield* sql<{ fixes: number }>`
+      SELECT (SELECT COUNT(*) FROM fixes WHERE status = 'pending') AS fixes`;
+    return { ...khanza, perbaikanMenunggu: local?.fixes ?? 0 } satisfies Stats;
   }).pipe(Effect.orDie);
 
   const transcriptOf = (conversationId: string | null) =>
     Effect.gen(function* () {
       if (conversationId === null) return { conversationId: null, runs: [] } satisfies Transcript;
       const runs = yield* sql<RunRow>`
-        SELECT id, kind, question, asked_by, provider, model, status, final_text, error, started_at, finished_at
+        SELECT id, mode, question, asked_by, provider, model, status, final_text, stop_reason, error, started_at, finished_at
         FROM agent_runs WHERE conversation_id = ${conversationId} ORDER BY started_at`;
       const ids = runs.map((r) => r.id);
       if (ids.length === 0) return { conversationId, runs: [] } satisfies Transcript;
@@ -206,13 +206,14 @@ const make = Effect.gen(function* () {
         runs: runs.map(
           (r): RunTranscript => ({
             id: r.id,
-            kind: r.kind,
+            mode: r.mode,
             question: r.question,
             askedBy: r.asked_by,
             provider: r.provider,
             model: r.model,
             status: r.status,
             finalText: r.final_text,
+            stopReason: r.stop_reason,
             error: r.error,
             startedAt: r.started_at,
             finishedAt: r.finished_at,
@@ -244,12 +245,6 @@ const make = Effect.gen(function* () {
     Effect.gen(function* () {
       const [row] = yield* sql<{ id: string }>`SELECT id FROM conversations WHERE id = ${id} AND deleted_at IS NULL`.pipe(Effect.orDie);
       return row ? yield* transcriptOf(row.id) : undefined;
-    });
-
-  const ticketTranscript = (ticketId: string) =>
-    Effect.gen(function* () {
-      const [row] = yield* sql<{ id: string }>`SELECT id FROM conversations WHERE ticket_id = ${ticketId}`.pipe(Effect.orDie);
-      return yield* transcriptOf(row?.id ?? null);
     });
 
   /** Tanya Data threads; `askedBy` limits them to one user. Active first, pinned on top. */
@@ -318,7 +313,7 @@ const make = Effect.gen(function* () {
       return { kind: filter.kind, rows, total: count?.n ?? 0 } satisfies AuditPage;
     }).pipe(Effect.orDie);
 
-  return { stats, conversation, ticketTranscript, conversations, audit };
+  return { stats, conversation, conversations, audit };
 });
 
 export class Views extends Context.Service<Views, Effect.Success<typeof make>>()("simha/Views") {}

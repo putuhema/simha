@@ -4,7 +4,7 @@
  * `tampilkan` can show it; the model sees the first 50 rows.
  */
 import { Effect, Schema } from "effect";
-import { ToolError } from "../errors.ts";
+import { KhanzaQueryError, ToolError } from "../errors.ts";
 import { CurrentSession, CurrentToolCall } from "../khanza/current-tool-call.ts";
 import { KhanzaRead } from "../khanza/KhanzaRead.ts";
 import { defineTool } from "../tool.ts";
@@ -35,6 +35,54 @@ const guard = (check: () => unknown) =>
     catch: (error) =>
       new ToolError({ tool: NAME, message: error instanceof QueryRejected ? `Query ditolak: ${error.message}` : String(error) }),
   });
+
+/** Edit distance, bounded at 2: only used to suggest a column when the query names one that does not exist. */
+const near = (a: string, b: string): boolean => {
+  if (Math.abs(a.length - b.length) > 2) return false;
+  const rows = Array.from({ length: a.length + 1 }, (_, i) => i);
+  for (let j = 1; j <= b.length; j++) {
+    let previous = rows[0] ?? 0;
+    rows[0] = j;
+    for (let i = 1; i <= a.length; i++) {
+      const current = rows[i] ?? 0;
+      rows[i] = Math.min(current + 1, (rows[i - 1] ?? 0) + 1, previous + (a[i - 1] === b[j - 1] ? 0 : 1));
+      previous = current;
+    }
+  }
+  return (rows[a.length] ?? 99) <= 2;
+};
+
+/** Real columns that look like the misspelt one, so one failed query teaches the right name. */
+const similarColumns = (name: string, columns: ReadonlyMap<string, ReadonlyArray<string>>): ReadonlyArray<string> => {
+  const wanted = name.toLowerCase();
+  const stem = wanted.slice(0, Math.max(3, Math.ceil(wanted.length / 2)));
+  const found: Array<string> = [];
+  for (const names of columns.values()) {
+    for (const column of names) {
+      if (found.includes(column) || !(column.startsWith(stem) || near(column, wanted))) continue;
+      found.push(column);
+      if (found.length >= 6) return found;
+    }
+  }
+  return found;
+};
+
+/**
+ * The driver's message plus the column names it probably meant. Without this
+ * the model retries with another guess, which costs a whole turn.
+ */
+export const withHint = (error: KhanzaQueryError, columns: ReadonlyMap<string, ReadonlyArray<string>>): KhanzaQueryError => {
+  if (error.kind !== "syntax") return error;
+  const unknown = /Unknown column '([^']+)'/.exec(error.message)?.[1];
+  if (unknown === undefined) return error;
+  const name = unknown.slice(unknown.lastIndexOf(".") + 1);
+  const similar = similarColumns(name, columns);
+  const hint =
+    similar.length === 0
+      ? `Petunjuk: kolom "${name}" tidak ada di skema Khanza ini. Cek lagi dengan lihatSkema; jangan menebak.`
+      : `Petunjuk: kolom "${name}" tidak ada. Kolom yang mirip: ${similar.join(", ")}.`;
+  return new KhanzaQueryError({ kind: error.kind, message: `${error.message}\n${hint}` });
+};
 
 export const jalankanQueryBaca = defineTool({
   name: NAME,
@@ -95,7 +143,9 @@ export const jalankanQueryBaca = defineTool({
       checkSelect(params.sql, { database: read.database, columnsOf: (t) => columns.get(t) }),
     )) as ReturnType<typeof checkSelect>;
 
-    const raw = yield* read.query<Row>((sql) => sql.unsafe(checked.sql));
+    const raw = yield* read
+      .query<Row>((sql) => sql.unsafe(checked.sql))
+      .pipe(Effect.catchTag("KhanzaQueryError", (error) => Effect.fail(withHint(error, columns))));
     const truncated = checked.limitAdded && raw.length > MAX_QUERY_ROWS;
     const rows = raw.slice(0, MAX_QUERY_ROWS).map(cleanRow);
     const kolom = Object.keys(rows[0] ?? {});

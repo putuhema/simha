@@ -4,7 +4,12 @@ import { KhanzaRead } from "../khanza/KhanzaRead.ts";
 import { decodeRows, defineTool } from "../tool.ts";
 import { containsWords, NullableStr, Str } from "./common.ts";
 
-const MAX_RESULTS = 20;
+/**
+ * Enough to recognise the patient, not a directory listing: with twenty rows of
+ * near-identical names the model more often picks the wrong one, and the rows
+ * are replayed on every later turn. `lebihBanyak` asks for a narrower search.
+ */
+const MAX_RESULTS = 5;
 
 /** Identity fields only. NIK, phone and address are never selected. */
 export const PasienRow = Schema.Struct({

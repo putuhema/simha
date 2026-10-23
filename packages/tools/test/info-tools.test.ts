@@ -54,7 +54,7 @@ describe.skipIf(testDb === null)("Tanya Data tools", () => {
         const out = yield* runTool(jalankanQueryBaca, { sql: perPoliSql, alasan: "kunjungan per poli" });
         expect(out.kolom).toEqual(["poli", "jumlah"]);
         expect(out.baris).toEqual([
-          { poli: "Poli Umum", jumlah: 3 },
+          { poli: "Poli Umum", jumlah: 4 },
           { poli: "Poli Gigi", jumlah: 2 },
         ]);
         expect(out).toMatchObject({ jumlahBaris: 2, terpotong: false });

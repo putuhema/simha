@@ -24,6 +24,7 @@ export { KhanzaWrite, KhanzaWriteLive, khanzaWriteLayer } from "./khanza/KhanzaW
 export type { KhanzaWriteService } from "./khanza/KhanzaWrite.ts";
 export type { ServerFlavor, ServerInfo } from "./khanza/server.ts";
 export { diagnosaPindahKamar } from "./diagnose/diagnosaPindahKamar.ts";
+export { diagnosaPulang } from "./diagnose/diagnosaPulang.ts";
 export { diagnosaTindakan } from "./diagnose/diagnosaTindakan.ts";
 export { dokumenPasien } from "./documents/dokumenPasien.ts";
 export { buatDraftResume } from "./drafts/draftTools.ts";

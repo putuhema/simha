@@ -1,20 +1,20 @@
 /**
- * Right column: the patient the ticket is about (identity, current visit,
- * DPJP), document and radiology buttons, the visit timeline, and the AI's
- * diagnosis in one paragraph.
+ * The patient behind an answer: identity, current visit, DPJP, document and
+ * radiology buttons, the visit timeline, and the AI's diagnosis in one
+ * paragraph. Shown in a dialog from the chat.
  */
 import type { DocumentInfo, DocumentKind } from "@simha/shared";
 import { BedDouble, FileText, Stethoscope, UserRound } from "lucide-react";
 import { useState } from "react";
-import { Markdown } from "../../components/agent/Markdown.tsx";
-import { DocumentCard } from "../../components/blocks/DocumentCard.tsx";
-import { OpenInKhanza } from "../../components/desktop/OpenInKhanza.tsx";
-import { RadiologyButton } from "../../components/pacs/Radiology.tsx";
-import { Button } from "../../components/ui/Button.tsx";
-import { Panel } from "../../components/ui/Card.tsx";
-import { Dialog } from "../../components/ui/Dialog.tsx";
-import { ErrorText } from "../../components/ui/Field.tsx";
-import { Empty, Spinner } from "../../components/ui/Spinner.tsx";
+import { Markdown } from "../agent/Markdown.tsx";
+import { DocumentCard } from "../blocks/DocumentCard.tsx";
+import { OpenInKhanza } from "../desktop/OpenInKhanza.tsx";
+import { RadiologyButton } from "../pacs/Radiology.tsx";
+import { Button } from "../ui/Button.tsx";
+import { Panel } from "../ui/Card.tsx";
+import { Dialog } from "../ui/Dialog.tsx";
+import { ErrorText } from "../ui/Field.tsx";
+import { Empty, Spinner } from "../ui/Spinner.tsx";
 import { api, errorMessage } from "../../lib/api.ts";
 import { useApi } from "../../lib/useApi.ts";
 

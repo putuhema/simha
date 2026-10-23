@@ -315,6 +315,17 @@ const threadActions = Effect.gen(function* () {
   yield* sql`ALTER TABLE conversations ADD COLUMN deleted_at TEXT`;
 });
 
+const investigateMode = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  // Tickets became a chat mode: old ticket runs keep their transcript but are
+  // marked as investigations, and their threads become normal Tanya Data
+  // threads. The tickets table stays for the audit trail of older installs.
+  yield* sql`ALTER TABLE agent_runs ADD COLUMN mode TEXT NOT NULL DEFAULT 'tanya'`;
+  yield* sql`UPDATE agent_runs SET mode = 'investigasi' WHERE kind = 'ticket'`;
+  yield* sql`UPDATE agent_runs SET kind = 'ask' WHERE kind = 'ticket'`;
+  yield* sql`UPDATE conversations SET kind = 'ask' WHERE kind = 'ticket'`;
+});
+
 export const auditMigrations = {
   "0001_init": init,
   "0002_agent": agent,
@@ -326,4 +337,5 @@ export const auditMigrations = {
   "0008_knowledge": knowledge,
   "0009_cache_usage": cacheUsage,
   "0010_thread_actions": threadActions,
+  "0011_investigate_mode": investigateMode,
 };

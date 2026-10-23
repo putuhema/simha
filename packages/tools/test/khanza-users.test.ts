@@ -39,7 +39,7 @@ describe.skipIf(testDb === null)("database users", () => {
     Effect.gen(function* () {
       const write = yield* KhanzaWrite;
       const rows = yield* write.sql<{ n: number }>`SELECT COUNT(*) AS n FROM kamar`;
-      expect(rows[0]?.n).toBe(6);
+      expect(rows[0]?.n).toBe(7);
     }).pipe(Effect.provide(khanzaWriteLayer(connectionAs(db, db.writeUser, db.writePass)))),
   );
 

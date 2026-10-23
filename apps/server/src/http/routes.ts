@@ -2,7 +2,7 @@
  * HTTP API under /api, plus the web UI at every other path. Request bodies are
  * checked against the Schemas in @simha/shared. Every route except health,
  * login and first-run setup needs a logged-in user (session cookie); the user
- * is who approves fixes, asks questions and creates tickets in the audit log.
+ * is who approves fixes and asks questions in the audit log.
  *
  *   GET    /api/health                   server, Khanza, AI model and PACS status (public)
  *   GET    /api/auth/state               logged-in user, or whether setup is needed (public)
@@ -12,14 +12,8 @@
  *   GET    /api/users                    list users (admin)
  *   POST   /api/users                    create a user (admin)
  *   PATCH  /api/users/:id                rename, change role, disable, reset password (admin)
- *   GET    /api/stats                    stat row: registrations today, inpatients, open tickets, pending fixes
- *   POST   /api/tickets                  create a ticket
- *   GET    /api/tickets                  list tickets (newest first)
- *   GET    /api/tickets/:id              one ticket
- *   PATCH  /api/tickets/:id              { status }: close or reopen
- *   GET    /api/tickets/:id/transcript   past investigations (steps, answers, fixes)
- *   POST   /api/tickets/:id/investigate  run the agent on a ticket (SSE)
- *   POST   /api/ask                      Tanya Data question (SSE)
+ *   GET    /api/stats                    registrations today, inpatients, pending fixes
+ *   POST   /api/ask                      a Tanya Data question or an investigation (SSE)
  *   GET    /api/conversations            recent Tanya Data threads (?mine=1)
  *   GET    /api/conversations/:id        one thread with its answers and blocks
  *   PATCH  /api/conversations/:id        { pinned?, archived? }: pin or archive (owner or admin)
@@ -28,7 +22,7 @@
  *   GET    /api/patients/:rm/radiologi   the patient's radiology studies in Orthanc PACS (?dari=&sampai=)
  *   GET    /api/pacs/instances/:id/:kind one image through the server: thumb (JPEG), preview (PNG), file (DICOM)
  *   GET    /api/berkas                  a digital patient file (?noRawat=&kode=&view=1|download=1)
- *   GET    /api/fixes                    list fixes (?status=pending&ticketId=...)
+ *   GET    /api/fixes                    list fixes (?status=pending)
  *   POST   /api/fixes                    propose a fix by hand, or edit an AI proposal (`replaces`)
  *   GET    /api/fixes/:id                fix with preview rows and history
  *   POST   /api/fixes/:id/approve        approve and run it (write user, one transaction)
@@ -61,15 +55,12 @@ import {
   CreateFavoriteRequest,
   CreateFixRequest,
   CreateKnowledgeRequest,
-  CreateTicketRequest,
   CreateUserRequest,
   FixStatus,
-  InvestigateRequest,
   KnowledgeFeedbackRequest,
   LoginRequest,
   RejectFixRequest,
   SetupRequest,
-  TicketStatus,
   UpdateConversationRequest,
   UpdateDraftRequest,
   UpdateKnowledgeRequest,
@@ -117,7 +108,7 @@ const body = <A>(schema: Schema.Codec<A, unknown>) =>
     Effect.mapError((e) => (Schema.isSchemaError(e) ? e.message : "Body harus berupa JSON yang valid.")),
   );
 
-/** Empty body allowed (e.g. POST /api/tickets/:id/investigate with no follow-up question). */
+/** Empty body allowed (e.g. POST /api/fixes/:id/reject with no reason). */
 const optionalBody = <A>(schema: Schema.Codec<A, unknown>, empty: A) =>
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
@@ -289,84 +280,10 @@ const AuthRoutes = Layer.mergeAll(
   ),
 );
 
-const TicketRoutes = Layer.mergeAll(
+const ChatRoutes = Layer.mergeAll(
   route("GET", "/api/stats", authed(Effect.gen(function* () {
       return json(yield* (yield* Views).stats);
     }))),
-
-  route(
-    "POST",
-    "/api/tickets",
-    authed(
-      handled(
-        Effect.gen(function* () {
-          const input = yield* body(CreateTicketRequest);
-          const user = yield* CurrentUser;
-          return json(yield* (yield* Store).createTicket(input, user.username), 201);
-        }),
-      ),
-    ),
-  ),
-
-  route("GET", "/api/tickets", authed(Effect.gen(function* () {
-      return json(yield* (yield* Store).listTickets);
-    }))),
-
-  route(
-    "GET",
-    "/api/tickets/:id",
-    authed(
-      Effect.gen(function* () {
-        const ticket = yield* (yield* Store).getTicket(yield* id);
-        return ticket ? json(ticket) : errorResponse(404, "Tiket tidak ditemukan.");
-      }),
-    ),
-  ),
-
-  route(
-    "PATCH",
-    "/api/tickets/:id",
-    authed(
-      handled(
-        Effect.gen(function* () {
-          const input = yield* body(Schema.Struct({ status: TicketStatus }));
-          const store = yield* Store;
-          const ticketId = yield* id;
-          if (!(yield* store.getTicket(ticketId))) return errorResponse(404, "Tiket tidak ditemukan.");
-          yield* store.setTicketStatus(ticketId, input.status);
-          return json(yield* store.getTicket(ticketId));
-        }),
-      ),
-    ),
-  ),
-
-  route(
-    "GET",
-    "/api/tickets/:id/transcript",
-    authed(
-      Effect.gen(function* () {
-        const ticketId = yield* id;
-        if (!(yield* (yield* Store).getTicket(ticketId))) return errorResponse(404, "Tiket tidak ditemukan.");
-        return json(yield* (yield* Views).ticketTranscript(ticketId));
-      }),
-    ),
-  ),
-
-  route(
-    "POST",
-    "/api/tickets/:id/investigate",
-    authed(
-      handled(
-        Effect.gen(function* () {
-          const input = yield* optionalBody(InvestigateRequest, {});
-          const ticket = yield* (yield* Store).getTicket(yield* id);
-          if (!ticket) return errorResponse(404, "Tiket tidak ditemukan.");
-          const user = yield* CurrentUser;
-          return sseResponse((yield* Agent).run({ kind: "ticket", ticket, question: input.question, askedBy: user.username }));
-        }),
-      ),
-    ),
-  ),
 
   route(
     "POST",
@@ -378,8 +295,8 @@ const TicketRoutes = Layer.mergeAll(
           const user = yield* CurrentUser;
           return sseResponse(
             (yield* Agent).run({
-              kind: "ask",
               question: input.question,
+              mode: input.mode ?? "tanya",
               conversationId: input.conversationId,
               askedBy: user.username,
             }),
@@ -1134,4 +1051,4 @@ const WebRoutes = route(
   }),
 );
 
-export const Routes = Layer.mergeAll(AuthRoutes, TicketRoutes, FixRoutes, DocumentRoutes, PacsRoutes, BerkasRoutes, DraftRoutes, DataRoutes, KnowledgeRoutes, WebRoutes);
+export const Routes = Layer.mergeAll(AuthRoutes, ChatRoutes, FixRoutes, DocumentRoutes, PacsRoutes, BerkasRoutes, DraftRoutes, DataRoutes, KnowledgeRoutes, WebRoutes);

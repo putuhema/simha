@@ -3,7 +3,7 @@
  * Kept in a store so an answer keeps streaming while the user looks at
  * another tab.
  */
-import type { Favorite, RenderBlock, Transcript } from "@simha/shared";
+import type { AgentMode, Favorite, RenderBlock, Transcript } from "@simha/shared";
 import { create } from "zustand";
 import { api, errorMessage } from "../lib/api.ts";
 import { emptyRun, fromTranscript, streamRun, type RunView } from "../lib/run.ts";
@@ -15,6 +15,9 @@ interface TanyaStore {
   readonly loading: boolean;
   readonly error: string | null;
   readonly running: boolean;
+  /** How the next question is answered; Tanya Data or a nurse complaint. */
+  readonly mode: AgentMode;
+  readonly setMode: (mode: AgentMode) => void;
   readonly ask: (question: string) => Promise<string | null>;
   readonly stop: () => void;
   readonly open: (conversationId: string) => Promise<void>;
@@ -31,11 +34,15 @@ export const useTanya = create<TanyaStore>((set, get) => ({
   loading: false,
   error: null,
   running: false,
+  mode: "tanya",
+
+  setMode: (mode) => set({ mode }),
 
   ask: async (question) => {
     if (get().running) return get().conversationId;
     controller = new AbortController();
-    const initial = emptyRun(question);
+    const mode = get().mode;
+    const initial = emptyRun(question, mode);
     set({ running: true, error: null, turns: [...get().turns, initial] });
     const replace = (run: RunView) => {
       // A new thread shows up in the sidebar as soon as the server names it.
@@ -47,7 +54,8 @@ export const useTanya = create<TanyaStore>((set, get) => ({
       if (isNew) bumpConversations();
     };
     const conversationId = get().conversationId;
-    const final = await streamRun("/api/ask", conversationId ? { question, conversationId } : { question }, initial, replace, controller.signal);
+    const body = conversationId ? { question, mode, conversationId } : { question, mode };
+    const final = await streamRun("/api/ask", body, initial, replace, controller.signal);
     set({ running: false });
     bumpConversations();
     return final.conversationId ?? get().conversationId;
@@ -58,10 +66,11 @@ export const useTanya = create<TanyaStore>((set, get) => ({
   open: async (conversationId) => {
     if (get().conversationId === conversationId && get().turns.length > 0) return;
     controller?.abort();
-    set({ conversationId, turns: [], loading: true, error: null, running: false });
+    set({ conversationId, turns: [], loading: true, error: null, running: false, mode: "tanya" });
     try {
       const transcript = await api.get<Transcript>(`/api/conversations/${conversationId}`);
-      set({ turns: transcript.runs.map(fromTranscript), loading: false });
+      const turns = transcript.runs.map(fromTranscript);
+      set({ turns, loading: false, mode: turns.at(-1)?.mode ?? "tanya" });
     } catch (error) {
       set({ loading: false, error: errorMessage(error) });
     }
@@ -69,11 +78,11 @@ export const useTanya = create<TanyaStore>((set, get) => ({
 
   reset: () => {
     controller?.abort();
-    set({ conversationId: null, turns: [], error: null, running: false, loading: false });
+    set({ conversationId: null, turns: [], error: null, running: false, loading: false, mode: "tanya" });
   },
 
   runFavorite: async (favorite) => {
-    const run = emptyRun(`★ ${favorite.question}`);
+    const run = emptyRun(`★ ${favorite.question}`, "tanya");
     set({ turns: [...get().turns, run], error: null });
     const replace = (next: RunView) => set({ turns: get().turns.map((t) => (t.key === run.key ? next : t)) });
     try {

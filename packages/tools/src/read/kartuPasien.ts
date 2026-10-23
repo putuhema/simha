@@ -1,6 +1,6 @@
 /**
  * Patient card: identity, the latest visits and the DPJP of the latest
- * visit, in one call. Used by the ticket view's patient column and by the AI
+ * visit, in one call. Used by the patient card in the chat and by the AI
  * for "ringkas kunjungan pasien ini". Never NIK, phone or address.
  */
 import { Effect, Schema } from "effect";

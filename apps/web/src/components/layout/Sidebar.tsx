@@ -5,7 +5,7 @@
  * icon rail on a wide window and becomes a drawer on a phone.
  */
 import { Menu } from "@base-ui/react/menu";
-import type { ConversationSummary, Favorite, Stats } from "@simha/shared";
+import type { ConversationSummary, Favorite } from "@simha/shared";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Archive,
@@ -28,7 +28,6 @@ import {
   Settings,
   SquarePen,
   Star,
-  Ticket,
   Trash2,
   X,
 } from "lucide-react";
@@ -277,7 +276,6 @@ const ConversationRow = ({ conversation, active, running, onNavigate, onDeleted,
 interface PanelProps {
   readonly health: Health | undefined;
   readonly healthError: string | null;
-  readonly stats: Stats | undefined;
   /** Called after any navigation (closes the phone drawer). */
   readonly onNavigate: () => void;
   /** The close button: collapse to the rail, or close the drawer. */
@@ -286,7 +284,7 @@ interface PanelProps {
 }
 
 /** The full sidebar. */
-export const SidebarPanel = ({ health, healthError, stats, onNavigate, onClose, closeLabel }: PanelProps) => {
+export const SidebarPanel = ({ health, healthError, onNavigate, onClose, closeLabel }: PanelProps) => {
   const navigate = useNavigate();
   const newChat = useNewChat();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -361,14 +359,6 @@ export const SidebarPanel = ({ health, healthError, stats, onNavigate, onClose, 
       </div>
 
       <nav className="mt-3 shrink-0 space-y-0.5 px-2.5">
-        <Link to="/tiket" onClick={onNavigate} className={rowClass} activeProps={{ className: activeClass }}>
-          <Ticket className="size-4" /> Tiket
-          {stats?.tiketTerbuka ? (
-            <span className="ml-auto rounded-full bg-card px-1.5 font-mono text-[10px] font-medium text-teal" title="Tiket terbuka">
-              {stats.tiketTerbuka}
-            </span>
-          ) : null}
-        </Link>
         <Link to="/pengetahuan" onClick={onNavigate} className={rowClass} activeProps={{ className: activeClass }}>
           <BookOpen className="size-4" /> Pengetahuan AI
         </Link>
@@ -503,7 +493,7 @@ export const SidebarPanel = ({ health, healthError, stats, onNavigate, onClose, 
 };
 
 /** The collapsed sidebar: icons only. */
-export const SidebarRail = ({ health, healthError, stats }: Pick<PanelProps, "health" | "healthError" | "stats">) => {
+export const SidebarRail = ({ health, healthError }: Pick<PanelProps, "health" | "healthError">) => {
   const { toggle, startSearch } = useSidebar();
   const newChat = useNewChat();
   const navigate = useNavigate();
@@ -523,10 +513,6 @@ export const SidebarRail = ({ health, healthError, stats }: Pick<PanelProps, "he
       </TipButton>
       <TipButton label="Cari" side="right" onClick={startSearch} className={icon}>
         <Search className="size-[17px]" />
-      </TipButton>
-      <TipButton label="Tiket" side="right" onClick={() => void navigate({ to: "/tiket" })} className={cn(icon, pathname === "/tiket" && "bg-paper-2 text-ink")}>
-        <Ticket className="size-[17px]" />
-        {stats?.tiketTerbuka ? <span className="absolute top-2 right-2 size-1.5 rounded-full bg-teal ring-2 ring-paper" /> : null}
       </TipButton>
       <TipButton
         label="Pengetahuan AI"

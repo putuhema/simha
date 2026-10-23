@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { compactHistory, estimateTokens, HISTORY_TOKEN_BUDGET } from "../src/agent/history.ts";
 
 /** One complete turn: question, optional tool round, answer. */
-const turn = (n: number, toolChars = 0): Array<ChatMessage> => {
+const turn = (n: number, toolChars = 0, content?: string): Array<ChatMessage> => {
   const messages: Array<ChatMessage> = [{ role: "user", text: `pertanyaan ${n}` }];
   if (toolChars > 0) {
     messages.push({
@@ -15,7 +15,7 @@ const turn = (n: number, toolChars = 0): Array<ChatMessage> => {
       role: "tool",
       toolCallId: `call_${n}`,
       name: "jalankanQueryBaca",
-      content: `${n}:${"x".repeat(toolChars)}`,
+      content: content ?? `${n}:${"x".repeat(toolChars)}`,
       isError: false,
     });
   }
@@ -32,18 +32,53 @@ describe("conversation history budget", () => {
     expect(estimateTokens(messages)).toBeLessThan(HISTORY_TOKEN_BUDGET);
   });
 
-  it("drops whole old turns and keeps the newest turns byte-identical", () => {
+  it("shrinks old tool results before dropping their turns", () => {
     const messages = [...turn(0, 40_000), ...turn(1, 40_000), ...turn(2, 40_000), ...turn(3, 40_000)];
     const compacted = compactHistory(messages);
-    expect(compacted.length).toBeLessThan(messages.length);
-    expect(roles(compacted)[0]).toBe("user");
-    // The summary names the dropped turns, not their tool payload.
-    expect(compacted[0]?.role === "user" && compacted[0].text).toContain("[Ringkasan percakapan sebelumnya");
-    expect(compacted[0]?.role === "user" && compacted[0].text).toContain("pertanyaan 0 → jawaban 0");
-    expect(JSON.stringify(compacted)).not.toContain("0:xxxx");
-    // The last two turns keep their exact content.
+    // Every turn survives: the questions, the answers and the tool call pairing stay.
+    expect(compacted.length).toBe(messages.length);
+    expect(roles(compacted)).toEqual(roles(messages));
+    expect(compacted.some((message) => message.role === "user" && message.text.includes("pertanyaan 0"))).toBe(true);
+    // The payload is replaced by a one-line summary, not the whole row set.
+    const tools = compacted.filter((message) => message.role === "tool");
+    expect(tools.length).toBe(messages.filter((message) => message.role === "tool").length);
+    // The two oldest results fit the budget; the newest turn is left alone.
+    expect(tools.filter((message) => message.content.length < 300).length).toBe(2);
+    expect(tools.some((message) => message.role === "tool" && message.content.startsWith("[ringkas]"))).toBe(true);
+    expect(compacted[0]?.role === "user" && compacted[0].text).not.toContain("[Ringkasan percakapan");
+  });
+
+  it("keeps the identifying values a follow-up needs", () => {
+    const pasien = JSON.stringify({
+      pasien: [{ no_rkm_medis: "123456", nm_pasien: "Budi Santoso", jk: "L", umur: "40" }],
+      lebihBanyak: false,
+      catatan: "y".repeat(400),
+    });
+    const messages: Array<ChatMessage> = [...turn(0, pasien.length, pasien), ...turn(1)];
+    const compacted = compactHistory(messages, 120);
+    const result = compacted.find((message) => message.role === "tool");
+    expect(result?.role === "tool" && result.content).toContain("no_rkm_medis=123456");
+    expect(result?.role === "tool" && result.content.length).toBeLessThan(300);
+    expect(estimateTokens(compacted)).toBeLessThanOrEqual(120);
+  });
+
+  it("never touches the newest turn", () => {
+    const messages = [...turn(0, 40_000), ...turn(1, 40_000)];
+    const compacted = compactHistory(messages);
     expect(compacted.slice(-4)).toEqual(messages.slice(-4));
-    expect(compacted.some((message) => message.role === "user" && message.text.includes("pertanyaan 2"))).toBe(true);
+  });
+
+  it("drops old turns and summarizes when no tool result can be shrunk", () => {
+    const messages: Array<ChatMessage> = [
+      { role: "user", text: "pertanyaan 0" },
+      { role: "assistant", text: "z".repeat(120_000), toolCalls: [] },
+      { role: "user", text: "pertanyaan 1" },
+      { role: "assistant", text: "jawaban 1", toolCalls: [] },
+    ];
+    const compacted = compactHistory(messages);
+    expect(compacted.length).toBeLessThan(messages.length);
+    expect(compacted[0]?.role === "user" && compacted[0].text).toContain("[Ringkasan percakapan sebelumnya");
+    expect(compacted[0]?.role === "user" && compacted[0].text).toContain("pertanyaan 0");
   });
 
   it("keeps every tool result paired with its assistant tool call", () => {

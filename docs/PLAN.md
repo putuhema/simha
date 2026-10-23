@@ -6,12 +6,12 @@ Status: **M6.6 (AI learning) done, waiting for your test.** Next: M7 (MCP over s
 
 | Package | Main modules |
 |---|---|
-| `packages/shared` | `contracts/` (API request/response Schemas), `render.ts` (render block Schema: table, bar, line, pie, stat, list), `ticket.ts`, `fix.ts`, `audit.ts`, `sse.ts` (stream event Schema) |
+| `packages/shared` | `api.ts` (API request/response and stream event Schemas, agent modes, render blocks, fixes), `forms.ts` (resume form draft) |
 | `packages/tools` | `audit/` (SQLite audit log + migrations, shared by server and MCP), `khanza/` (read and write pools, grants check, query timeout), `registry.ts` (`Tool` = name, description, params Schema, kind, handler), `read/` (cariPasien, kunjunganAktif, riwayatKamar, statusKamar, daftarTindakan, statusBilling, dataSep, suratKontrol), `diagnose/` (diagnosaPindahKamar, diagnosaTindakan), `propose/usulkanPerbaikan.ts`, `info/` (lihatSkema, jalankanQueryBaca, tampilkan), `app/` (cariAplikasiKhanza + generated map), `knowledge/` (examples/notes, search, catatPengetahuan), `guards/` (select guard, write guard, column deny-list, PII masking), `services/` (KhanzaRead, KhanzaWrite, AuditLog, FixStore as Effect services) |
 | `packages/llm` | `LlmClient.ts` (service: `chat(messages, tools) -> Stream<LlmEvent>`), `adapters/anthropic.ts`, `adapters/openai-compat.ts`, `adapters/fake.ts`, `layer.ts` (picks adapter from `LLM_PROVIDER`) |
 | `packages/mcp` | `server.ts` (registers the tool registry with `@modelcontextprotocol/sdk`), `stdio.ts`, `http.ts` |
 | `apps/server` | `config.ts`, `agent/` (loop, `system-prompt.md`), `fixes/` (approve, execute, rollback), `auth/` (local login), `http/` (routes, SSE), `main.ts` |
-| `apps/web` | routes `tiket`, `tanya`, `pengaturan`; `components/` (render blocks: table, chart, stat), stores |
+| `apps/web` | routes `tanya`, `pengetahuan`, `pengaturan`; Tanya Data and investigate modes; `components/` (render blocks: table, chart, stat; patient card, fix card), stores |
 | `apps/desktop` | Electron main (starts or connects to the server), preload, packaging for Windows |
 
 ## Milestones
@@ -19,12 +19,12 @@ Status: **M6.6 (AI learning) done, waiting for your test.** Next: M7 (MCP over s
 Each one ends with tests passing and a stop for you to test.
 
 - **M1. Data layer. ✅ Done.** Config Layer, read and write pools, SQLite audit DB with migrations, the 8 read tools, `pnpm tool` to try them, tests on synthetic data (temporary MariaDB or `docker-compose.yml`).
-- **M2. Agent. ✅ Done.** Tool registry, LLM service with `anthropic`, `openai-compat` and `fake` adapters, agent loop, `POST /ask` and `POST /tickets/:id/investigate` with SSE, PII masking. Demo with DeepSeek and Gemini (and Claude through a gateway).
+- **M2. Agent. ✅ Done.** Tool registry, LLM service with `anthropic`, `openai-compat` and `fake` adapters, agent loop, `POST /ask` (Tanya Data and investigate modes) with SSE, PII masking. Demo with DeepSeek and Gemini (and Claude through a gateway).
 - **M3. Fixes. ✅ Done.** `diagnosaPindahKamar`, `diagnosaTindakan`, `usulkanPerbaikan` → preview → approve → execute in a transaction → rollback. Tests prove a row-count mismatch rolls back and nothing is written without an approval row in the audit log.
 - **M4. Tanya Data tools. ✅ Done.** `lihatSkema`, guarded `jalankanQueryBaca`, `tampilkan`. Tests prove non-SELECT, multiple statements and deny-listed columns are rejected.
-- **M5. Web UI. ✅ Done.** Tiket, Tanya Data (charts, tables, favorites), Pengaturan (provider, audit log). Login. Playwright smoke tests.
+- **M5. Web UI. ✅ Done.** Tanya Data (charts, tables, favorites), Pengaturan (provider, audit log). Login. Playwright smoke tests. Tiket later became the **Investigasi** mode inside the chat (one composer, one thread list, fix cards inline, patient card in a dialog); old ticket threads are migrated to chat threads.
 - **M5.1. Patient documents. ✅ Done.** Riwayat pasien, CPPT / SOAP and resume medis as printable HTML from Khanza data (`dokumenPasien`), from the patient card or the agent.
-- **M5.2. Routine data checks and agent test set.** Scheduled checks for known data problems with "Buat tiket"; fixed scenarios with known answers to score each AI provider/model.
+- **M5.2. Routine data checks and agent test set.** Scheduled checks for known data problems that open an investigation; fixed scenarios with known answers to score each AI provider/model.
 - **M6. Desktop. ✅ Done.** Electron app wrapping the UI (remote server or a local server it starts), setup page, "Buka di Khanza", Windows installer.
 - **M6.2. Resume drafts. ✅ Done.** The AI drafts the resume medis rawat inap from Khanza data, asks for the rest, and "Isi di Khanza" fills Khanza's own form (see M6.2 notes).
 - **M6.5. App map: menu, flows, rights. ✅ Done.** `pnpm extract-khanza-app` reads `frmUtama.java` and writes `docs/khanza-app/` (explicit: 20 groups [A]–[T], every button, form, access right and table). Hand-written flows cover registrasi, rawat inap, IGD, lab, radiologi, farmasi, kasir, BPJS, master data and reports. The agent uses `cariAplikasiKhanza`; `synonyms.json` maps staff words ("pindah kamar", "SEP") to real menu paths.
@@ -42,7 +42,7 @@ Each one ends with tests passing and a stop for you to test.
 
 ## M2 notes
 
-- Tickets, conversations and agent runs live in the audit SQLite DB (migration `0002_agent`). Each run records the question, provider, model, masking setting, steps, tokens and result; `tool_calls.session_id` is the run id.
+- Conversations and agent runs live in the audit SQLite DB (migration `0002_agent`). Each run records the question, provider, model, masking setting, steps, tokens and result; `tool_calls.session_id` is the run id.
 - The system prompt is `apps/server/src/agent/system-prompt.md` followed by `docs/khanza_notes.md`, so local notes reach the model without code changes.
 - The model gets the server date and time with every question, so "hari ini" and "minggu ini" resolve correctly.
 - Claude's own response content (including thinking blocks) is replayed unchanged on the next step. All tool results of a turn go back in one message.
@@ -91,16 +91,16 @@ Each one ends with tests passing and a stop for you to test.
 
 ## M5 notes
 
-- **Login.** Users, sessions and an event log are in the audit DB (migration `0005_auth`). The first visit creates the first admin; admins add more users. Every API route except health, login and first-run setup needs a session. The user is now who approves fixes, asks questions (`agent_runs.asked_by`) and creates tickets, so the `actor` / `createdBy` request fields are gone.
+- **Login.** Users, sessions and an event log are in the audit DB (migration `0005_auth`). The first visit creates the first admin; admins add more users. Every API route except health, login and first-run setup needs a session. The user is now who approves fixes and asks questions (`agent_runs.asked_by`), so the `actor` / `createdBy` request fields are gone.
 - **API under `/api`.** The server serves the built UI at every other path, with security headers (CSP `default-src 'self'`, no framing). Fonts are bundled, so nothing loads from the internet.
 - **AI settings page.** It changes the provider without a restart. `LlmClient` is now a proxy over the current adapter. A broken AI configuration no longer stops the server; questions fail with the reason until an admin fixes it.
-- **History.** Ticket and chat history are rebuilt from the audit DB (`agent_runs`, `tool_calls`, `render_blocks`, `fixes`), so a reload shows the same steps, charts and fixes as the live stream.
+- **History.** Chat and investigation history are rebuilt from the audit DB (`agent_runs`, `tool_calls`, `render_blocks`, `fixes`), so a reload shows the same steps, charts and fixes as the live stream.
 - **New read tool `kartuPasien`:** identity, the latest visits and DPJP, for the patient column. The AI can use it too, for "ringkas kunjungan pasien ini".
 - **UI stack.** React 19, Vite 8, TanStack Router, Tailwind v4, Base UI, ECharts (loaded on first chart), TanStack Table v9, Zustand. `@effect/atom-react` is not used: the UI only reads JSON from the API, so plain stores were enough.
 - **Tests.**
   - Vitest unit tests for the UI helpers: SSE parsing, CSV, answer sections, step marks, chart options.
   - Server tests for login, roles, settings, transcripts, the audit API and static files.
-  - 7 Playwright smoke tests. They cover setup, ticket → approve → rollback, Tanya Data chart + favorite, stat card, settings + audit log, a 400 px window, and logout.
+  - 17 Playwright smoke tests. They cover setup, investigate → approve → rollback, Tanya Data chart + favorite, the patient card (CPPT, radiology), settings + audit log, a 400 px window, and logout.
 - **Bugs the tests caught.**
   - "Percakapan baru" reopened the old thread from the URL.
   - The narrow layout scrolled sideways.

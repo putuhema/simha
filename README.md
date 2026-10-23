@@ -2,10 +2,10 @@
 
 **Simha** (*simha* = lion, from SIMRS + harness) is an AI assistant for hospital IT staff working with **SIMRS Khanza**. It reads, explains and proposes — it never changes data on its own.
 
-- **Tiket mode:** paste a nurse's complaint. The agent reads the real patient data through safe, read-only tools, explains each check, gives a diagnosis and proposes a fix as SQL. The fix only runs after a person clicks **Approve**, and it can be rolled back.
+- **Investigasi keluhan:** switch the chat to **Investigasi** and paste a nurse's complaint. The agent reads the real patient data through safe, read-only tools, explains each check, gives a diagnosis and proposes a fix as SQL. The fix only runs after a person clicks **Approve**, and it can be rolled back.
 - **Tanya Data mode:** ask questions about hospital data in plain Indonesian ("10 obat paling banyak dipakai minggu ini"). The agent writes a guarded `SELECT` and shows the answer as a table, chart or number.
 
-> Status: **M6.6 done**: web UI (Tiket, Tanya Data, Pengetahuan AI, Pengaturan), desktop app with Khanza bridge, resume drafts, app map and AI learning (examples, notes, feedback). See [docs/PLAN.md](docs/PLAN.md). Name, tagline and identifiers: [docs/BRAND.md](docs/BRAND.md).
+> Status: **M6.6 done**: web UI (Tanya Data with an investigate mode, Pengetahuan AI, Pengaturan), desktop app with Khanza bridge, resume drafts, app map and AI learning (examples, notes, feedback). See [docs/PLAN.md](docs/PLAN.md). Name, tagline and identifiers: [docs/BRAND.md](docs/BRAND.md).
 
 ## Safety model (short version)
 
@@ -138,13 +138,13 @@ pnpm start       # http://127.0.0.1:8787
 
 Open http://127.0.0.1:8787. The first visit asks for the **first admin account**. After that everyone logs in with their own account, which admins create under **Pengaturan → Pengguna**.
 
-- **Tiket.** Paste a nurse's complaint with **+ Tiket baru**. The AI investigates right away. The middle column shows:
+- **Investigasi keluhan.** In the composer, switch the mode from **Tanya data** to **Investigasi** and paste the nurse's complaint. It is the same chat as Tanya Data, so follow-up questions keep the context. The answer shows:
   - "Yang dicek AI" (✓ fine, ! problem found, ✕ failed; click a step for its details);
   - the diagnosis;
   - "Saran perbaikan" with the proposed SQL, how many rows it changes, and **Setujui / Edit / Tolak**. After approval it shows the result and **Rollback**.
 
-  The right column shows the patient (identity, current visit, room, DPJP, visit timeline) and the AI's summary. Ask follow-up questions at the bottom.
-- **Patient documents.** Under the patient card, **Riwayat**, **CPPT / SOAP** and **Resume** make a printable document straight from Khanza; no AI is involved. You can also ask the agent, e.g. "buatkan CPPT pasien 2026/10/21/000002". Each document has **Cetak / PDF**, open in a new tab, and download HTML.
+  The AI gets one last turn without tools after 45 seconds or 8 model turns, so a slow investigation still ends with an answer and what is still missing instead of running forever. When the answer names a patient (RM or a patient lookup), **Kartu pasien** opens the patient (identity, current visit, room, DPJP, visit timeline, documents and radiology) and the AI's diagnosis. The discharge complaint has its own check: `diagnosaPulang` looks at the registration status, active room rows, billing, resume, DPJP and BPJS SEP in one step.
+- **Patient documents.** Under **Kartu pasien**, **Riwayat**, **CPPT / SOAP** and **Resume** make a printable document straight from Khanza; no AI is involved. You can also ask the agent, e.g. "buatkan CPPT pasien 2026/10/21/000002". Each document has **Cetak / PDF**, open in a new tab, and download HTML.
   - **Riwayat** shows all visits (latest 20) with diagnoses (ICD-10), rooms, tindakan and drugs.
   - **CPPT** shows the SOAP notes from `pemeriksaan_ralan` / `pemeriksaan_ranap`, each with the doctor or nurse who wrote it and the vital signs, plus diagnoses, allergies, lab (abnormal values in red) and radiology.
   - **Resume** shows the resume medis written in Khanza, or a clearly marked draft built from the CPPT, with the empty fields left for the doctor.
@@ -253,7 +253,7 @@ curl -b jar -N -X POST localhost:8787/api/ask -H 'content-type: application/json
   -d '{"question":"10 obat paling banyak dipakai minggu ini"}'
 ```
 
-`/api/ask` and `/api/tickets/:id/investigate` stream Server-Sent Events:
+`/api/ask` streams Server-Sent Events:
 
 - `run_started`: run and conversation id, provider, model;
 - `text_delta`: answer text;
@@ -262,7 +262,7 @@ curl -b jar -N -X POST localhost:8787/api/ask -H 'content-type: application/json
 - `document`, `draft`, `radiology`, `berkas`: answer cards (printable document, form draft, radiology images, digital files);
 - then `done` or `error`.
 
-Send the `conversationId` with the next `/api/ask` for a follow-up.
+Send the `conversationId` with the next `/api/ask` for a follow-up. Add `"mode":"investigasi"` to ask for a complaint investigation instead of a Tanya Data answer.
 
 | Endpoint | |
 |---|---|
@@ -272,18 +272,14 @@ Send the `conversationId` with the next `/api/ask` for a follow-up.
 | `POST /api/auth/login`, `POST /api/auth/logout` | |
 | `POST /api/auth/password` | `{ currentPassword, newPassword }` |
 | `GET /api/users`, `POST /api/users`, `PATCH /api/users/:id` | manage users (admin) |
-| `GET /api/stats` | registrations today, inpatients, open tickets, fixes waiting |
-| `POST /api/tickets`, `GET /api/tickets`, `GET /api/tickets/:id` | `{ nurseName, unit, complaint }` |
-| `PATCH /api/tickets/:id` | `{ status }`: close or reopen |
-| `GET /api/tickets/:id/transcript` | past investigations: steps, answers, blocks, fixes |
-| `POST /api/tickets/:id/investigate` | run the agent; optional `{ question }` for a follow-up (SSE) |
-| `POST /api/ask` | `{ question, conversationId? }` (SSE) |
-| `GET /api/conversations`, `GET /api/conversations/:id` | Tanya Data threads (`?mine=1`), active first and pinned on top |
+| `GET /api/stats` | registrations today, inpatients, fixes waiting |
+| `POST /api/ask` | `{ question, conversationId?, mode?: "tanya" \| "investigasi" }` (SSE) |
+| `GET /api/conversations`, `GET /api/conversations/:id` | chat threads (`?mine=1`), active first and pinned on top; each run carries its mode |
 | `PATCH /api/conversations/:id` | `{ pinned?, archived? }`: pin, unpin, archive or unarchive (owner or admin) |
 | `DELETE /api/conversations/:id` | remove a thread and its messages (owner or admin; the audit log keeps its runs) |
 | `GET /api/patients/:rm` | patient card (no NIK, phone or address) |
-| `GET /api/fixes`, `GET /api/fixes/:id` | `?status=pending&ticketId=` |
-| `POST /api/fixes` | `{ title, reason, sql, params?, ticketId?, replaces? }` |
+| `GET /api/fixes`, `GET /api/fixes/:id` | `?status=pending` |
+| `POST /api/fixes` | `{ title, reason, sql, params?, replaces? }` |
 | `POST /api/fixes/:id/approve`, `/reject` (`{ reason? }`), `/rollback` | |
 | `POST /api/documents` | `{ jenis: "riwayat" \| "cppt" \| "resume", noRkmMedis?, noRawat? }`: make a patient document |
 | `GET /api/documents/:id` | its HTML (`?download=1` to save it) |
@@ -320,7 +316,7 @@ Notes:
 
 | Tool | Input | What it returns |
 |---|---|---|
-| `cariPasien` | `noRkmMedis` or `nama` | RM, name, sex, birth date, age, payer. Never NIK, phone or address. Max 20. |
+| `cariPasien` | `noRkmMedis` or `nama` | RM, name, sex, birth date, age, payer. Never NIK, phone or address. Max 5, then `lebihBanyak`. |
 | `kunjunganAktif` | `noRkmMedis`, `batas?` | Latest visits, newest first, with status, payment status, clinic, doctor, payer, current room and number of active `kamar_inap` rows. |
 | `riwayatKamar` | `noRawat` | All `kamar_inap` rows of a stay in order, with ward and class; flags active rows (`stts_pulang = '-'`). |
 | `statusKamar` | `kdKamar`, `kdBangsal` or `namaBangsal` | Room status, active patients per room, whether it can be used, and a note when `kamar.status` disagrees with the patients in it. |
@@ -388,10 +384,14 @@ follow-up replays exactly what the model saw.
   stops working is easy to spot.
 - **History budget.** A follow-up resends the conversation, and past tool results (a query can return 50
   rows) are the biggest part of it. Once the replayed history passes about 24,000 estimated tokens
-  (`apps/server/src/agent/history.ts`), the oldest complete turns are dropped and replaced by a one-line
-  question/answer summary; the newest turns stay byte-identical for the cache. The stored conversation
-  is never changed.
-- **Streaming.** `/api/ask` and `/api/tickets/:id/investigate` stream answer text, thinking and
+  (`apps/server/src/agent/history.ts`) the oldest tool results are first replaced by a one-line `[ringkas]`
+  summary: the tool, the row count, the values that identify the result (RM, no_rawat, period) and the
+  first row. The turn, its question and its answer survive, so a follow-up like "sekarang per bulan" still
+  knows the patient. Only when that is not enough are whole old turns dropped and replaced by a
+  question/answer list. The newest turn stays byte-identical for the cache, and the stored conversation is
+  never changed. Measured on 20 turns of 50-row results: 53.9k tokens replay as 22.6k with every turn kept,
+  where dropping turns alone kept only the newest 8.
+- **Streaming.** `/api/ask` streams answer text, thinking and
   half-written tool calls as Server-Sent Events. A `: keep-alive` comment every 15 seconds keeps proxies
   and mobile networks from dropping the connection while a tool runs.
 
@@ -415,7 +415,7 @@ pnpm e2e         # build the UI and run the Playwright smoke tests
 - a scripted "AI";
 - the built UI.
 
-Open it to try the UI without a real AI or real patient data. The scripted AI understands a ticket about "RM 000002" and the questions "… per poli" and "… hari ini". `pnpm e2e` runs Playwright against that server; the first time, install the browser with `pnpm --filter @simha/web exec playwright install chromium`.
+Open it to try the UI without a real AI or real patient data. Switch to **Investigasi** and the scripted AI understands a complaint about "RM 000002" (room move) or "tidak bisa pulang" (closed registration); in Tanya Data it answers "… per poli" and "… hari ini". `pnpm e2e` runs Playwright against that server; the first time, install the browser with `pnpm --filter @simha/web exec playwright install chromium`.
 
 ### Test database
 
@@ -435,7 +435,7 @@ apps/
   web/        React + TanStack Router UI
   desktop/    Electron app: window, setup page, local server, Buka di Khanza, Windows installer
 packages/
-  shared/     Effect Schemas for API contracts, render blocks, ticket/fix types
+  shared/     Effect Schemas for API contracts, render blocks, mode/fix types
   tools/      Neutral tool registry + handlers + SQL guards
   llm/        LLM adapter interface + adapters + fake adapter for tests
   mcp/        MCP server exposing packages/tools

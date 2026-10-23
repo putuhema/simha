@@ -7,6 +7,9 @@
 --   2026/10/01/000003  RM 000001 outpatient at poli gigi, paid, nota closed, SEP + surat kontrol.
 --   2026/09/15/000004  RM 000001 finished inpatient stay: moved Melati -> Mawar, nota closed.
 --   2026/10/22/000005  RM 000003 outpatient, still open, not billed.
+--   2026/10/23/000006  RM 000003 inpatient whose registration is already
+--                      'Sudah' while the kamar_inap row is still active (the
+--                      data problem behind "tidak bisa pulang").
 
 -- Non-strict so columns the tests don't care about get their implicit defaults.
 SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION';
@@ -25,7 +28,8 @@ INSERT INTO dokter (kd_dokter, nm_dokter, jk, no_telp, status) VALUES
 
 INSERT INTO bangsal (kd_bangsal, nm_bangsal, status) VALUES
   ('MEL', 'Melati', '1'),
-  ('MAW', 'Mawar', '1');
+  ('MAW', 'Mawar', '1'),
+  ('ICU', 'ICU', '1');
 
 INSERT INTO kamar (kd_kamar, kd_bangsal, trf_kamar, status, kelas, statusdata) VALUES
   ('MEL-01', 'MEL', 300000, 'ISI', 'Kelas 2', '1'),
@@ -33,7 +37,8 @@ INSERT INTO kamar (kd_kamar, kd_bangsal, trf_kamar, status, kelas, statusdata) V
   ('MAW-01', 'MAW', 450000, 'ISI', 'Kelas 1', '1'),
   ('MAW-02', 'MAW', 450000, 'ISI', 'Kelas 1', '1'),       -- marked ISI but nobody is in it
   ('MAW-03', 'MAW', 450000, 'KOSONG', 'Kelas 1', '1'),
-  ('MAW-04', 'MAW', 450000, 'DIBERSIHKAN', 'Kelas 1', '1');
+  ('MAW-04', 'MAW', 450000, 'DIBERSIHKAN', 'Kelas 1', '1'),
+  ('ICU-01', 'ICU', 750000, 'ISI', 'Kelas 1', '1');
 
 INSERT INTO pasien (no_rkm_medis, nm_pasien, no_ktp, jk, tmp_lahir, tgl_lahir, alamat, no_tlp, umur, kd_pj, no_peserta, tgl_daftar) VALUES
   ('000001', 'BUDI SANTOSO', '5171000000000001', 'L', 'DENPASAR', '1980-01-02', 'JL. FIKTIF NO. 1', '081300000001', '46 Th', 'BPJ', '0000000000001', '2020-01-01'),
@@ -46,7 +51,8 @@ INSERT INTO reg_periksa (no_reg, no_rawat, tgl_registrasi, jam_reg, kd_dokter, n
   ('002', '2026/10/21/000002', '2026-10-21', '07:30:00', 'D001', '000002', 'U0001', 'ANAK', 'JL. FIKTIF NO. 2', 'ANAK', 10000, 'Dirawat', 'Lama', 'Ranap', 'BPJ', 51, 'Th', 'Belum Bayar', 'Lama'),
   ('003', '2026/10/01/000003', '2026-10-01', '08:15:00', 'D002', '000001', 'GIG', 'DIRI SENDIRI', 'JL. FIKTIF NO. 1', 'DIRI SENDIRI', 10000, 'Sudah', 'Lama', 'Ralan', 'BPJ', 46, 'Th', 'Sudah Bayar', 'Lama'),
   ('004', '2026/09/15/000004', '2026-09-15', '10:00:00', 'D001', '000001', 'U0001', 'ISTRI', 'JL. FIKTIF NO. 1', 'ISTRI', 10000, 'Sudah', 'Lama', 'Ranap', 'BPJ', 46, 'Th', 'Sudah Bayar', 'Lama'),
-  ('005', '2026/10/22/000005', '2026-10-22', '08:00:00', 'D002', '000003', 'GIG', 'DIRI SENDIRI', 'JL. FIKTIF NO. 3', 'DIRI SENDIRI', 10000, 'Belum', 'Baru', 'Ralan', 'UMU', 36, 'Th', 'Belum Bayar', 'Baru');
+  ('005', '2026/10/22/000005', '2026-10-22', '08:00:00', 'D002', '000003', 'GIG', 'DIRI SENDIRI', 'JL. FIKTIF NO. 3', 'DIRI SENDIRI', 10000, 'Belum', 'Baru', 'Ralan', 'UMU', 36, 'Th', 'Belum Bayar', 'Baru'),
+  ('006', '2026/10/23/000006', '2026-10-23', '10:00:00', 'D001', '000003', 'U0001', 'DIRI SENDIRI', 'JL. FIKTIF NO. 3', 'DIRI SENDIRI', 10000, 'Sudah', 'Lama', 'Ranap', 'UMU', 36, 'Th', 'Belum Bayar', 'Lama');
 
 INSERT INTO dpjp_ranap (no_rawat, kd_dokter) VALUES
   ('2026/10/20/000001', 'D001'),
@@ -58,7 +64,8 @@ INSERT INTO kamar_inap (no_rawat, kd_kamar, trf_kamar, diagnosa_awal, diagnosa_a
   ('2026/10/21/000002', 'MEL-02', 300000, 'DIARE', '', '2026-10-21', '08:00:00', '0000-00-00', '00:00:00', 1, 300000, '-'),
   ('2026/10/21/000002', 'MAW-01', 450000, 'DIARE', '', '2026-10-21', '14:00:00', '0000-00-00', '00:00:00', 1, 450000, '-'),
   ('2026/09/15/000004', 'MEL-01', 300000, 'TIFOID', 'TIFOID', '2026-09-15', '11:00:00', '2026-09-17', '09:00:00', 2, 600000, 'Pindah Kamar'),
-  ('2026/09/15/000004', 'MAW-03', 450000, 'TIFOID', 'TIFOID', '2026-09-17', '09:00:00', '2026-09-20', '12:00:00', 3, 1350000, 'Membaik');
+  ('2026/09/15/000004', 'MAW-03', 450000, 'TIFOID', 'TIFOID', '2026-09-17', '09:00:00', '2026-09-20', '12:00:00', 3, 1350000, 'Membaik'),
+  ('2026/10/23/000006', 'ICU-01', 750000, 'SEPSIS', '', '2026-10-23', '10:00:00', '0000-00-00', '00:00:00', 1, 750000, '-');
 
 INSERT INTO jns_perawatan (kd_jenis_prw, nm_perawatan, kd_kategori, total_byrdr, total_byrpr, total_byrdrpr, kd_pj, kd_poli, status) VALUES
   ('RJ001', 'Cabut Gigi', 'KT01', 150000, 0, 150000, 'BPJ', 'GIG', '1'),
