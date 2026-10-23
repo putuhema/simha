@@ -136,7 +136,7 @@ export const PatientPanel = ({ rm, summary }: { readonly rm: string | undefined;
               </Row>
             </dl>
             <DocumentButtons rm={card.data.pasien.no_rkm_medis} noRawat={visit?.no_rawat} />
-            <OpenInKhanza copy={visit?.no_rawat ?? card.data.pasien.no_rkm_medis} className="mt-3" />
+            <OpenInKhanza noRawat={visit?.no_rawat ?? null} noRm={card.data.pasien.no_rkm_medis} className="mt-3" />
           </div>
         ) : null}
       </Panel>

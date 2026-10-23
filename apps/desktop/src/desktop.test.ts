@@ -41,3 +41,15 @@ describe("desktop helpers", () => {
     expect(isLauncher("C:\\SIMRS\\catatan.txt")).toBe(false);
   });
 });
+
+describe("Khanza bridge requests", () => {
+  it("only passes known forms with a valid no. rawat / no. RM", async () => {
+    const { parseTarget } = await import("./khanza-bridge.ts");
+    expect(parseTarget({ form: "resume", value: "2024/02/21/000213" })).toEqual({ form: "resume", value: "2024/02/21/000213" });
+    expect(parseTarget({ form: "riwayat", value: "018412" })).toEqual({ form: "riwayat", value: "018412" });
+    expect(parseTarget({ form: "resume", value: "018412" })).toBeNull();
+    expect(parseTarget({ form: "resume", value: "2024/02/21/000213\topen\tx" })).toBeNull();
+    expect(parseTarget({ form: "hapus_data", value: "2024/02/21/000213" })).toBeNull();
+    expect(parseTarget(null)).toBeNull();
+  });
+});

@@ -193,7 +193,15 @@ Change it later from the menu **Aplikasi → Pengaturan koneksi** or **Pengatura
 2. brings the open Khanza window to the front (a `java`/`javaw` window titled "Khanza…" or "SIM …"), or starts the `.bat` if Khanza is not open;
 3. tells you to paste the number into Khanza's search.
 
-Khanza cannot yet be told to open a specific form; see "Khanza bridge" in `docs/PLAN.md`.
+**Open a form directly (Khanza bridge).** With a Khanza build that includes `HarnessBridge` (see below), the button opens the form itself in the running Khanza: **Resume medis**, **CPPT / SOAP** (ranap or ralan, picked from the visit) or **Riwayat perawatan**. Documents open their own form (a resume opens the resume); the arrow next to the button lists the others. If Khanza is not open yet, it is started and the form opens after you log in. Khanza checks the logged-in user's own access rights, so the button never opens more than the Khanza menu would. **Pengaturan → Desktop** shows whether the bridge is active and which Khanza user is logged in.
+
+**Adding the bridge to your Khanza build.** In the Khanza source folder (your own fork):
+
+```bash
+node integrations/khanza-bridge/apply.mjs ~/Work/simrsmt   # adds HarnessBridge.java + 2 lines in frmUtama.java
+```
+
+Then build Khanza as usual (NetBeans: **Clean and Build**) and copy `dist/SIMRSKhanza.jar` to the PCs. Run the script again after every Khanza update: it only adds what is missing. How it works: after a login, Khanza listens on `127.0.0.1` (a free port) and writes the port and a random token to `~/.simrs-harness/khanza-bridge.properties` (readable only by that Windows/macOS user, removed at logout). Only the forms above can be opened, only with a no. rawat / no. RM; nothing is written to the database.
 
 Khanza runs on its own (it keeps running when SIMRS Harness quits). Everything it prints is saved to `logs/khanza.log` in the app data folder. If it stops within 15 seconds of a start, a banner says so, with **Lihat output**.
 

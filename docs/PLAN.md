@@ -26,7 +26,7 @@ Each one ends with tests passing and a stop for you to test.
 - **M5.1. Patient documents. ✅ Done.** Riwayat pasien, CPPT / SOAP and resume medis as printable HTML from Khanza data (`dokumenPasien`), from the patient card or the agent.
 - **M5.2. Routine data checks and agent test set.** Scheduled checks for known data problems with "Buat tiket"; fixed scenarios with known answers to score each AI provider/model.
 - **M6. Desktop. ✅ Done.** Electron app wrapping the UI (remote server or a local server it starts), setup page, "Buka di Khanza", Windows installer.
-- **M6.1. Khanza bridge.** A small patch to Khanza so the desktop app can open a given form for a given no. rawat (see M6 notes).
+- **M6.1. Khanza bridge. ✅ Done.** `HarnessBridge.java` in the hospital's Khanza build (applied with `integrations/khanza-bridge/apply.mjs`): "Buka di Khanza" opens resume, CPPT/SOAP or riwayat for the visit in the running Khanza (see M6.1 notes).
 - **M7. MCP.** Same tools over stdio and streamable HTTP, README section for Claude Desktop / Claude Code.
 
 ## M1 notes
@@ -124,7 +124,15 @@ Each one ends with tests passing and a stop for you to test.
 - **Khanza bridge (M6.1, planned).** Khanza forms already accept a visit: `RMDataResumePasienRanap.setNoRm(no_rawat, date)`, and `DlgKamarInap` opens forms this way (749 `setNoRm(` calls). The patch: one new class that, after login, listens on `127.0.0.1` with a token for `{form, noRawat}`, opens only forms on a fixed list on the Swing thread (`isCek()` keeps Khanza's own access rights), and brings them to the front; plus one line in the login handler. It needs a Khanza build we maintain (re-apply after each Khanza update) and testing on a hospital PC.
 - **Khanza output.** "Buka di Khanza" starts Khanza detached (it outlives the app) with stdout/stderr in `logs/khanza.log`; an exit within 15 s is reported to the UI ("Khanza berhenti… Lihat output").
 - **Terminal panel.** The window is a `BaseWindow` with two `WebContentsView`s: the app view and the terminal panel (Ctrl+`, resizable). The panel is a local page (`build/terminal/`, xterm.js) with its own preload; shells are `node-pty` 1.1.0 (prebuilt for macOS and Windows, copied to `build/node_modules` and unpacked from the asar). The web UI can only toggle the panel or open the Khanza output tab; only the panel page may create, write to or resize a shell. At most 8 tabs.
-- **Not done yet.** Code signing (SmartScreen warns on first install), auto-update, and the Khanza bridge.
+- **Not done yet.** Code signing (SmartScreen warns on first install) and auto-update.
+
+## M6.1 notes
+
+- **Khanza side** (`integrations/khanza-bridge/HarnessBridge.java`, package `simrskhanza`; the fork's branch `harness-bridge`). Started right after `akses.setData(...)` in `frmUtama.BtnLoginActionPerformed` (only when the login succeeded), stopped at logout. Listens on `127.0.0.1`, random port; writes `port`, a 48-hex-char token and the user to `~/.simrs-harness/khanza-bridge.properties` (`rw-------`). One request per connection, one tab-separated line: `TOKEN ping` or `TOKEN open FORM VALUE`; the token is compared in constant time.
+- **Forms**, opened the way Khanza's own lists open them (`DlgKamarInap`, `DlgReg`, `frmUtama`): `resume_ranap` (RMDataResumePasienRanap: isCek, setNoRm, tampil), `resume_ralan` (RMDataResumePasien), `soap_ranap` (DlgRawatInap, depo chosen like DlgKamarInap), `soap_ralan` (DlgRawatJalan with the visit's poli and penjamin), `riwayat` (RMRiwayatPerawatan, by no. RM). `resume` and `soap` pick ranap or ralan from `reg_periksa.status_lanjut`. Rights: `data_resume_pasien`, `tindakan_ranap`, `tindakan_ralan` (same as the menu buttons).
+- **Order.** Checks (rights, visit exists) run on the Swing thread and are answered right away; the form then opens like a menu click, including Khanza's own warnings (e.g. "User login bukan dokter"), which no longer block the answer.
+- **Tested** against the real Khanza code and the local `sik` database (stand-in login): all five forms open on the requested visit; wrong token, unknown form, missing right and unknown visit are refused with a message; the info file is removed at logout. Not yet tested: a real login in the built Khanza, and on a Windows PC.
+- **Later:** billing ranap/ralan and SEP (Khanza runs extra prompts and depot logic before opening them).
 
 ## Decisions and questions
 

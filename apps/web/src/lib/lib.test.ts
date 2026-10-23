@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { chartOption } from "../components/blocks/chart-options.ts";
 import { rmFromSteps, rmFromText, splitAnswer } from "./answer.ts";
 import { fileNameFor, toCsv } from "./csv.ts";
+import { noRawatIn, noRmIn } from "./desktop.ts";
 import { formatRelative } from "./format.ts";
 import { applyEvent, emptyRun } from "./run.ts";
 import { parseSseChunk } from "./sse.ts";
@@ -182,5 +183,14 @@ describe("formatRelative", () => {
     expect(formatRelative("2026-10-22T09:59:30Z", now)).toBe("baru saja");
     expect(formatRelative("2026-10-22T09:45:00Z", now)).toBe("15 menit lalu");
     expect(formatRelative("2026-10-22T07:00:00Z", now)).toBe("3 jam lalu");
+  });
+});
+
+describe("Khanza targets", () => {
+  it("finds the no. rawat and the no. RM to open in Khanza", () => {
+    expect(noRawatIn("Resume untuk 2024/02/21/000213 (RM 018412)")).toBe("2024/02/21/000213");
+    expect(noRawatIn(null, "tidak ada", '{"noRawat":"2026/10/23/000001"}')).toBe("2026/10/23/000001");
+    expect(noRmIn("RM 000002 · SITI AMINAH")).toBe("000002");
+    expect(noRawatIn("RM 000002")).toBeNull();
   });
 });

@@ -15,8 +15,11 @@ const Row = ({ label, children }: { readonly label: string; readonly children: R
 
 export const DesktopSettings = () => {
   const [info, setInfo] = useState<DesktopInfo | null>(null);
+  const [bridgeUser, setBridgeUser] = useState<string | null | undefined>(undefined);
+  const checkBridge = () => void desktop?.khanzaBridge().then((b) => setBridgeUser(b.user));
   useEffect(() => {
     void desktop?.info().then(setInfo);
+    checkBridge();
   }, []);
   if (!desktop || !info) return null;
   const bridge = desktop;
@@ -51,6 +54,22 @@ export const DesktopSettings = () => {
           pencarian Khanza.
         </p>
         <dl>
+          <Row label="Buka form langsung">
+            <span className="inline-flex flex-wrap items-center gap-2">
+              {bridgeUser === undefined ? (
+                "Memeriksa…"
+              ) : bridgeUser ? (
+                <span className="inline-flex items-center gap-1.5 text-ok">
+                  <span className="size-2 rounded-full bg-ok" /> Aktif · login Khanza: <span className="font-mono text-[12.5px]">{bridgeUser}</span>
+                </span>
+              ) : (
+                <span className="text-ink-3">Tidak aktif (Khanza belum login, atau versinya belum punya bridge)</span>
+              )}
+              <button type="button" onClick={checkBridge} className="text-[12.5px] text-teal underline-offset-2 hover:underline">
+                Cek lagi
+              </button>
+            </span>
+          </Row>
           <Row label="File Khanza">
             {info.khanzaLauncher ? (
               <span className="block truncate font-mono text-[12.5px]" title={info.khanzaLauncher}>
@@ -65,7 +84,7 @@ export const DesktopSettings = () => {
           <Button size="sm" onClick={() => void choose()}>
             <FolderOpen /> Pilih file…
           </Button>
-          {info.khanzaLauncher ? <OpenInKhanza copy={null} label="Tes buka Khanza" /> : null}
+          {info.khanzaLauncher ? <OpenInKhanza label="Tes buka Khanza" /> : null}
           <Button size="sm" variant="ghost" onClick={() => void bridge.showKhanzaOutput()}>
             <SquareTerminal /> Lihat output Khanza
           </Button>

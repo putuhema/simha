@@ -15,7 +15,7 @@ import { RenderBlockView } from "../../components/blocks/RenderBlockView.tsx";
 import type { Health } from "../../components/layout/Sidebar.tsx";
 import { ErrorText } from "../../components/ui/Field.tsx";
 import { Spinner } from "../../components/ui/Spinner.tsx";
-import { khanzaTarget } from "../../lib/desktop.ts";
+import { noRawatIn, noRmIn } from "../../lib/desktop.ts";
 import type { RunView } from "../../lib/run.ts";
 import { useApi } from "../../lib/useApi.ts";
 import { bumpFavorites } from "../../stores/refresh.ts";
@@ -103,7 +103,10 @@ const Turn = ({ turn }: { readonly turn: RunView }) => {
       {turn.status === "done" && turn.text ? (
         <div className="-mt-2 flex animate-fade-in items-center gap-1.5">
           <CopyButton text={turn.text} />
-          <OpenInKhanza copy={khanzaTarget(turn.text, turn.question, JSON.stringify(turn.steps.map((s) => s.input)))} />
+          <OpenInKhanza
+            noRawat={noRawatIn(turn.text, turn.question, JSON.stringify(turn.steps.map((s) => s.input)))}
+            noRm={noRmIn(turn.text, turn.question, JSON.stringify(turn.steps.map((s) => s.input)))}
+          />
         </div>
       ) : null}
     </article>

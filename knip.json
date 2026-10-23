@@ -15,6 +15,11 @@
         "src/setup/setup.js",
         "scripts/*.mjs"
       ]
+    },
+    ".": {
+      "entry": [
+        "integrations/*/*.mjs"
+      ]
     }
   },
   "ignoreBinaries": [

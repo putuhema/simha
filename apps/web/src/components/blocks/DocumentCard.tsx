@@ -6,11 +6,14 @@
 import type { DocumentInfo } from "@simrs/shared";
 import { Download, ExternalLink, FileText, Printer } from "lucide-react";
 import { useRef } from "react";
-import { khanzaTarget } from "../../lib/desktop.ts";
+import { noRawatIn, noRmIn, type KhanzaForm } from "../../lib/desktop.ts";
 import { formatDateTime } from "../../lib/format.ts";
 import { OpenInKhanza } from "../desktop/OpenInKhanza.tsx";
 import { Badge } from "../ui/Badge.tsx";
 import { Button } from "../ui/Button.tsx";
+
+/** The Khanza form that matches each document. */
+const KHANZA_FORM: Readonly<Record<DocumentInfo["jenis"], KhanzaForm>> = { riwayat: "riwayat", cppt: "soap", resume: "resume" };
 
 const KIND_LABEL: Readonly<Record<DocumentInfo["jenis"], string>> = {
   riwayat: "Riwayat",
@@ -40,7 +43,12 @@ export const DocumentCard = ({ document, height = 520 }: { readonly document: Do
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <OpenInKhanza copy={khanzaTarget(document.subjek)} className="mr-1" />
+          <OpenInKhanza
+            noRawat={noRawatIn(document.subjek)}
+            noRm={noRmIn(document.subjek)}
+            defaultForm={KHANZA_FORM[document.jenis]}
+            className="mr-1"
+          />
           <Button size="sm" variant="primary" onClick={() => frame.current?.contentWindow?.print()}>
             <Printer /> Cetak / PDF
           </Button>

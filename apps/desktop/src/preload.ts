@@ -10,8 +10,11 @@ contextBridge.exposeInMainWorld("simrsDesktop", {
   platform: process.platform,
   /** App version, platform and connection settings. */
   info: () => ipcRenderer.invoke("desktop:info"),
-  /** Bring Khanza to the front (or start it) and copy `copy` to the clipboard. */
-  openKhanza: (copy?: string | null) => ipcRenderer.invoke("desktop:openKhanza", copy ?? null),
+  /** Open a Khanza form for a visit (bridge), or bring Khanza to the front / start it; copies `copy`. */
+  openKhanza: (copy?: string | null, target?: { form: string; value: string } | null) =>
+    ipcRenderer.invoke("desktop:openKhanza", copy ?? null, target ?? null),
+  /** Is a logged-in Khanza with the bridge running? `user` is its login, or null. */
+  khanzaBridge: () => ipcRenderer.invoke("desktop:khanzaBridge"),
   /** Pick the file that starts Khanza on this PC; resolves with the saved path or null. */
   chooseKhanzaLauncher: () => ipcRenderer.invoke("desktop:chooseKhanzaLauncher"),
   /** Show the connection settings page. */

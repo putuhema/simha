@@ -27,6 +27,7 @@ import {
 } from "electron";
 import path from "node:path";
 import { isLauncher, openKhanza, type KhanzaExit } from "./khanza.ts";
+import { parseTarget, pingBridge } from "./khanza-bridge.ts";
 import { createTerminal, killAllTerminals, killTerminal, resizeTerminal, startFolder, writeTerminal, type TerminalKind } from "./pty.ts";
 import { checkServer, ensureEnvFile, serverLogTail, startLocalServer, stopLocalServer } from "./server.ts";
 import { dataDir, loadSettings, normalizeServerUrl, saveSettings, type DesktopSettings } from "./settings.ts";
@@ -271,12 +272,13 @@ const reportKhanzaExit = (exit: KhanzaExit) => {
 
 const registerIpc = () => {
   ipcMain.handle("desktop:info", (event) => (fromApp(event) ? publicInfo() : refuse()));
-  ipcMain.handle("desktop:openKhanza", (event, copy: unknown) => {
+  ipcMain.handle("desktop:openKhanza", (event, copy: unknown, target: unknown) => {
     if (!fromApp(event)) return refuse();
-    // Only short identifiers (no. rawat, no. RM) go to the clipboard.
+    // Only short identifiers (no. rawat, no. RM) go to the clipboard, and only known forms to Khanza.
     const text = typeof copy === "string" && copy.length > 0 && copy.length <= 64 ? copy : null;
-    return openKhanza(loadSettings().khanzaLauncher, text, { logFile: khanzaLog(), onEarlyExit: reportKhanzaExit });
+    return openKhanza(loadSettings().khanzaLauncher, text, { logFile: khanzaLog(), onEarlyExit: reportKhanzaExit }, parseTarget(target));
   });
+  ipcMain.handle("desktop:khanzaBridge", async (event) => (fromApp(event) ? { user: await pingBridge() } : refuse()));
   ipcMain.handle("desktop:chooseKhanzaLauncher", (event) => (fromApp(event) ? chooseLauncher() : refuse()));
   ipcMain.handle("desktop:openSetup", (event) => (fromApp(event) ? showSetup(null) : refuse()));
   ipcMain.handle("desktop:toggleTerminal", (event) => (fromApp(event) ? toggleTerminal() : refuse()));
