@@ -207,6 +207,30 @@ test("asking for a radiology result shows the reading and the images in one card
   await expect(page.getByTestId("radiology-exam")).toContainText("Thorax PA");
 });
 
+test("digital files show image previews and a PDF link", async () => {
+  await page.getByRole("button", { name: "Percakapan baru" }).first().click();
+  await page.getByLabel("Pertanyaan").fill("Tampilkan berkas digital 2026/10/21/000002");
+  await page.getByLabel("Pertanyaan").press("Enter");
+
+  const card = page.getByTestId("berkas-card");
+  await expect(card).toContainText("Berkas digital");
+  await expect(card).toContainText("Hasil Laboratorium");
+  await expect(card).toContainText("Foto Thorax");
+
+  const photo = card.getByRole("img", { name: "Foto Thorax" });
+  await expect(photo).toHaveJSProperty("complete", true);
+  expect(await photo.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+
+  const pdf = card.getByRole("link", { name: "Buka PDF" });
+  await expect(pdf).toHaveAttribute("href", /\/api\/berkas\?noRawat=.*&kode=DL001/);
+
+  // The thumbnail opens the full image and logs the view.
+  await card.getByRole("button", { name: /Foto Thorax/ }).click();
+  await expect(page.getByTestId("berkas-viewer").getByRole("img", { name: "Foto Thorax" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("berkas-viewer")).toHaveCount(0);
+});
+
 test("the patient card makes CPPT / SOAP without the AI", async () => {
   await page.getByRole("link", { name: /^Tiket/ }).click();
   await page.getByRole("button", { name: /Ns. Ayu/ }).click();

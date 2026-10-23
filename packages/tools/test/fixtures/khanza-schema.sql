@@ -12,6 +12,15 @@ CREATE TABLE `bangsal` (
   KEY `status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
 
+DROP TABLE IF EXISTS `berkas_digital_perawatan`;
+CREATE TABLE `berkas_digital_perawatan` (
+  `no_rawat` varchar(17) NOT NULL,
+  `kode` varchar(10) NOT NULL,
+  `lokasi_file` varchar(200) NOT NULL,
+  PRIMARY KEY (`no_rawat`,`kode`),
+  KEY `kode` (`kode`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
+
 DROP TABLE IF EXISTS `bridging_sep`;
 CREATE TABLE `bridging_sep` (
   `no_sep` varchar(40) NOT NULL DEFAULT '',
@@ -448,6 +457,13 @@ CREATE TABLE `kamar_inap` (
   KEY `ttl_biaya` (`ttl_biaya`),
   KEY `stts_pulang` (`stts_pulang`),
   KEY `trf_kamar` (`trf_kamar`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
+
+DROP TABLE IF EXISTS `master_berkas_digital`;
+CREATE TABLE `master_berkas_digital` (
+  `kode` varchar(10) NOT NULL,
+  `nama` varchar(50) NOT NULL,
+  PRIMARY KEY (`kode`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
 
 DROP TABLE IF EXISTS `nota_inap`;

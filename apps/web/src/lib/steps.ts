@@ -28,6 +28,7 @@ const LABELS: Readonly<Record<string, string>> = {
   suratKontrol: "Surat kontrol BPJS",
   kartuPasien: "Kartu pasien",
   dokumenPasien: "Buat dokumen",
+  berkasDigital: "Berkas digital",
   buatDraftResume: "Siapkan draf resume",
   isiDraft: "Isi draf resume",
   hasilRadiologi: "Hasil radiologi",

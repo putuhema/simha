@@ -13,6 +13,7 @@ import type {
   AuditKind,
   AuditPage,
   ConversationSummary,
+  BerkasDigital,
   RenderBlock,
   RunTranscript,
   RadiologyGallery,
@@ -226,6 +227,12 @@ const make = Effect.gen(function* () {
               .flatMap((s) => {
                 const gallery = (parseJson(s.output_json) as { gallery?: Partial<RadiologyGallery> } | null)?.gallery;
                 return gallery ? [{ pemeriksaan: [], pacsCatatan: null, ...gallery } as RadiologyGallery] : [];
+              }),
+            berkas: steps
+              .filter((s) => s.session_id === r.id && s.tool === "berkasDigital" && s.status === "ok")
+              .flatMap((s) => {
+                const gallery = (parseJson(s.output_json) as { berkas?: BerkasDigital } | null)?.berkas;
+                return gallery ? [gallery] : [];
               }),
             fixIds: fixes.filter((f) => f.run_id === r.id).map((f) => f.id),
           }),

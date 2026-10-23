@@ -3,7 +3,7 @@
  * agent events. Also converts a stored run (transcript) to the same shape, so
  * live and reloaded answers render with the same components.
  */
-import type { AgentEvent, DocumentInfo, FormDraft, RadiologyGallery, RenderBlock, RunTranscript } from "@simha/shared";
+import type { AgentEvent, BerkasDigital, DocumentInfo, FormDraft, RadiologyGallery, RenderBlock, RunTranscript } from "@simha/shared";
 import { request } from "./api.ts";
 import { readEventStream } from "./sse.ts";
 import type { StepView } from "./steps.ts";
@@ -27,6 +27,8 @@ export interface RunView {
   readonly drafts: ReadonlyArray<FormDraft>;
   /** Radiology images shown in this run. */
   readonly radiology: ReadonlyArray<RadiologyGallery>;
+  /** Digital patient files shown in this run. */
+  readonly berkas: ReadonlyArray<BerkasDigital>;
   readonly fixIds: ReadonlyArray<string>;
   readonly error: string | null;
   readonly at: string;
@@ -52,6 +54,7 @@ export const emptyRun = (question: string, key: string = crypto.randomUUID()): R
   documents: [],
   drafts: [],
   radiology: [],
+  berkas: [],
   fixIds: [],
   error: null,
   at: new Date().toISOString(),
@@ -118,6 +121,8 @@ export const applyEvent = (run: RunView, event: AgentEvent): RunView => {
       };
     case "radiology":
       return { ...run, radiology: [...run.radiology, event.gallery] };
+    case "berkas":
+      return { ...run, berkas: [...run.berkas, event.berkas] };
     case "done":
       return { ...run, status: "done", text: event.text };
     case "error":
@@ -148,6 +153,7 @@ export const fromTranscript = (run: RunTranscript): RunView => ({
   documents: run.documents,
   drafts: run.drafts,
   radiology: run.radiology,
+  berkas: run.berkas ?? [],
   fixIds: run.fixIds,
   error: run.error,
   at: run.startedAt,

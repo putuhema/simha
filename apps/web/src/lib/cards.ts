@@ -4,7 +4,7 @@
  * radiology images. The chat shows a one-line reference for each; the card
  * itself opens in the right panel.
  */
-import { FORM_TITLES, type DocumentInfo, type FormDraft, type RadiologyGallery, type RenderBlock } from "@simha/shared";
+import { FORM_TITLES, type BerkasDigital, type DocumentInfo, type FormDraft, type RadiologyGallery, type RenderBlock } from "@simha/shared";
 import type { RunView } from "./run.ts";
 
 export const RENDER_TYPE_LABEL: Readonly<Record<RenderBlock["tipe"], string>> = {
@@ -38,7 +38,8 @@ export type AnswerCard =
   | (CardBase & { readonly kind: "render"; readonly block: RenderBlock })
   | (CardBase & { readonly kind: "document"; readonly document: DocumentInfo })
   | (CardBase & { readonly kind: "draft"; readonly draft: FormDraft })
-  | (CardBase & { readonly kind: "radiology"; readonly radiology: RadiologyGallery });
+  | (CardBase & { readonly kind: "radiology"; readonly radiology: RadiologyGallery })
+  | (CardBase & { readonly kind: "berkas"; readonly berkas: BerkasDigital });
 
 const cardKey = (kind: AnswerCard["kind"], id: string) => `${kind}:${id}`;
 
@@ -132,6 +133,21 @@ export const cardsFromTurns = (turns: ReadonlyArray<RunView>): ReadonlyArray<Ans
         badge: "Radiologi",
         summary: radiologySummary(gallery),
         radiology: gallery,
+      });
+    });
+    turn.berkas.forEach((berkas, index) => {
+      const id = `${turn.key}:berkas:${index}`;
+      add({
+        kind: "berkas",
+        key: cardKey("berkas", id),
+        id,
+        turnKey: turn.key,
+        question: turn.question,
+        at: turn.at,
+        label: "Berkas digital",
+        badge: "Berkas",
+        summary: `${berkas.berkas.length} berkas · ${berkas.subjek}`,
+        berkas,
       });
     });
   }

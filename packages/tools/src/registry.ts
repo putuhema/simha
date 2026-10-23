@@ -4,6 +4,8 @@
 import { Schema } from "effect";
 import { AppDocs } from "./app/AppDocs.ts";
 import { cariAplikasiKhanza } from "./app/cariAplikasiKhanza.ts";
+import type { Berkas } from "./berkas/Berkas.ts";
+import { berkasDigital } from "./berkas/berkasDigital.ts";
 import { diagnosaPindahKamar } from "./diagnose/diagnosaPindahKamar.ts";
 import { diagnosaTindakan } from "./diagnose/diagnosaTindakan.ts";
 import { dokumenPasien } from "./documents/dokumenPasien.ts";
@@ -24,7 +26,7 @@ import { readTools } from "./read/index.ts";
 import type { Tool } from "./tool.ts";
 
 /** Services tool handlers may use. Never the Khanza write pool. */
-export type ToolServices = KhanzaRead | FixStore | ResultStore | SchemaDocs | AppDocs | Pacs | KnowledgeStore;
+export type ToolServices = KhanzaRead | FixStore | ResultStore | SchemaDocs | AppDocs | Pacs | Berkas | KnowledgeStore;
 
 /** A tool with its parameter and output types erased, for lists of mixed tools. */
 export type AnyTool<R = ToolServices> = Tool<unknown, unknown, R>;
@@ -78,4 +80,5 @@ export const defaultRegistry: ToolRegistry = makeRegistry([
   buatDraftResume,
   isiDraft,
   hasilRadiologi,
+  berkasDigital,
 ] as unknown as ReadonlyArray<AnyTool>);

@@ -27,6 +27,7 @@
  *   GET    /api/patients/:rm             patient card (kartuPasien tool)
  *   GET    /api/patients/:rm/radiologi   the patient's radiology studies in Orthanc PACS (?dari=&sampai=)
  *   GET    /api/pacs/instances/:id/:kind one image through the server: thumb (JPEG), preview (PNG), file (DICOM)
+ *   GET    /api/berkas                  a digital patient file (?noRawat=&kode=&view=1|download=1)
  *   GET    /api/fixes                    list fixes (?status=pending&ticketId=...)
  *   POST   /api/fixes                    propose a fix by hand, or edit an AI proposal (`replaces`)
  *   GET    /api/fixes/:id                fix with preview rows and history
@@ -78,6 +79,7 @@ import {
   type User,
 } from "@simha/shared";
 import {
+  Berkas,
   dokumenPasien,
   FixStore,
   IMAGE_KINDS,
@@ -697,6 +699,64 @@ const PacsRoutes = Layer.mergeAll(
   ),
 );
 
+/**
+ * Digital patient files (berkas digital) from Khanza. The database keeps a
+ * relative path; the server resolves it inside KHANZA_BERKAS_DIR and streams
+ * the file. The browser never sees the folder or the path. Opening a PDF or
+ * a full image is logged; loading thumbnails is not.
+ */
+const BerkasRoutes = route(
+  "GET",
+  "/api/berkas",
+  authed(
+    Effect.gen(function* () {
+      const query = yield* searchParams;
+      const noRawat = query.get("noRawat")?.trim() ?? "";
+      const kode = query.get("kode")?.trim() ?? "";
+      if (!/^[A-Za-z0-9/_.-]{1,17}$/.test(noRawat) || !/^[A-Za-z0-9._-]{1,10}$/.test(kode)) {
+        return errorResponse(400, "Berkas tidak valid.");
+      }
+      const read = yield* KhanzaRead;
+      const rows = yield* read
+        .query<{ readonly lokasi_file: string; readonly nama: string | null }>(
+          (sql) => sql`
+            SELECT b.lokasi_file, m.nama
+            FROM berkas_digital_perawatan b
+            LEFT JOIN master_berkas_digital m ON m.kode = b.kode
+            WHERE b.no_rawat = ${noRawat} AND b.kode = ${kode}
+            LIMIT 1`,
+        )
+        .pipe(Effect.catch(() => Effect.succeed([])));
+      const row = rows[0];
+      if (!row) return errorResponse(404, "Berkas tidak ditemukan.");
+      const berkas = yield* Berkas;
+      const result = yield* berkas.read(row.lokasi_file).pipe(
+        Effect.map((file) => ({ ok: true as const, file })),
+        Effect.catch((e) => Effect.succeed({ ok: false as const, message: e.message })),
+      );
+      if (!result.ok) return errorResponse(404, result.message);
+      const file = result.file;
+      const download = query.get("download") === "1";
+      const view = query.get("view") === "1";
+      if (download || view) {
+        const user = yield* CurrentUser;
+        yield* (yield* Auth).logEvent(download ? "berkas_downloaded" : "berkas_viewed", user.username, `${noRawat}/${kode}: ${row.nama ?? "berkas"}`);
+      }
+      const safeName = file.namaFile.replaceAll(/[^A-Za-z0-9._-]+/g, "-") || "berkas";
+      const inline = !download && file.jenis !== "lainnya";
+      return HttpServerResponse.uint8Array(file.data, {
+        contentType: file.contentType,
+        headers: {
+          "content-disposition": `${inline ? "inline" : "attachment"}; filename="${safeName}"`,
+          "x-content-type-options": "nosniff",
+          "referrer-policy": "no-referrer",
+          "cache-control": "private, max-age=3600",
+        },
+      });
+    }),
+  ),
+);
+
 /** Form drafts (resume medis): read and edited in the draft card; filled into Khanza by the desktop app. */
 const DraftRoutes = Layer.mergeAll(
   route(
@@ -1074,4 +1134,4 @@ const WebRoutes = route(
   }),
 );
 
-export const Routes = Layer.mergeAll(AuthRoutes, TicketRoutes, FixRoutes, DocumentRoutes, PacsRoutes, DraftRoutes, DataRoutes, KnowledgeRoutes, WebRoutes);
+export const Routes = Layer.mergeAll(AuthRoutes, TicketRoutes, FixRoutes, DocumentRoutes, PacsRoutes, BerkasRoutes, DraftRoutes, DataRoutes, KnowledgeRoutes, WebRoutes);

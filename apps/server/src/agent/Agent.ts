@@ -10,7 +10,7 @@
  * fake test adapter.
  */
 import { LlmClient, type ChatMessage, type LlmEvent, type ToolCall } from "@simha/llm";
-import type { AgentEvent, DocumentInfo, FormDraft, RadiologyGallery, RenderBlock, Ticket } from "@simha/shared";
+import type { AgentEvent, BerkasDigital, DocumentInfo, FormDraft, RadiologyGallery, RenderBlock, Ticket } from "@simha/shared";
 import {
   AuditLog,
   defaultRegistry,
@@ -24,6 +24,7 @@ import {
   ResultStore,
   runTool,
   AppDocs,
+  Berkas,
   SchemaDocs,
   type ToolRegistry,
 } from "@simha/tools";
@@ -93,6 +94,7 @@ const make = Effect.gen(function* () {
   const docs = yield* SchemaDocs;
   const appDocs = yield* AppDocs;
   const pacs = yield* Pacs;
+  const berkas = yield* Berkas;
   const system = yield* SystemPrompt;
   const registry: ToolRegistry = defaultRegistry;
 
@@ -128,6 +130,7 @@ const make = Effect.gen(function* () {
         Effect.provideService(SchemaDocs, docs),
         Effect.provideService(AppDocs, appDocs),
         Effect.provideService(Pacs, pacs),
+        Effect.provideService(Berkas, berkas),
         Effect.exit,
       );
       const durationMs = performance.now() - started;
@@ -141,6 +144,7 @@ const make = Effect.gen(function* () {
         document: tool.kind === "render" ? (result as { readonly document?: DocumentInfo }).document : undefined,
         draft: tool.kind === "render" ? (result as { readonly draft?: FormDraft }).draft : undefined,
         gallery: tool.kind === "render" ? (result as { readonly gallery?: RadiologyGallery }).gallery : undefined,
+        berkas: tool.kind === "render" ? (result as { readonly berkas?: BerkasDigital }).berkas : undefined,
         durationMs,
       };
     });
@@ -269,6 +273,7 @@ const make = Effect.gen(function* () {
               if (outcome.ok && outcome.document) yield* emit({ _tag: "document", callId: call.id, document: outcome.document });
               if (outcome.ok && outcome.draft) yield* emit({ _tag: "draft", callId: call.id, draft: outcome.draft });
               if (outcome.ok && outcome.gallery) yield* emit({ _tag: "radiology", callId: call.id, gallery: outcome.gallery });
+              if (outcome.ok && outcome.berkas) yield* emit({ _tag: "berkas", callId: call.id, berkas: outcome.berkas });
               yield* append({
                 role: "tool",
                 toolCallId: call.id,

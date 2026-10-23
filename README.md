@@ -148,11 +148,12 @@ Open http://127.0.0.1:8787. The first visit asks for the **first admin account**
   - **Riwayat** shows all visits (latest 20) with diagnoses (ICD-10), rooms, tindakan and drugs.
   - **CPPT** shows the SOAP notes from `pemeriksaan_ralan` / `pemeriksaan_ranap`, each with the doctor or nurse who wrote it and the vital signs, plus diagnoses, allergies, lab (abnormal values in red) and radiology.
   - **Resume** shows the resume medis written in Khanza, or a clearly marked draft built from the CPPT, with the empty fields left for the doctor.
+- **Berkas digital (file upload).** Set `KHANZA_BERKAS_DIR` to the folder that holds Khanza's uploaded files (usually `webapps/berkas`). Ask e.g. *"tampilkan berkas digital 2026/10/21/000002"* or *"file pasien RM 000002"*: the AI calls `berkasDigital`, and one card shows the visit's `berkas_digital_perawatan` entries — image thumbnails with a full-size viewer, **Buka PDF** for PDFs, and a download for other files. Every path is checked to stay inside that folder; the bytes go through the authenticated `/api/berkas` route, so the browser never sees the folder path. The AI only receives the file names, kinds and sizes, never the contents. Missing files (or an unset folder) are listed with a warning so the card still explains what Khanza has.
 - **Radiology images (PACS).** When `ORTHANC_URL` (plus `ORTHANC_USER` / `ORTHANC_PASS`) is set in `.env`, the patient card gets a **Radiologi** button. It lists the patient's studies from Orthanc (matched by No. RM = DICOM PatientID, newest first, max 50) with a thumbnail per series. Click one to open the full-screen viewer (← → to flick through, Esc to close), download the DICOM file, or open the study in Orthanc's Stone Web Viewer (that link goes to Orthanc directly, so it works only on the hospital network). Images go through the Simha server, so the browser never sees Orthanc's address or login. Opening a patient's images and DICOM downloads are written to the audit log (`radiology_viewed`, `dicom_downloaded`).
   You can also ask the AI, e.g. *"hasil radiologi 2026/10/22/000012"* or *"foto thorax RM 037423"*. The `hasilRadiologi` tool shows one card per question: each exam from Khanza (`periksa_radiologi`, name, radiologist) with its reading (`hasil_radiologi`, the *Kesan* highlighted) and the PACS images of that exam (same day or the next, closest in time). For a visit, images are looked up from registration until discharge plus a day. When PACS is not set up, the readings are still shown. The AI does not repeat the card in its answer unless you ask for a summary, and it never sees or interprets the images. Try it from the terminal with `pnpm tool hasilRadiologi '{"noRawat":"2026/10/22/000012"}'`.
 
   The HTML is filled from a fixed template by the server, never written by the AI, and every value is escaped. It is served with a CSP that allows no scripts. Generated documents are kept in the audit DB, and downloads are logged.
-- **Tanya Data.** Ask in plain Indonesian. Answers show tables (sortable, CSV export), charts and numbers, each with an assumption line and "Query yang dipakai". The **card panel** on the right is closed by default (a new chat, starting the app, or opening a stored thread), so the chat stays uncluttered. While a live answer runs, the panel opens by itself as soon as it produces a result. Every result — table, chart, numbers, document, form draft or radiology — goes there: the chat keeps a one-line door to it, a strip of tabs switches between cards, the panel can be dragged wider, and the expand icon opens the card full size. Earlier cards reopen with the small card button at the top right (or ⇧⌘K). On a narrow window the cards stay inline in the chat. **Simpan ke favorit** saves the question and SQL; favorites re-run without the AI.
+- **Tanya Data.** Ask in plain Indonesian. Answers show tables (sortable, CSV export), charts and numbers, each with an assumption line and "Query yang dipakai". The **card panel** on the right is closed by default (a new chat, starting the app, or opening a stored thread), so the chat stays uncluttered. While a live answer runs, the panel opens by itself as soon as it produces a result. Every result — table, chart, numbers, document, form draft, radiology or digital file — goes there: the chat keeps a one-line door to it, a strip of tabs switches between cards, the panel can be dragged wider, and the expand icon opens the card full size. Earlier cards reopen with the small card button at the top right (or ⇧⌘K). On a narrow window the cards stay inline in the chat. **Simpan ke favorit** saves the question and SQL; favorites re-run without the AI.
 - **Pengetahuan AI.** See what the AI learned: examples saved automatically, AI/staff notes and 👎 corrections. 👍 verifies an example; admins can verify, edit, deactivate or delete items.
 - **Pengaturan.** The tabs are:
   - **AI:** provider, model, base URL, API key, "samarkan data" and **Tes koneksi**. Saving switches the AI without a restart and overrides `.env`; admins only.
@@ -258,6 +259,7 @@ curl -b jar -N -X POST localhost:8787/api/ask -H 'content-type: application/json
 - `text_delta`: answer text;
 - `tool_started` / `tool_finished`: each check, with the full result;
 - `render`: a table, chart, number or list, with its SQL;
+- `document`, `draft`, `radiology`, `berkas`: answer cards (printable document, form draft, radiology images, digital files);
 - then `done` or `error`.
 
 Send the `conversationId` with the next `/api/ask` for a follow-up.
@@ -285,6 +287,7 @@ Send the `conversationId` with the next `/api/ask` for a follow-up.
 | `POST /api/fixes/:id/approve`, `/reject` (`{ reason? }`), `/rollback` | |
 | `POST /api/documents` | `{ jenis: "riwayat" \| "cppt" \| "resume", noRkmMedis?, noRawat? }`: make a patient document |
 | `GET /api/documents/:id` | its HTML (`?download=1` to save it) |
+| `GET /api/berkas` | `?noRawat=&kode=&view=1\|download=1`: a digital patient file (authenticated; the path stays on the server) |
 | `GET /api/favorites`, `POST /api/favorites` (`{ blockId, question? }`), `DELETE /api/favorites/:id`, `POST /api/favorites/:id/run` | |
 | `GET /api/knowledge`, `POST /api/knowledge` (`{ text }`) | what the AI learned; staff note |
 | `PATCH /api/knowledge/:id`, `DELETE /api/knowledge/:id` | verify / deactivate / edit / delete (admin) |
@@ -347,6 +350,7 @@ The agent answers data questions with three tools:
    - **Errors go back to the AI** so it can fix the query. After 3 failures in a row it stops and explains what it could not answer.
    - **The AI sees the first 50 rows;** the full result is stored for display.
 3. **`tampilkan(tipe, judul, queryId, asumsi?, opsi?)`** shows a stored result as `table`, `bar`, `line`, `pie`, `stat` or `list`, with the SQL and a one-line assumption ("bulan ini = 1–22 Okt 2026, hanya rawat jalan"). The brief named this argument `data`; here it is a `queryId`, so the numbers on screen are exactly what the database returned and the AI never retypes them.
+4. **`berkasDigital(noRawat?, noRkmMedis?)`** shows the digital files Khanza has for a visit or patient (`berkas_digital_perawatan` + `master_berkas_digital`) as a card. The AI sees file names, kinds and sizes only; the bytes are streamed by the authenticated route and never exposed to the model. Set `KHANZA_BERKAS_DIR` to the Khanza file folder (usually `webapps/berkas`) so the files can be opened.
 
 Favorites store the question, the SQL and the chart settings, and re-run through the same guard and audit log.
 

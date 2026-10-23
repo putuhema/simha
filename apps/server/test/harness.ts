@@ -5,7 +5,7 @@
 import { NodeFileSystem } from "@effect/platform-node";
 import { makeFakeClient, type FakeTurn, type LlmInfo } from "@simha/llm";
 import type { AgentEvent } from "@simha/shared";
-import { appDocsLayer, AuditLogMemory, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, pacsLayer, KnowledgeStoreLive, ResultStoreLive, schemaDocsLayer, type Pacs } from "@simha/tools";
+import { appDocsLayer, AuditLogMemory, Berkas, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, makeBerkas, pacsLayer, KnowledgeStoreLive, ResultStoreLive, schemaDocsLayer, type Pacs } from "@simha/tools";
 import { connectionAs, testDb } from "@simha/tools/testing";
 import { Duration, Effect, Layer, ManagedRuntime, Redacted } from "effect";
 import { SqlClient } from "effect/sql";
@@ -55,6 +55,8 @@ export interface TestAppOptions {
   readonly webDir?: string;
   /** The PACS (e.g. the fake Orthanc). Default: not configured. */
   readonly pacs?: Layer.Layer<Pacs>;
+  /** Digital-file backend. Default: no folder, so files are listed but cannot be opened. */
+  readonly berkas?: Layer.Layer<Berkas>;
 }
 
 export const makeTestApp = (
@@ -86,6 +88,7 @@ export const makeTestApp = (
         Layer.succeed(HttpSettings, { webDir: options.webDir ?? "/nonexistent", secureCookie: false }),
         systemPromptLayer("Test system prompt."),
         options.pacs ?? pacsLayer({ url: "", user: "", pass: Redacted.make("") }),
+        options.berkas ?? Layer.succeed(Berkas, makeBerkas({ dir: "" })),
       ),
     ),
     Layer.provideMerge(AuditLogMemory),

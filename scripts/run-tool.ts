@@ -14,6 +14,8 @@ import { NodeRuntime } from "@effect/platform-node";
 import {
   AppDocsLive,
   AuditLogLive,
+  BerkasLive,
+  berkasDigital,
   cariAplikasiKhanza,
   jalankanQueryBaca,
   KhanzaReadLive,
@@ -27,11 +29,11 @@ import {
   SchemaDocsLive,
   ToolInputError,
 } from "@simha/tools";
-import type { AppDocs, KhanzaRead, Pacs, ResultStore, SchemaDocs, Tool } from "@simha/tools";
+import type { AppDocs, Berkas, KhanzaRead, Pacs, ResultStore, SchemaDocs, Tool } from "@simha/tools";
 import { Console, Effect, Layer } from "effect";
 
-type AnyReadTool = Tool<unknown, unknown, KhanzaRead | ResultStore | SchemaDocs | AppDocs | Pacs>;
-const tools = [...readTools, lihatSkema, cariAplikasiKhanza, jalankanQueryBaca, buatDraftResume, hasilRadiologi] as unknown as ReadonlyArray<AnyReadTool>;
+type AnyReadTool = Tool<unknown, unknown, KhanzaRead | ResultStore | SchemaDocs | AppDocs | Pacs | Berkas>;
+const tools = [...readTools, lihatSkema, cariAplikasiKhanza, jalankanQueryBaca, buatDraftResume, hasilRadiologi, berkasDigital] as unknown as ReadonlyArray<AnyReadTool>;
 
 const [name, json = "{}"] = process.argv.slice(2);
 
@@ -59,7 +61,7 @@ const runOne = (tool: AnyReadTool) =>
     yield* Console.log(JSON.stringify(result, null, 2));
   }).pipe(
     Effect.provide(
-      Layer.mergeAll(KhanzaReadLive, ResultStoreLive, SchemaDocsLive, AppDocsLive, PacsLive).pipe(Layer.provideMerge(AuditLogLive)),
+      Layer.mergeAll(KhanzaReadLive, ResultStoreLive, SchemaDocsLive, AppDocsLive, PacsLive, BerkasLive).pipe(Layer.provideMerge(AuditLogLive)),
     ),
     Effect.catchTags({
       ConfigError: (e) => fail(`Config error: ${e.message}\nCopy .env.example to .env and fill it in.`),

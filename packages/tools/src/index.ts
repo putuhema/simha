@@ -4,6 +4,9 @@
 export { AppDocs, AppDocsLive, appDocsLayer, loadAppDocs, parseAppIndex, parseFlowDoc, parseSynonyms } from "./app/AppDocs.ts";
 export type { AppDocsService, AppFlow, AppFlowStep, AppForm, AppMenu, AppRight, AppSynonym } from "./app/AppDocs.ts";
 export { cariAplikasiKhanza } from "./app/cariAplikasiKhanza.ts";
+export { Berkas, BerkasError, BerkasLive, berkasContentType, berkasKindOf, makeBerkas, safeRelativePath } from "./berkas/Berkas.ts";
+export type { BerkasContent, BerkasInfo, BerkasOptions, BerkasService } from "./berkas/Berkas.ts";
+export { berkasDigital } from "./berkas/berkasDigital.ts";
 export { searchApp } from "./app/search.ts";
 export type { AppScope, AppSearchResult } from "./app/search.ts";
 export { AuditLog, AuditLogLive, AuditLogMemory, auditLogLayerFile } from "./audit/AuditLog.ts";

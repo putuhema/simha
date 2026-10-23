@@ -48,6 +48,18 @@ export const KHANZA_TABLES: ReadonlyArray<ExpectedTable> = [
     columns: ["kd_kamar", "kd_bangsal", "kelas", "status"],
   },
   {
+    name: "berkas_digital_perawatan",
+    purpose: "Uploaded digital files of a visit (berkasDigital)",
+    columns: ["no_rawat", "kode", "lokasi_file"],
+    extra: true,
+  },
+  {
+    name: "master_berkas_digital",
+    purpose: "Names of the digital file kinds (berkasDigital)",
+    columns: ["kode", "nama"],
+    extra: true,
+  },
+  {
     name: "bangsal",
     purpose: "Wards, e.g. Melati / Mawar",
     columns: ["kd_bangsal", "nm_bangsal"],

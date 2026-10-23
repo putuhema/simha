@@ -175,6 +175,46 @@ export const RadiologyGallery = Schema.Struct({
 });
 export type RadiologyGallery = typeof RadiologyGallery.Type;
 
+// --- Digital patient files (berkas digital) -----------------------------------------
+
+/** What a digital file is: a picture, a PDF, or something to download. */
+export const BerkasFileKind = Schema.Literals(["gambar", "pdf", "lainnya"]);
+export type BerkasFileKind = typeof BerkasFileKind.Type;
+
+/**
+ * One file from Khanza's berkas_digital_perawatan (scanned lab result, photo,
+ * consent PDF, ...). `ada` is false when the server cannot see the file on
+ * disk (KHANZA_BERKAS_DIR not set, or the file is missing). The bytes are
+ * served by GET /api/berkas?noRawat=...&kode=...; the path stays on the server.
+ */
+export const BerkasDigitalFile = Schema.Struct({
+  noRawat: Schema.String,
+  /** master_berkas_digital.kode. */
+  kode: Schema.String,
+  /** master_berkas_digital.nama, e.g. "Hasil Laboratorium". */
+  nama: Schema.String,
+  /** File name only, e.g. "2026-10-21-lab.pdf". */
+  namaFile: Schema.String,
+  jenis: BerkasFileKind,
+  /** Size in bytes, when the server can read it. */
+  ukuran: Schema.NullOr(Schema.Number),
+  ada: Schema.Boolean,
+});
+export type BerkasDigitalFile = typeof BerkasDigitalFile.Type;
+
+/** Digital files of one visit, or of a patient's visits, shown as one card. */
+export const BerkasDigital = Schema.Struct({
+  noRkmMedis: Schema.String,
+  /** The visit asked about; null when the list spans a patient's visits. */
+  noRawat: Schema.NullOr(Schema.String),
+  /** "RM 000002 · SITI AMINAH · 2026/10/21/000002" */
+  subjek: Schema.String,
+  berkas: Schema.Array(BerkasDigitalFile),
+  /** Why some files cannot be opened (folder not configured, file missing, ...). */
+  catatan: Schema.NullOr(Schema.String),
+});
+export type BerkasDigital = typeof BerkasDigital.Type;
+
 // --- Form drafts (filled in Khanza by the desktop app) ---------------------------------
 
 /** Where a field's value came from: Khanza data, an existing Khanza entry, the AI (from the chat), or typed by the user. */
@@ -372,6 +412,9 @@ export const DraftEvent = Schema.TaggedStruct("draft", { callId: Schema.String, 
 /** Radiology images to show in the chat (from the `gambarRadiologi` tool). */
 export const RadiologyEvent = Schema.TaggedStruct("radiology", { callId: Schema.String, gallery: RadiologyGallery });
 
+/** Digital patient files to show in the chat (from the `berkasDigital` tool). */
+export const BerkasEvent = Schema.TaggedStruct("berkas", { callId: Schema.String, berkas: BerkasDigital });
+
 /** Last event of a successful run. */
 export const RunDone = Schema.TaggedStruct("done", {
   runId: Schema.String,
@@ -394,6 +437,7 @@ export const AgentEvent = Schema.Union([
   DocumentEvent,
   DraftEvent,
   RadiologyEvent,
+  BerkasEvent,
   RunDone,
   RunError,
 ]);
@@ -586,6 +630,8 @@ export const RunTranscript = Schema.Struct({
   drafts: Schema.Array(FormDraft),
   /** Radiology images shown in this run. */
   radiology: Schema.Array(RadiologyGallery),
+  /** Digital patient files shown in this run. */
+  berkas: Schema.Array(BerkasDigital),
   fixIds: Schema.Array(Schema.String),
 });
 export type RunTranscript = typeof RunTranscript.Type;

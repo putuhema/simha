@@ -13,13 +13,14 @@
  * - "hari ini": the number of registrations today;
  * - "riwayat": the history document of RM 000002;
  * - "radiologi" / "foto thorax": the reading and images of 2026/10/21/000002 (fake PACS);
+ * - "berkas digital" / "file pasien": digital files of 2026/10/21/000002 (fixtures/berkas);
  * - anything else: a short text answer.
  *
  * PACS is a fake Orthanc with one synthetic chest X-ray study for RM 000002.
  */
 import { NodeFileSystem, NodeHttpServer, NodeRuntime } from "@effect/platform-node";
 import { fakeTurn, makeFakeClient, type ChatRequest, type FakeTurn } from "@simha/llm";
-import { AppDocsLive, AuditLogMemory, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, pacsLayer, KnowledgeStoreLive, ResultStoreLive, SchemaDocsLive } from "@simha/tools";
+import { AppDocsLive, AuditLogMemory, Berkas, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, makeBerkas, pacsLayer, KnowledgeStoreLive, ResultStoreLive, SchemaDocsLive } from "@simha/tools";
 import { startTestDb } from "@simha/tools/testing/db";
 import { Duration, Effect, Layer, Redacted } from "effect";
 import { HttpRouter } from "effect/http";
@@ -35,6 +36,9 @@ import { llmSettingsLayer } from "../src/llm/LlmSettings.ts";
 import { FAKE_ORTHANC, makeFakeOrthanc } from "./fake-orthanc.ts";
 import { StoreLive } from "../src/store.ts";
 import { ViewsLive } from "../src/views.ts";
+
+/** The fixture files pointed at by berkas_digital_perawatan in the test seed. */
+const BERKAS_DIR = NodePath.resolve(import.meta.dirname, "..", "..", "..", "packages", "tools", "test", "fixtures", "berkas");
 
 const lastUserText = (request: ChatRequest) => {
   const user = request.messages.findLast((m) => m.role === "user");
@@ -53,6 +57,12 @@ const respond = (request: ChatRequest): ReturnType<typeof fakeTurn> => {
   const question = lastUserText(request);
   const results = toolResults(request);
   const step = results.length;
+
+  // Digital files (berkas digital) of the visit.
+  if (/berkas digital|file pasien|berkas pasien/i.test(question)) {
+    if (step === 0) return fakeTurn("", [{ name: "berkasDigital", args: { noRawat: "2026/10/21/000002" } }]);
+    return fakeTurn("Berkas digital kunjungan ini sudah saya tampilkan.");
+  }
 
   // Radiology images from the (fake) PACS.
   if (/radiologi|foto thorax|rontgen/i.test(question)) {
@@ -210,6 +220,7 @@ const main = Effect.gen(function* () {
         khanzaReadLayer({ connection: connection(info.readUser, info.readPass), timeout: Duration.seconds(5) }),
         systemPromptLayer("E2E test system prompt."),
         pacsLayer(FAKE_ORTHANC, makeFakeOrthanc().fetch),
+        Layer.succeed(Berkas, makeBerkas({ dir: BERKAS_DIR })),
       ),
     ),
     Layer.provideMerge(AuditLogMemory),

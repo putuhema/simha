@@ -4,11 +4,12 @@
  * draft or radiology card stays here, one at a time, with a strip of tabs.
  * With no cards yet it is the "start" panel, like a quiet desk.
  */
-import { ChartColumn, FilePenLine, FileText, LayoutGrid, Maximize2, PanelRightClose, ScanLine, Table2 } from "lucide-react";
+import { ChartColumn, FilePenLine, FileText, FolderOpen, LayoutGrid, Maximize2, PanelRightClose, ScanLine, Table2 } from "lucide-react";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { AnswerCard } from "../../lib/cards.ts";
 import { cn } from "../../lib/cn.ts";
 import { useCardsPanel } from "../../stores/cards.ts";
+import { BerkasDigitalCard } from "../berkas/BerkasDigitalCard.tsx";
 import { DocumentCard } from "../blocks/DocumentCard.tsx";
 import { DraftCard } from "../blocks/DraftCard.tsx";
 import { RenderBlockView } from "../blocks/RenderBlockView.tsx";
@@ -43,6 +44,7 @@ const ICON = {
   document: FileText,
   draft: FilePenLine,
   radiology: ScanLine,
+  berkas: FolderOpen,
 } as const;
 
 export const CardIcon = ({ card, className }: { readonly card: AnswerCard; readonly className?: string }) => {
@@ -70,6 +72,8 @@ export const CardBody = ({
       return <DraftCard draft={card.draft} fill={fill} />;
     case "radiology":
       return <RadiologyCard gallery={card.radiology} />;
+    case "berkas":
+      return <BerkasDigitalCard berkas={card.berkas} />;
   }
 };
 

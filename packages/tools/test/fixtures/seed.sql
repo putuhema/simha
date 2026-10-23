@@ -173,6 +173,15 @@ INSERT INTO detail_pemberian_obat (tgl_perawatan, jam, no_rawat, kode_brng, h_be
   ('2026-10-21', '09:30:00', '2026/10/21/000002', 'B001', 300, 500, 6, 3000, 'Ranap', '-', '-'),
   ('2026-10-21', '09:30:00', '2026/10/21/000002', 'B002', 600, 1000, 4, 4000, 'Ranap', '-', '-');
 
+INSERT INTO master_berkas_digital (kode, nama) VALUES
+  ('DL001', 'Hasil Laboratorium'),
+  ('DL002', 'Foto Thorax');
+
+-- File names are relative to KHANZA_BERKAS_DIR (fixtures/berkas in the e2e server).
+INSERT INTO berkas_digital_perawatan (no_rawat, kode, lokasi_file) VALUES
+  ('2026/10/21/000002', 'DL001', 'berkas/2026/10/21/000002-hasil-lab.pdf'),
+  ('2026/10/21/000002', 'DL002', 'berkas/2026/10/21/000002-foto-thorax.png');
+
 INSERT INTO icd9 (kode, deskripsi_panjang, deskripsi_pendek, validcode, accpdx, im) VALUES
   ('99.18', 'Injection or infusion of electrolytes', 'Inject/infuse electrolytes', '1', 'Y', '0');
 

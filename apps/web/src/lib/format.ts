@@ -24,5 +24,13 @@ export const formatAgo = (iso: string, now = Date.now()) => {
   return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short" }).format(new Date(iso));
 };
 
+/** "12 KB", "1.4 MB"; an empty string when the size is unknown. */
+export const formatBytes = (bytes: number | null | undefined) => {
+  if (bytes === null || bytes === undefined) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+};
+
 export const formatDuration = (ms: number | null | undefined) =>
   ms === null || ms === undefined ? "" : ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} dtk`;
