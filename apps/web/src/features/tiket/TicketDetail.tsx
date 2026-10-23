@@ -9,6 +9,7 @@ import { useState, type FormEvent } from "react";
 import { Markdown } from "../../components/agent/Markdown.tsx";
 import { PendingLine, pendingStep, StepList } from "../../components/agent/StepList.tsx";
 import { DocumentCard } from "../../components/blocks/DocumentCard.tsx";
+import { RadiologyCard } from "../../components/pacs/Radiology.tsx";
 import { DraftCard } from "../../components/blocks/DraftCard.tsx";
 import { Badge } from "../../components/ui/Badge.tsx";
 import { Button } from "../../components/ui/Button.tsx";
@@ -71,6 +72,9 @@ const RunSection = ({
       ))}
       {run.drafts.map((draft) => (
         <DraftCard key={draft.id} draft={draft} />
+      ))}
+      {run.radiology.map((gallery, i) => (
+        <RadiologyCard key={i} gallery={gallery} />
       ))}
       {run.status === "running" && run.text ? <Markdown text={run.text} className="text-ink-2" /> : null}
 

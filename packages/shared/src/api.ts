@@ -101,6 +101,59 @@ export const DocumentInfo = Schema.Struct({
 });
 export type DocumentInfo = typeof DocumentInfo.Type;
 
+// --- Radiology images (Orthanc PACS) ---
+
+/** One DICOM series in a study; `instances` are Orthanc instance IDs (images). */
+export const PacsSeries = Schema.Struct({
+  id: Schema.String,
+  modality: Schema.String,
+  description: Schema.String,
+  bodyPart: Schema.String,
+  number: Schema.Number,
+  instances: Schema.Array(Schema.String),
+});
+export type PacsSeries = typeof PacsSeries.Type;
+
+/** One study (exam) of a patient. Patients are matched by No. RM = DICOM PatientID. */
+export const PacsStudy = Schema.Struct({
+  id: Schema.String,
+  studyInstanceUid: Schema.String,
+  /** YYYY-MM-DD, or "" when Orthanc has no StudyDate. */
+  date: Schema.String,
+  /** HH:MM, or "". */
+  time: Schema.String,
+  description: Schema.String,
+  accession: Schema.String,
+  institution: Schema.String,
+  series: Schema.Array(PacsSeries),
+});
+export type PacsStudy = typeof PacsStudy.Type;
+
+/** GET /api/patients/:rm/radiologi. `configured` is false when ORTHANC_URL is empty. */
+export const PacsStudies = Schema.Struct({
+  configured: Schema.Boolean,
+  /** Orthanc's own Stone Web Viewer, for "open in Stone Viewer" links (reachable on the hospital network only). */
+  viewerBase: Schema.NullOr(Schema.String),
+  studies: Schema.Array(PacsStudy),
+});
+export type PacsStudies = typeof PacsStudies.Type;
+
+/**
+ * Radiology images of a patient (or of one visit), shown as a card in the chat
+ * by the `gambarRadiologi` tool. Images load from /api/pacs/instances/...
+ */
+export const RadiologyGallery = Schema.Struct({
+  noRkmMedis: Schema.String,
+  noRawat: Schema.NullOr(Schema.String),
+  /** Dates of the visit the studies were matched to (YYYY-MM-DD), when noRawat is set. */
+  rentang: Schema.NullOr(Schema.Struct({ dari: Schema.String, sampai: Schema.String })),
+  /** False when noRawat was given but no study fell in the visit dates, so all of the patient's studies are shown. */
+  cocokKunjungan: Schema.Boolean,
+  viewerBase: Schema.NullOr(Schema.String),
+  studies: Schema.Array(PacsStudy),
+});
+export type RadiologyGallery = typeof RadiologyGallery.Type;
+
 // --- Form drafts (filled in Khanza by the desktop app) ---------------------------------
 
 /** Where a field's value came from: Khanza data, an existing Khanza entry, the AI (from the chat), or typed by the user. */
@@ -227,6 +280,9 @@ export const DocumentEvent = Schema.TaggedStruct("document", { callId: Schema.St
 /** A form draft was made or changed (buatDraftResume / isiDraft); replaces an earlier draft with the same id. */
 export const DraftEvent = Schema.TaggedStruct("draft", { callId: Schema.String, draft: FormDraft });
 
+/** Radiology images to show in the chat (from the `gambarRadiologi` tool). */
+export const RadiologyEvent = Schema.TaggedStruct("radiology", { callId: Schema.String, gallery: RadiologyGallery });
+
 /** Last event of a successful run. */
 export const RunDone = Schema.TaggedStruct("done", {
   runId: Schema.String,
@@ -248,6 +304,7 @@ export const AgentEvent = Schema.Union([
   RenderEvent,
   DocumentEvent,
   DraftEvent,
+  RadiologyEvent,
   RunDone,
   RunError,
 ]);
@@ -438,6 +495,8 @@ export const RunTranscript = Schema.Struct({
   documents: Schema.Array(DocumentInfo),
   /** Drafts made in this run, in their latest state. */
   drafts: Schema.Array(FormDraft),
+  /** Radiology images shown in this run. */
+  radiology: Schema.Array(RadiologyGallery),
   fixIds: Schema.Array(Schema.String),
 });
 export type RunTranscript = typeof RunTranscript.Type;
@@ -506,3 +565,4 @@ export const AuditPage = Schema.Struct({
   total: Schema.Number,
 });
 export type AuditPage = typeof AuditPage.Type;
+

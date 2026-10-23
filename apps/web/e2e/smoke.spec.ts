@@ -123,6 +123,22 @@ test("the agent makes a patient history document that can be printed", async () 
   await expect(card.getByRole("button", { name: "Cetak / PDF" })).toBeEnabled();
 });
 
+test("the agent shows a visit's radiology images in the chat", async () => {
+  await page.getByLabel("Pertanyaan").fill("tampilkan foto thorax 2026/10/21/000002");
+  await page.getByLabel("Pertanyaan").press("Enter");
+  const card = page.getByTestId("radiology-card");
+  await expect(card).toContainText("RM 000002 · 2026/10/21/000002");
+  await expect(card.getByTestId("pacs-study")).toContainText("2 seri · 3 gambar");
+  await card.getByRole("button", { name: /Seri 1/ }).click();
+  await expect(page.getByTestId("pacs-viewer")).toContainText("1 / 3");
+  await page.keyboard.press("Escape");
+  await expect(page.getByText("Ada 1 studi thorax")).toBeVisible();
+
+  // Kept when the conversation is reopened.
+  await page.reload();
+  await expect(page.getByTestId("radiology-card")).toContainText("3 gambar");
+});
+
 test("the patient card makes CPPT / SOAP without the AI", async () => {
   await page.getByRole("link", { name: /^Tiket/ }).click();
   await page.getByRole("button", { name: /Ns. Ayu/ }).click();
@@ -132,6 +148,29 @@ test("the patient card makes CPPT / SOAP without the AI", async () => {
   const doc = dialog.frameLocator("iframe");
   await expect(doc.getByText("BAB cair 6x sejak kemarin, mual, lemas.")).toBeVisible();
   await expect(doc.getByText("Ns. Rina Fiktif")).toBeVisible();
+  await page.keyboard.press("Escape");
+});
+
+test("the patient card shows radiology images from PACS", async () => {
+  await page.getByRole("link", { name: /^Tiket/ }).click();
+  await page.getByRole("button", { name: /Ns. Ayu/ }).click();
+  await page.getByTestId("patient-card").getByRole("button", { name: "Radiologi" }).click();
+  const study = page.getByTestId("pacs-study");
+  await expect(study).toContainText("THORAX PA");
+  await expect(study).toContainText("2 seri · 3 gambar");
+  const thumb = study.getByRole("img", { name: /Seri 1 PA/ });
+  await expect(thumb).toHaveJSProperty("complete", true);
+  expect(await thumb.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+
+  await study.getByRole("button", { name: /Seri 2/ }).click();
+  const viewer = page.getByTestId("pacs-viewer");
+  await expect(viewer).toContainText("3 / 3");
+  await page.keyboard.press("ArrowRight");
+  await expect(viewer).toContainText("1 / 3");
+  await expect(viewer.getByRole("link", { name: /Unduh DICOM/ })).toHaveAttribute("href", /\/api\/pacs\/instances\/.+\/file$/);
+  await page.keyboard.press("Escape");
+  await expect(viewer).toHaveCount(0);
+  await expect(study).toBeVisible();
   await page.keyboard.press("Escape");
 });
 

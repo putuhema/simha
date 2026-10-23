@@ -137,6 +137,13 @@
 }
 
 @layer components {
+  /* Radiology viewer (dark, full screen) */
+  .viewer-btn {
+    @apply inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-white/85 transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-[0.97];
+  }
+  .viewer-nav {
+    @apply absolute top-1/2 -mt-5 grid size-10 place-items-center rounded-full bg-white/10 text-white transition-[background-color,transform] duration-150 hover:bg-white/15 active:scale-[0.94];
+  }
   /* Section label: small caps in the condensed face. */
   .eyebrow {
     @apply font-display text-[11px] font-semibold tracking-[0.12em] text-ink-3 uppercase;

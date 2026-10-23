@@ -13,12 +13,14 @@ import type { ResultStore } from "./info/ResultStore.ts";
 import type { SchemaDocs } from "./info/SchemaDocs.ts";
 import { tampilkan } from "./info/tampilkan.ts";
 import type { KhanzaRead } from "./khanza/KhanzaRead.ts";
+import { gambarRadiologi } from "./pacs/gambarRadiologi.ts";
+import type { Pacs } from "./pacs/Pacs.ts";
 import { usulkanPerbaikan } from "./propose/usulkanPerbaikan.ts";
 import { readTools } from "./read/index.ts";
 import type { Tool } from "./tool.ts";
 
 /** Services tool handlers may use. Never the Khanza write pool. */
-export type ToolServices = KhanzaRead | FixStore | ResultStore | SchemaDocs;
+export type ToolServices = KhanzaRead | FixStore | ResultStore | SchemaDocs | Pacs;
 
 /** A tool with its parameter and output types erased, for lists of mixed tools. */
 export type AnyTool<R = ToolServices> = Tool<unknown, unknown, R>;
@@ -69,4 +71,5 @@ export const defaultRegistry: ToolRegistry = makeRegistry([
   dokumenPasien,
   buatDraftResume,
   isiDraft,
+  gambarRadiologi,
 ] as unknown as ReadonlyArray<AnyTool>);

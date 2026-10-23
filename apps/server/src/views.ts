@@ -15,6 +15,7 @@ import type {
   ConversationSummary,
   RenderBlock,
   RunTranscript,
+  RadiologyGallery,
   Stats,
   ToolStep,
   Transcript,
@@ -218,6 +219,13 @@ const make = Effect.gen(function* () {
             blocks: blocks.filter((b) => b.session_id === r.id).map((b) => JSON.parse(b.block_json) as RenderBlock),
             documents: documents.filter((d) => d.session_id === r.id).map(toDocumentInfo),
             drafts: drafts.filter((d) => d.session_id === r.id).map(toDraft),
+            // Rebuilt from the tool's stored output (the audit log keeps it).
+            radiology: steps
+              .filter((s) => s.session_id === r.id && s.tool === "gambarRadiologi" && s.status === "ok")
+              .flatMap((s) => {
+                const gallery = (parseJson(s.output_json) as { gallery?: RadiologyGallery } | null)?.gallery;
+                return gallery ? [gallery] : [];
+              }),
             fixIds: fixes.filter((f) => f.run_id === r.id).map((f) => f.id),
           }),
         ),

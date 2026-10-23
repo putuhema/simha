@@ -17,17 +17,19 @@ import {
   KhanzaReadLive,
   lihatSkema,
   buatDraftResume,
+  gambarRadiologi,
+  PacsLive,
   readTools,
   ResultStoreLive,
   runTool,
   SchemaDocsLive,
   ToolInputError,
 } from "@simrs/tools";
-import type { KhanzaRead, ResultStore, SchemaDocs, Tool } from "@simrs/tools";
+import type { KhanzaRead, Pacs, ResultStore, SchemaDocs, Tool } from "@simrs/tools";
 import { Console, Effect, Layer } from "effect";
 
-type AnyReadTool = Tool<unknown, unknown, KhanzaRead | ResultStore | SchemaDocs>;
-const tools = [...readTools, lihatSkema, jalankanQueryBaca, buatDraftResume] as unknown as ReadonlyArray<AnyReadTool>;
+type AnyReadTool = Tool<unknown, unknown, KhanzaRead | ResultStore | SchemaDocs | Pacs>;
+const tools = [...readTools, lihatSkema, jalankanQueryBaca, buatDraftResume, gambarRadiologi] as unknown as ReadonlyArray<AnyReadTool>;
 
 const [name, json = "{}"] = process.argv.slice(2);
 
@@ -55,7 +57,7 @@ const runOne = (tool: AnyReadTool) =>
     yield* Console.log(JSON.stringify(result, null, 2));
   }).pipe(
     Effect.provide(
-      Layer.mergeAll(KhanzaReadLive, ResultStoreLive, SchemaDocsLive).pipe(Layer.provideMerge(AuditLogLive)),
+      Layer.mergeAll(KhanzaReadLive, ResultStoreLive, SchemaDocsLive, PacsLive).pipe(Layer.provideMerge(AuditLogLive)),
     ),
     Effect.catchTags({
       ConfigError: (e) => fail(`Config error: ${e.message}\nCopy .env.example to .env and fill it in.`),

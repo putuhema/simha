@@ -4,7 +4,7 @@
  *   pnpm start   (from the repo root)
  */
 import { NodeFileSystem, NodeHttpServer, NodeRuntime } from "@effect/platform-node";
-import { AuditLogLive, FixStoreLive, KhanzaReadLive, KhanzaWriteLive, ResultStoreLive, SchemaDocsLive } from "@simrs/tools";
+import { AuditLogLive, FixStoreLive, KhanzaReadLive, KhanzaWriteLive, PacsLive, ResultStoreLive, SchemaDocsLive } from "@simrs/tools";
 import { Effect, Layer } from "effect";
 import { HttpRouter } from "effect/http";
 import { createServer } from "node:http";
@@ -19,7 +19,7 @@ import { StoreLive } from "./store.ts";
 import { ViewsLive } from "./views.ts";
 
 /**
- * Everything the routes need: audit DB, Khanza read pool, AI provider, agent,
+ * Everything the routes need: audit DB, Khanza read pool, AI provider, agent, PACS,
  * login, and the fix executor (the only user of the Khanza write pool).
  */
 export const AppLive = Layer.mergeAll(AgentLive, FixExecutorLive, ViewsLive).pipe(
@@ -34,6 +34,7 @@ export const AppLive = Layer.mergeAll(AgentLive, FixExecutorLive, ViewsLive).pip
       KhanzaReadLive,
       KhanzaWriteLive,
       LlmSettingsLive,
+      PacsLive,
       SystemPromptLive,
     ),
   ),

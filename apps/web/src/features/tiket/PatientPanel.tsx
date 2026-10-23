@@ -1,6 +1,7 @@
 /**
  * Right column: the patient the ticket is about (identity, current visit,
- * DPJP), the visit timeline, and the AI's diagnosis in one paragraph.
+ * DPJP), document and radiology buttons, the visit timeline, and the AI's
+ * diagnosis in one paragraph.
  */
 import type { DocumentInfo, DocumentKind } from "@simrs/shared";
 import { BedDouble, FileText, Stethoscope, UserRound } from "lucide-react";
@@ -8,6 +9,7 @@ import { useState } from "react";
 import { Markdown } from "../../components/agent/Markdown.tsx";
 import { DocumentCard } from "../../components/blocks/DocumentCard.tsx";
 import { OpenInKhanza } from "../../components/desktop/OpenInKhanza.tsx";
+import { RadiologyButton } from "../../components/pacs/Radiology.tsx";
 import { Button } from "../../components/ui/Button.tsx";
 import { Panel } from "../../components/ui/Card.tsx";
 import { Dialog } from "../../components/ui/Dialog.tsx";
@@ -77,6 +79,7 @@ const DocumentButtons = ({ rm, noRawat }: { readonly rm: string; readonly noRawa
             {busy === jenis ? <Spinner className="size-3" /> : <FileText />} {label}
           </Button>
         ))}
+        <RadiologyButton rm={rm} />
       </div>
       {error ? <div className="mt-2"><ErrorText>{error}</ErrorText></div> : null}
       <Dialog open={document !== null} onOpenChange={(open) => !open && setDocument(null)} wide title={document?.judul ?? ""} description={document?.subjek}>

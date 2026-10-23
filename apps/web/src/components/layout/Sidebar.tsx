@@ -39,6 +39,8 @@ import { TipButton } from "../ui/Tip.tsx";
 export interface Health {
   readonly khanza: { readonly readOnly: boolean; readonly server: { readonly flavor: string; readonly version: string } };
   readonly llm: { readonly provider: string; readonly model: string; readonly maskPii: boolean };
+  /** Orthanc PACS configured (radiology images). */
+  readonly pacs?: boolean;
 }
 
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);

@@ -4,7 +4,7 @@
  * login and first-run setup needs a logged-in user (session cookie); the user
  * is who approves fixes, asks questions and creates tickets in the audit log.
  *
- *   GET    /api/health                   server, Khanza and AI model status (public)
+ *   GET    /api/health                   server, Khanza, AI model and PACS status (public)
  *   GET    /api/auth/state               logged-in user, or whether setup is needed (public)
  *   POST   /api/auth/setup               create the first admin (only while there are no users)
  *   POST   /api/auth/login | logout
@@ -23,6 +23,8 @@
  *   GET    /api/conversations            recent Tanya Data threads (?mine=1)
  *   GET    /api/conversations/:id        one thread with its answers and blocks
  *   GET    /api/patients/:rm             patient card (kartuPasien tool)
+ *   GET    /api/patients/:rm/radiologi   the patient's radiology studies in Orthanc PACS (?dari=&sampai=)
+ *   GET    /api/pacs/instances/:id/:kind one image through the server: thumb (JPEG), preview (PNG), file (DICOM)
  *   GET    /api/fixes                    list fixes (?status=pending&ticketId=...)
  *   POST   /api/fixes                    propose a fix by hand, or edit an AI proposal (`replaces`)
  *   GET    /api/fixes/:id                fix with preview rows and history
@@ -64,7 +66,20 @@ import {
   formProblems,
   type User,
 } from "@simrs/shared";
-import { dokumenPasien, FixStore, kartuPasien, KhanzaRead, planFix, ResultStore, runTool } from "@simrs/tools";
+import {
+  dokumenPasien,
+  FixStore,
+  IMAGE_KINDS,
+  isImageKind,
+  isOrthancId,
+  kartuPasien,
+  KhanzaRead,
+  Pacs,
+  planFix,
+  ResultStore,
+  runTool,
+  type PacsError,
+} from "@simrs/tools";
 import { Effect, Layer, Option, Schema } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { Agent } from "../agent/Agent.ts";
@@ -159,7 +174,8 @@ const AuthRoutes = Layer.mergeAll(
     Effect.gen(function* () {
       const read = yield* KhanzaRead;
       const llm = yield* LlmClient;
-      return json({ ok: true, khanza: { connected: true, readOnly: true, server: read.server }, llm: llm.info });
+      const pacs = yield* Pacs;
+      return json({ ok: true, khanza: { connected: true, readOnly: true, server: read.server }, llm: llm.info, pacs: pacs.configured });
     }),
   ),
 
@@ -541,6 +557,73 @@ const DocumentRoutes = Layer.mergeAll(
   ),
 );
 
+/**
+ * Radiology images from Orthanc. The browser never sees Orthanc's address or
+ * login; images are streamed through. Opening a patient's images and
+ * downloading DICOM files are written to the audit log.
+ */
+const PacsRoutes = Layer.mergeAll(
+  route(
+    "GET",
+    "/api/patients/:rm/radiologi",
+    authed(
+      Effect.gen(function* () {
+        const pacs = yield* Pacs;
+        if (!pacs.configured) return json({ configured: false, viewerBase: null, studies: [] });
+        const rm = (yield* pathParam("rm")).trim();
+        // * and ? are DICOM wildcards: they would match other patients.
+        if (!/^[^*?\\]{1,20}$/.test(rm)) return errorResponse(400, "Nomor RM tidak valid.");
+        const query = yield* searchParams;
+        const date = (name: string) => {
+          const value = query.get(name);
+          return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
+        };
+        const user = yield* CurrentUser;
+        const auth = yield* Auth;
+        return yield* pacs.studies(rm, { from: date("dari"), to: date("sampai") }).pipe(
+          Effect.tap((studies) => auth.logEvent("radiology_viewed", user.username, `RM ${rm}: ${studies.length} studi`)),
+          Effect.map((studies) => json({ configured: true, viewerBase: pacs.viewerBase, studies })),
+          Effect.catch((e: PacsError) => Effect.succeed(errorResponse(502, e.message))),
+        );
+      }),
+    ),
+  ),
+
+  route(
+    "GET",
+    "/api/pacs/instances/:id/:kind",
+    authed(
+      Effect.gen(function* () {
+        const instance = yield* id;
+        const kind = yield* pathParam("kind");
+        if (!isOrthancId(instance)) return errorResponse(400, "ID gambar tidak valid.");
+        if (!isImageKind(kind)) return errorResponse(404, "Tidak ditemukan.");
+        const pacs = yield* Pacs;
+        if (kind === "file") {
+          const user = yield* CurrentUser;
+          yield* (yield* Auth).logEvent("dicom_downloaded", user.username, instance);
+        }
+        return yield* pacs.image(instance, kind).pipe(
+          Effect.map((upstream) =>
+            HttpServerResponse.fromWeb(
+              new Response(upstream.body, {
+                headers: {
+                  "content-type": upstream.headers.get("content-type") ?? IMAGE_KINDS[kind].type,
+                  // Orthanc instances never change; cache in this browser only, never in shared proxies.
+                  "cache-control": "private, max-age=86400, immutable",
+                  "x-content-type-options": "nosniff",
+                  ...(kind === "file" ? { "content-disposition": `attachment; filename="${instance}.dcm"` } : {}),
+                },
+              }),
+            ),
+          ),
+          Effect.catch((e: PacsError) => Effect.succeed(errorResponse(502, e.message))),
+        );
+      }),
+    ),
+  ),
+);
+
 /** Form drafts (resume medis): read and edited in the draft card; filled into Khanza by the desktop app. */
 const DraftRoutes = Layer.mergeAll(
   route(
@@ -704,4 +787,4 @@ const WebRoutes = route(
   }),
 );
 
-export const Routes = Layer.mergeAll(AuthRoutes, TicketRoutes, FixRoutes, DocumentRoutes, DraftRoutes, DataRoutes, WebRoutes);
+export const Routes = Layer.mergeAll(AuthRoutes, TicketRoutes, FixRoutes, DocumentRoutes, PacsRoutes, DraftRoutes, DataRoutes, WebRoutes);

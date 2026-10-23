@@ -1,0 +1,286 @@
+/**
+ * Radiology images from the hospital's Orthanc PACS: a button on the patient
+ * card opens the patient's studies (newest first) with a thumbnail per
+ * series; a thumbnail opens a full-screen viewer that flicks through every
+ * image of the study. Images come through the harness server
+ * (/api/pacs/instances/...), which logs who opened them. The same study list
+ * is shown in the chat when the AI calls `gambarRadiologi` (RadiologyCard).
+ */
+import { Dialog as BaseDialog } from "@base-ui/react/dialog";
+import type { PacsStudies, PacsStudy, RadiologyGallery } from "@simrs/shared";
+import { ChevronLeft, ChevronRight, Download, ExternalLink, ScanLine, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useApi } from "../../lib/useApi.ts";
+import { Button } from "../ui/Button.tsx";
+import { Dialog } from "../ui/Dialog.tsx";
+import { ErrorText } from "../ui/Field.tsx";
+import { Empty, Spinner } from "../ui/Spinner.tsx";
+
+const image = (instance: string, kind: "thumb" | "preview" | "file") => `/api/pacs/instances/${instance}/${kind}`;
+
+const dateLabel = (study: PacsStudy) => {
+  if (!study.date) return "Tanpa tanggal";
+  const date = new Date(`${study.date}T00:00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+  return study.time ? `${date} · ${study.time}` : date;
+};
+
+const stoneUrl = (viewerBase: string | null, study: PacsStudy | undefined) =>
+  viewerBase && study?.studyInstanceUid
+    ? `${viewerBase}/stone-webviewer/index.html?study=${encodeURIComponent(study.studyInstanceUid)}`
+    : null;
+
+interface ViewerImage {
+  readonly instance: string;
+  readonly caption: string;
+}
+
+/** Every image of a study in series order, with a caption per image. */
+const imagesOf = (study: PacsStudy): ReadonlyArray<ViewerImage> =>
+  study.series.flatMap((se) =>
+    se.instances.map((instance, i) => ({
+      instance,
+      caption: [
+        `Seri ${se.number}`,
+        se.description || se.bodyPart,
+        se.modality,
+        se.instances.length > 1 ? `gambar ${i + 1}/${se.instances.length}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    })),
+  );
+
+/** Full-screen image viewer. ← → flick through the images, Esc closes. */
+const Viewer = ({
+  study,
+  start,
+  viewerBase,
+  onClose,
+}: {
+  readonly study: PacsStudy | null;
+  readonly start: number;
+  readonly viewerBase: string | null;
+  readonly onClose: () => void;
+}) => {
+  const images = study ? imagesOf(study) : [];
+  const [index, setIndex] = useState(start);
+  useEffect(() => setIndex(start), [start, study]);
+  const current = images[index];
+  const go = (delta: number) => images.length > 0 && setIndex((i) => (i + delta + images.length) % images.length);
+  const count = images.length;
+  // On the window: focus may still be on the thumbnail that opened the viewer.
+  useEffect(() => {
+    if (study === null || count < 2) return;
+    const onKey = (e: KeyboardEvent) => {
+      const delta = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+      if (delta === 0) return;
+      e.preventDefault();
+      setIndex((i) => (i + delta + count) % count);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [study, count]);
+  const stone = stoneUrl(viewerBase, study ?? undefined);
+
+  return (
+    <BaseDialog.Root open={study !== null} onOpenChange={(open) => !open && onClose()}>
+      <BaseDialog.Portal>
+        <BaseDialog.Popup
+          className="fixed inset-0 z-50 flex flex-col bg-[#0b0f0f] text-white outline-none transition-opacity duration-150 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0"
+          data-testid="pacs-viewer"
+        >
+          <header className="flex h-12 shrink-0 items-center gap-3 px-4 text-[13px]">
+            <BaseDialog.Title className="truncate text-white/85">
+              {study ? `${study.description || "Studi radiologi"} · ${dateLabel(study)}` : ""}
+            </BaseDialog.Title>
+            <span className="truncate text-white/55">{current?.caption}</span>
+            <span className="font-mono text-[12px] text-white/50">
+              {images.length > 0 ? `${index + 1} / ${images.length}` : ""}
+            </span>
+            <span className="ml-auto" />
+            {stone ? (
+              <a className="viewer-btn" href={stone} target="_blank" rel="noreferrer">
+                <ExternalLink className="size-3.5" /> Stone Viewer
+              </a>
+            ) : null}
+            {current ? (
+              <a className="viewer-btn" href={image(current.instance, "file")} download>
+                <Download className="size-3.5" /> Unduh DICOM
+              </a>
+            ) : null}
+            <BaseDialog.Close className="viewer-btn" aria-label="Tutup">
+              <X className="size-4" /> <span className="font-mono text-[11px] text-white/50">Esc</span>
+            </BaseDialog.Close>
+          </header>
+          <div className="relative flex min-h-0 flex-1 items-center justify-center px-16 pb-6">
+            {current ? (
+              <img
+                key={current.instance}
+                src={image(current.instance, "preview")}
+                alt={current.caption}
+                className="max-h-full max-w-full object-contain select-none"
+                draggable={false}
+              />
+            ) : null}
+            {images.length > 1 ? (
+              <>
+                <button type="button" className="viewer-nav left-3" onClick={() => go(-1)} aria-label="Gambar sebelumnya">
+                  <ChevronLeft className="size-5" />
+                </button>
+                <button type="button" className="viewer-nav right-3" onClick={() => go(1)} aria-label="Gambar berikutnya">
+                  <ChevronRight className="size-5" />
+                </button>
+              </>
+            ) : null}
+          </div>
+        </BaseDialog.Popup>
+      </BaseDialog.Portal>
+    </BaseDialog.Root>
+  );
+};
+
+const StudyBlock = ({
+  study,
+  viewerBase,
+  onOpen,
+}: {
+  readonly study: PacsStudy;
+  readonly viewerBase: string | null;
+  readonly onOpen: (index: number) => void;
+}) => {
+  const imageCount = study.series.reduce((n, s) => n + s.instances.length, 0);
+  const stone = stoneUrl(viewerBase, study);
+  // Index of each series' first image in the viewer's flat list.
+  const firstIndex = study.series.map((_, i) => study.series.slice(0, i).reduce((n, s) => n + s.instances.length, 0));
+  return (
+    <section className="rounded-lg border border-line bg-card" data-testid="pacs-study">
+      <header className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-line-2 px-4 py-2.5">
+        <h3 className="font-display text-[15px] font-semibold">{study.description || "Studi radiologi"}</h3>
+        <span className="font-mono text-[12px] text-ink-2">{dateLabel(study)}</span>
+        <span className="text-[12px] text-ink-3">
+          {[...new Set(study.series.map((s) => s.modality).filter(Boolean))].join(", ")}
+          {study.accession ? ` · Acc ${study.accession}` : ""} · {study.series.length} seri · {imageCount} gambar
+        </span>
+        {stone ? (
+          <a className="ml-auto inline-flex items-center gap-1 text-[12.5px] text-teal hover:underline" href={stone} target="_blank" rel="noreferrer">
+            Stone Viewer <ExternalLink className="size-3" />
+          </a>
+        ) : null}
+      </header>
+      <ul className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-4">
+        {study.series.map((se, i) => (
+          <li key={se.id}>
+            <button
+              type="button"
+              className="group w-full text-left disabled:opacity-50"
+              disabled={se.instances.length === 0}
+              onClick={() => onOpen(firstIndex[i] ?? 0)}
+            >
+              <span className="relative block aspect-square overflow-hidden rounded-md bg-[#0b0f0f] ring-teal transition-shadow group-hover:ring-2">
+                {se.instances[0] ? (
+                  <img
+                    src={image(se.instances[0], "thumb")}
+                    alt={`Seri ${se.number} ${se.description}`}
+                    loading="lazy"
+                    className="size-full object-contain"
+                  />
+                ) : null}
+                {se.instances.length > 1 ? (
+                  <span className="absolute right-1.5 bottom-1.5 rounded bg-black/60 px-1.5 font-mono text-[11px] text-white">
+                    {se.instances.length}
+                  </span>
+                ) : null}
+              </span>
+              <span className="mt-1 block truncate text-[12px] text-ink-2">
+                Seri {se.number} · {se.description || se.bodyPart || se.modality || "–"}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+};
+
+/** The patient's studies; `open` controls the dialog. */
+const RadiologyDialog = ({ rm, open, onOpenChange }: { readonly rm: string; readonly open: boolean; readonly onOpenChange: (open: boolean) => void }) => {
+  const result = useApi<PacsStudies>(open ? `/api/patients/${encodeURIComponent(rm)}/radiologi` : null);
+  const studies = result.data?.studies ?? [];
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange} wide title="Gambar radiologi" description={`RM ${rm} · dari PACS (Orthanc)`}>
+      <div className="max-h-[70vh] space-y-3 overflow-y-auto" data-testid="pacs-studies">
+        {result.loading && !result.data ? (
+          <div className="flex items-center gap-2 text-[13px] text-ink-3">
+            <Spinner className="size-4" /> Mengambil studi dari PACS…
+          </div>
+        ) : result.error ? (
+          <ErrorText>{result.error}</ErrorText>
+        ) : result.data && !result.data.configured ? (
+          <Empty title="PACS belum diatur">Isi ORTHANC_URL di file .env server untuk menampilkan gambar radiologi.</Empty>
+        ) : studies.length === 0 ? (
+          <Empty title="Belum ada gambar">
+            Tidak ada studi DICOM untuk RM {rm} di PACS. Pemeriksaan USG sering tidak dikirim ke PACS.
+          </Empty>
+        ) : (
+          <StudyList studies={studies} viewerBase={result.data?.viewerBase ?? null} />
+        )}
+      </div>
+    </Dialog>
+  );
+};
+
+/** Study blocks with thumbnails; a thumbnail opens the viewer. */
+const StudyList = ({ studies, viewerBase }: { readonly studies: ReadonlyArray<PacsStudy>; readonly viewerBase: string | null }) => {
+  const [viewing, setViewing] = useState<{ readonly study: PacsStudy; readonly index: number } | null>(null);
+  return (
+    <>
+      {studies.map((study) => (
+        <StudyBlock key={study.id} study={study} viewerBase={viewerBase} onOpen={(index) => setViewing({ study, index })} />
+      ))}
+      <Viewer study={viewing?.study ?? null} start={viewing?.index ?? 0} viewerBase={viewerBase} onClose={() => setViewing(null)} />
+    </>
+  );
+};
+
+const day = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+
+/** Radiology images in the chat (from the AI's `gambarRadiologi` tool). */
+export const RadiologyCard = ({ gallery }: { readonly gallery: RadiologyGallery }) => (
+  <figure className="animate-rise space-y-2" data-testid="radiology-card">
+    <figcaption className="flex items-center gap-2 text-[13px] text-ink-2">
+      <span className="grid size-7 place-items-center rounded-md bg-teal-soft text-teal">
+        <ScanLine className="size-4" />
+      </span>
+      <span>
+        Gambar radiologi · RM <span className="font-mono">{gallery.noRkmMedis}</span>
+        {gallery.noRawat ? <> · <span className="font-mono">{gallery.noRawat}</span></> : null}
+        {gallery.rentang && gallery.cocokKunjungan ? ` · ${day(gallery.rentang.dari)} – ${day(gallery.rentang.sampai)}` : null}
+      </span>
+    </figcaption>
+    {gallery.noRawat && !gallery.cocokKunjungan && gallery.studies.length > 0 ? (
+      <p className="text-[12.5px] text-ink-3">Tidak ada studi pada tanggal kunjungan ini; ditampilkan semua studi pasien.</p>
+    ) : null}
+    {gallery.studies.length === 0 ? (
+      <p className="rounded-lg border border-line bg-card px-4 py-3 text-[13px] text-ink-3">
+        Tidak ada studi DICOM untuk RM {gallery.noRkmMedis} di PACS.
+      </p>
+    ) : (
+      <StudyList studies={gallery.studies} viewerBase={gallery.viewerBase} />
+    )}
+  </figure>
+);
+
+/** "Radiologi" button for the patient card. Renders nothing when the server has no PACS. */
+export const RadiologyButton = ({ rm }: { readonly rm: string }) => {
+  const health = useApi<{ readonly pacs?: boolean }>("/api/health");
+  const [open, setOpen] = useState(false);
+  if (!health.data?.pacs) return null;
+  return (
+    <>
+      <Button size="sm" onClick={() => setOpen(true)}>
+        <ScanLine /> Radiologi
+      </Button>
+      <RadiologyDialog rm={rm} open={open} onOpenChange={setOpen} />
+    </>
+  );
+};

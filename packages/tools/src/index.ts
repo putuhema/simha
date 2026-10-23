@@ -30,6 +30,9 @@ export type { DocumentRow, QueryResult, StoredBlock } from "./info/ResultStore.t
 export { SchemaDocs, SchemaDocsLive, schemaDocsLayer } from "./info/SchemaDocs.ts";
 export { checkSelect, MAX_QUERY_ROWS, QueryRejected } from "./info/select-guard.ts";
 export { tampilkan } from "./info/tampilkan.ts";
+export { gambarRadiologi } from "./pacs/gambarRadiologi.ts";
+export { IMAGE_KINDS, isImageKind, isOrthancId, Pacs, PacsError, PacsLive, pacsLayer } from "./pacs/Pacs.ts";
+export type { ImageKind, PacsOptions, PacsService } from "./pacs/Pacs.ts";
 export { maskPii, maskText } from "./privacy/mask.ts";
 export { usulkanPerbaikan } from "./propose/usulkanPerbaikan.ts";
 export * from "./read/index.ts";

@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { StreamingMarkdown } from "../../components/agent/Markdown.tsx";
 import { PendingLine, pendingStep, StepList } from "../../components/agent/StepList.tsx";
 import { DocumentCard } from "../../components/blocks/DocumentCard.tsx";
+import { RadiologyCard } from "../../components/pacs/Radiology.tsx";
 import { DraftCard } from "../../components/blocks/DraftCard.tsx";
 import { OpenInKhanza } from "../../components/desktop/OpenInKhanza.tsx";
 import { RenderBlockView } from "../../components/blocks/RenderBlockView.tsx";
@@ -61,7 +62,7 @@ const CopyButton = ({ text }: { readonly text: string }) => {
  * riwayat) and names its visit or patient; not when the turn already shows a card with its own button.
  */
 const khanzaButtonFor = (turn: RunView): { form: KhanzaForm; noRawat: string | null; noRm: string | null } | null => {
-  if (turn.documents.length > 0 || turn.drafts.length > 0) return null;
+  if (turn.documents.length > 0 || turn.drafts.length > 0 || turn.radiology.length > 0) return null;
   const form = formMentioned(turn.text);
   if (!form) return null;
   const inputs = JSON.stringify(turn.steps.map((s) => s.input));
@@ -117,6 +118,9 @@ const Turn = ({ turn, drafts }: { readonly turn: RunView; readonly drafts: Reado
         <div key={document.id} className="animate-rise">
           <DocumentCard document={document} />
         </div>
+      ))}
+      {turn.radiology.map((gallery, i) => (
+        <RadiologyCard key={i} gallery={gallery} />
       ))}
       <StreamingMarkdown text={turn.text} streaming={running} className="text-[14.5px]" />
       {turn.status === "error" ? <ErrorText>{turn.error}</ErrorText> : null}

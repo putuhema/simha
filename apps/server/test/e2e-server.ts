@@ -12,11 +12,14 @@
  * - "per poli": a bar chart of visits per clinic;
  * - "hari ini": the number of registrations today;
  * - "riwayat": the history document of RM 000002;
+ * - "foto thorax" / "rontgen": the radiology images of 2026/10/21/000002 from the fake PACS;
  * - anything else: a short text answer.
+ *
+ * PACS is a fake Orthanc with one synthetic chest X-ray study for RM 000002.
  */
 import { NodeFileSystem, NodeHttpServer, NodeRuntime } from "@effect/platform-node";
 import { fakeTurn, makeFakeClient, type ChatRequest, type FakeTurn } from "@simrs/llm";
-import { AuditLogMemory, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, ResultStoreLive, SchemaDocsLive } from "@simrs/tools";
+import { AuditLogMemory, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, pacsLayer, ResultStoreLive, SchemaDocsLive } from "@simrs/tools";
 import { startTestDb } from "@simrs/tools/testing/db";
 import { Duration, Effect, Layer, Redacted } from "effect";
 import { HttpRouter } from "effect/http";
@@ -29,6 +32,7 @@ import { HttpSettings } from "../src/config.ts";
 import { FixExecutorLive } from "../src/fixes/FixExecutor.ts";
 import { Routes } from "../src/http/routes.ts";
 import { llmSettingsLayer } from "../src/llm/LlmSettings.ts";
+import { FAKE_ORTHANC, makeFakeOrthanc } from "./fake-orthanc.ts";
 import { StoreLive } from "../src/store.ts";
 import { ViewsLive } from "../src/views.ts";
 
@@ -50,6 +54,11 @@ const respond = (request: ChatRequest): ReturnType<typeof fakeTurn> => {
   const results = toolResults(request);
   const step = results.length;
 
+  // Radiology images from the (fake) PACS.
+  if (/foto thorax|rontgen/i.test(question)) {
+    if (step === 0) return fakeTurn("", [{ name: "gambarRadiologi", args: { noRawat: "2026/10/21/000002" } }]);
+    return fakeTurn("Ada 1 studi thorax (21 Okt 2026) dengan 3 gambar di PACS.");
+  }
   // Resume medis: start a draft, ask for what is missing; a follow-up with answers fills the draft.
   if (/buat resume/i.test(question)) {
     if (step === 0) return fakeTurn("", [{ name: "buatDraftResume", args: { noRawat: "2026/10/21/000002" } }]);
@@ -198,6 +207,7 @@ const main = Effect.gen(function* () {
         khanzaWriteLayer(connection(info.writeUser, info.writePass)),
         khanzaReadLayer({ connection: connection(info.readUser, info.readPass), timeout: Duration.seconds(5) }),
         systemPromptLayer("E2E test system prompt."),
+        pacsLayer(FAKE_ORTHANC, makeFakeOrthanc().fetch),
       ),
     ),
     Layer.provideMerge(AuditLogMemory),

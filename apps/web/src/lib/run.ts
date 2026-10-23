@@ -3,7 +3,7 @@
  * agent events. Also converts a stored run (transcript) to the same shape, so
  * live and reloaded answers render with the same components.
  */
-import type { AgentEvent, DocumentInfo, FormDraft, RenderBlock, RunTranscript } from "@simrs/shared";
+import type { AgentEvent, DocumentInfo, FormDraft, RadiologyGallery, RenderBlock, RunTranscript } from "@simrs/shared";
 import { request } from "./api.ts";
 import { readEventStream } from "./sse.ts";
 import type { StepView } from "./steps.ts";
@@ -25,6 +25,8 @@ export interface RunView {
   readonly documents: ReadonlyArray<DocumentInfo>;
   /** Form drafts made or changed in this run (latest state of each). */
   readonly drafts: ReadonlyArray<FormDraft>;
+  /** Radiology images shown in this run. */
+  readonly radiology: ReadonlyArray<RadiologyGallery>;
   readonly fixIds: ReadonlyArray<string>;
   readonly error: string | null;
   readonly at: string;
@@ -49,6 +51,7 @@ export const emptyRun = (question: string, key: string = crypto.randomUUID()): R
   blocks: [],
   documents: [],
   drafts: [],
+  radiology: [],
   fixIds: [],
   error: null,
   at: new Date().toISOString(),
@@ -113,6 +116,8 @@ export const applyEvent = (run: RunView, event: AgentEvent): RunView => {
           ? run.drafts.map((d) => (d.id === event.draft.id ? event.draft : d))
           : [...run.drafts, event.draft],
       };
+    case "radiology":
+      return { ...run, radiology: [...run.radiology, event.gallery] };
     case "done":
       return { ...run, status: "done", text: event.text };
     case "error":
@@ -142,6 +147,7 @@ export const fromTranscript = (run: RunTranscript): RunView => ({
   blocks: run.blocks,
   documents: run.documents,
   drafts: run.drafts,
+  radiology: run.radiology,
   fixIds: run.fixIds,
   error: run.error,
   at: run.startedAt,

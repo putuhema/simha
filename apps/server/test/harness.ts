@@ -5,9 +5,9 @@
 import { NodeFileSystem } from "@effect/platform-node";
 import { makeFakeClient, type FakeTurn, type LlmInfo } from "@simrs/llm";
 import type { AgentEvent } from "@simrs/shared";
-import { AuditLogMemory, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, ResultStoreLive, schemaDocsLayer } from "@simrs/tools";
+import { AuditLogMemory, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, pacsLayer, ResultStoreLive, schemaDocsLayer, type Pacs } from "@simrs/tools";
 import { connectionAs, testDb } from "@simrs/tools/testing";
-import { Duration, Effect, Layer, ManagedRuntime } from "effect";
+import { Duration, Effect, Layer, ManagedRuntime, Redacted } from "effect";
 import { SqlClient } from "effect/sql";
 import { HttpRouter } from "effect/http";
 import { AgentLive } from "../src/agent/Agent.ts";
@@ -53,6 +53,8 @@ const PASSWORD = "rahasia-uji-123";
 export interface TestAppOptions {
   /** Directory served as the web UI. */
   readonly webDir?: string;
+  /** The PACS (e.g. the fake Orthanc). Default: not configured. */
+  readonly pacs?: Layer.Layer<Pacs>;
 }
 
 export const makeTestApp = (
@@ -81,6 +83,7 @@ export const makeTestApp = (
         AuthLive,
         Layer.succeed(HttpSettings, { webDir: options.webDir ?? "/nonexistent", secureCookie: false }),
         systemPromptLayer("Test system prompt."),
+        options.pacs ?? pacsLayer({ url: "", user: "", pass: Redacted.make("") }),
       ),
     ),
     Layer.provideMerge(AuditLogMemory),
