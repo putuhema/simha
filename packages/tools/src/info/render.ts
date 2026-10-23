@@ -5,7 +5,7 @@
  * Checks what the UI needs: the named columns exist, chart values are
  * numbers, and charts and lists are small enough to read.
  */
-import type { RenderBlock, RenderType } from "@simrs/shared";
+import type { RenderBlock, RenderType } from "@simha/shared";
 import type { QueryResult, Row } from "./ResultStore.ts";
 
 export interface RenderSpec {

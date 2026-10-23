@@ -1,5 +1,5 @@
 {
-  "name": "@simrs/scripts",
+  "name": "@simha/scripts",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
   "dependencies": {
     "@effect/platform-node": "catalog:",
     "@effect/sql-mysql2": "catalog:",
-    "@simrs/tools": "workspace:*",
+    "@simha/tools": "workspace:*",
     "effect": "catalog:"
   }
 }

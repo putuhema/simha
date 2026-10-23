@@ -1,4 +1,4 @@
-import type { Role, User } from "@simrs/shared";
+import type { Role, User } from "@simha/shared";
 import { KeyRound, UserPlus } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Badge } from "../../components/ui/Badge.tsx";

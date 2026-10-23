@@ -20,7 +20,7 @@ export interface KhanzaWriteService {
   readonly sql: SqlClient.SqlClient;
 }
 
-export class KhanzaWrite extends Context.Service<KhanzaWrite, KhanzaWriteService>()("simrs/KhanzaWrite") {}
+export class KhanzaWrite extends Context.Service<KhanzaWrite, KhanzaWriteService>()("simha/KhanzaWrite") {}
 
 const makeKhanzaWrite = Effect.fn("makeKhanzaWrite")(function* (connection: KhanzaConnectionOptions) {
   const sql: SqlClient.SqlClient = yield* connectKhanza(connection, 2);
@@ -32,7 +32,7 @@ const makeKhanzaWrite = Effect.fn("makeKhanzaWrite")(function* (connection: Khan
     return yield* new KhanzaSetupError({
       message:
         `KHANZA_DB_WRITE_USER (${connection.username}) has more privileges than the fix allow-list needs, ` +
-        `so the harness refuses to use it.\nGive it table-level grants only (see README.md). Grants found:\n  ${tooBroad.join("\n  ")}`,
+        `so Simha refuses to use it.\nGive it table-level grants only (see README.md). Grants found:\n  ${tooBroad.join("\n  ")}`,
     });
   }
 

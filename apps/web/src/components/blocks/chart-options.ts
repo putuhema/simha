@@ -2,7 +2,7 @@
  * ECharts options for render blocks, in the app's palette. Pure, so the
  * mapping from block to chart can be tested without a browser.
  */
-import type { RenderBlock } from "@simrs/shared";
+import type { RenderBlock } from "@simha/shared";
 
 const SERIES_COLORS = ["#0e6b62", "#b45309", "#3f5c8a", "#9a3b5f", "#5b6b2f"];
 

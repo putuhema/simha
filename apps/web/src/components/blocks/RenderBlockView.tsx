@@ -2,7 +2,7 @@
  * One Tanya Data result: title and assumption line, then the table, chart,
  * number or list, the SQL behind it, and actions (CSV, save as favorite).
  */
-import type { RenderBlock } from "@simrs/shared";
+import type { RenderBlock } from "@simha/shared";
 import { Download, Star, ThumbsDown, ThumbsUp } from "lucide-react";
 import { lazy, Suspense, useMemo, useState } from "react";
 import { api, errorMessage } from "../../lib/api.ts";

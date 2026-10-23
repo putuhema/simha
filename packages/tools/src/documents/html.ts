@@ -92,7 +92,7 @@ ${meta.hospital.logo ? `<img src="${escapeHtml(meta.hospital.logo)}" alt="">` : 
 <h1>${escapeHtml(title)}</h1>
 <div class="sub">${escapeHtml(subtitle)}</div>
 ${body}
-<footer><span>Dibuat dari data SIMRS Khanza oleh SIMRS Harness${meta.generatedBy ? ` untuk ${escapeHtml(meta.generatedBy)}` : ""}, ${escapeHtml(when)}.</span><span>Periksa kembali sebelum digunakan.</span></footer>
+<footer><span>Dibuat dari data SIMRS Khanza oleh Simha${meta.generatedBy ? ` untuk ${escapeHtml(meta.generatedBy)}` : ""}, ${escapeHtml(when)}.</span><span>Periksa kembali sebelum digunakan.</span></footer>
 </div>
 </body>
 </html>`;

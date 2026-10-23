@@ -25,7 +25,7 @@ export interface LlmClientService {
   readonly chat: (request: ChatRequest) => Stream.Stream<LlmEvent, LlmError>;
 }
 
-export class LlmClient extends Context.Service<LlmClient, LlmClientService>()("simrs/LlmClient") {}
+export class LlmClient extends Context.Service<LlmClient, LlmClientService>()("simha/LlmClient") {}
 
 /** Wraps an async generator of events as a Stream. Stopping the stream runs the generator's `finally` (adapters abort the HTTP request there). */
 export const streamFrom = (

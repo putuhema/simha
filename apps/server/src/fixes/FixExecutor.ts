@@ -29,7 +29,7 @@ import {
   type Fix,
   type FixParam,
   type Row,
-} from "@simrs/tools";
+} from "@simha/tools";
 import { Context, Effect, Layer, Schema } from "effect";
 import type { SqlError } from "effect/sql/SqlError";
 
@@ -278,6 +278,6 @@ const make = Effect.gen(function* () {
   return { approve, applyApproved, reject, rollback };
 });
 
-export class FixExecutor extends Context.Service<FixExecutor, Effect.Success<typeof make>>()("simrs/FixExecutor") {}
+export class FixExecutor extends Context.Service<FixExecutor, Effect.Success<typeof make>>()("simha/FixExecutor") {}
 
 export const FixExecutorLive = Layer.effect(FixExecutor, make);

@@ -12,7 +12,7 @@ Berkas ini yang dipakai agent lewat tool `cariAplikasiKhanza`.
 - [cara-pakai.md](cara-pakai.md) — arti grup A–T, path menu, dan judul dialog.
 - [flows/](flows/README.md) — alur pasien dan data (registrasi, ranap, lab, farmasi, kasir, BPJS, ...).
 - [roles.md](roles.md) — cara hak akses bekerja dan kenapa menu tidak muncul.
-- [bridge.md](bridge.md) — cara SIMRS Harness membuka form di aplikasi desktop.
+- [bridge.md](bridge.md) — cara Simha membuka form di aplikasi desktop.
 - [synonyms.json](synonyms.json) — kata yang dipakai staf tetapi tidak ada di label menu (mis. "pindah kamar").
 - [index.json](index.json) — graf lengkap untuk mesin (menu, form, hak, tabel).
 

@@ -22,7 +22,7 @@ export const AuthLayout = ({ title, subtitle, children }: { readonly title: stri
       </svg>
       <div className="relative flex items-center gap-2">
         <img src="/favicon.svg" alt="" className="size-8" />
-        <span className="font-display text-[20px] font-semibold">SIMRS Harness</span>
+        <span className="font-display text-[20px] font-semibold">Simha</span>
       </div>
       <div className="relative">
         <p className="font-display text-[34px] leading-[1.1] font-semibold tracking-tight">

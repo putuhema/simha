@@ -234,7 +234,7 @@ const make = Effect.gen(function* () {
   return { create, get, list, events, transition, addEvent, approvalOf };
 });
 
-export class FixStore extends Context.Service<FixStore, Effect.Success<typeof make>>()("simrs/FixStore") {}
+export class FixStore extends Context.Service<FixStore, Effect.Success<typeof make>>()("simha/FixStore") {}
 
 /** Needs the audit DB's SqlClient (provided by AuditLogLive / AuditLogMemory). */
 export const FixStoreLive = Layer.effect(FixStore, make);

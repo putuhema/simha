@@ -5,7 +5,7 @@
  * phone.
  */
 import { Menu } from "@base-ui/react/menu";
-import type { ConversationSummary, Favorite, Stats } from "@simrs/shared";
+import type { ConversationSummary, Favorite, Stats } from "@simha/shared";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Archive,
@@ -321,7 +321,7 @@ export const SidebarPanel = ({ health, healthError, stats, onNavigate, onClose, 
       <div className="drag flex h-12 shrink-0 items-center gap-2 pr-2 pl-[var(--titlebar-inset,12px)]">
         <Link to="/tanya" onClick={onNavigate} className="no-drag flex min-w-0 items-center gap-2">
           <img src="/favicon.svg" alt="" className="size-6" />
-          <span className="truncate font-display text-[16px] font-semibold tracking-tight">SIMRS Harness</span>
+          <span className="truncate font-display text-[16px] font-semibold tracking-tight">Simha</span>
         </Link>
         <TipButton
           label={closeLabel}

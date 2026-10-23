@@ -1,5 +1,5 @@
 /**
- * Adds the SIMRS Harness bridge to a Khanza source tree (run again after
+ * Adds the Simha bridge to a Khanza source tree (run again after
  * every Khanza update; it only changes what is missing):
  *
  *   node integrations/khanza-bridge/apply.mjs ~/Work/simrsmt
@@ -29,7 +29,10 @@ let text = readFileSync(file, "latin1");
 const eol = text.includes("\r\n") ? "\r\n" : "\n";
 
 const addAfter = (anchor, line, what) => {
-  if (text.includes(line.trim())) return console.log(`✓ ${what} (sudah ada)`);
+  // The call itself is the marker, not the comment: a tree patched before the
+  // rename still has the old comment but must not get a second call.
+  const call = line.split("//")[0].trim();
+  if (text.includes(call)) return console.log(`✓ ${what} (sudah ada)`);
   const match = new RegExp(`^([ \\t]*)${anchor.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[^\\n]*$`, "m").exec(text);
   if (!match) {
     console.error(`✕ ${what}: baris "${anchor}" tidak ditemukan di frmUtama.java. Tambahkan manual: ${line.trim()}`);
@@ -43,9 +46,9 @@ const addAfter = (anchor, line, what) => {
 
 addAfter(
   "akses.setData(edAdmin.getText(), edPwd.getText());",
-  'HarnessBridge.start(); // SIMRS Harness: "Buka di Khanza" opens forms here (only after a successful login)',
+  'HarnessBridge.start(); // Simha: "Buka di Khanza" opens forms here (only after a successful login)',
   "start setelah login",
 );
-addAfter("akses.setLogOut();", "HarnessBridge.stop(); // SIMRS Harness bridge", "stop saat logout");
+addAfter("akses.setLogOut();", "HarnessBridge.stop(); // Simha bridge", "stop saat logout");
 
 writeFileSync(file, text, "latin1");

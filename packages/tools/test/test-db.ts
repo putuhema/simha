@@ -76,7 +76,7 @@ const waitForServer = async (socketPath: string, child: ChildProcess, log: () =>
 
 /** Starts a temporary MariaDB. Returns the admin target and a stop function. */
 const startTemporaryMariadb = async (): Promise<{ target: AdminTarget; stop: () => Promise<void> }> => {
-  const dir = mkdtempSync(NodePath.join(tmpdir(), "simrs-harness-testdb-"));
+  const dir = mkdtempSync(NodePath.join(tmpdir(), "simha-testdb-"));
   const datadir = NodePath.join(dir, "data");
   const socketPath = NodePath.join(dir, "mysqld.sock");
   const port = await freePort();

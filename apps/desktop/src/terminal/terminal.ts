@@ -1,7 +1,7 @@
 /**
  * The terminal panel at the bottom of the desktop app: tabs of real shells
  * on this PC plus an "Output Khanza" tab, drawn with xterm.js. Runs in a page
- * built into the app; talks to the main process through window.simrsTerminal.
+ * built into the app; talks to the main process through window.simhaTerminal.
  */
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
@@ -30,7 +30,7 @@ interface Tab {
   ended: boolean;
 }
 
-const bridge = (window as unknown as { simrsTerminal: Bridge }).simrsTerminal;
+const bridge = (window as unknown as { simhaTerminal: Bridge }).simhaTerminal;
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 const tabsBar = $("tabs");
 const screens = $("screens");

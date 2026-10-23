@@ -1,5 +1,5 @@
 /**
- * @simrs/llm: one chat interface over several AI providers.
+ * @simha/llm: one chat interface over several AI providers.
  */
 export { fakeTurn, makeFakeClient } from "./adapters/fake.ts";
 export type { FakeClient, FakeTurn } from "./adapters/fake.ts";

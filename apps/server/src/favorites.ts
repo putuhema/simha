@@ -4,8 +4,8 @@
  * agent (select guard, read user, time limit, audit log), with its own
  * session id `favorite:<id>:<run>` in the audit log.
  */
-import type { Favorite } from "@simrs/shared";
-import { jalankanQueryBaca, ResultStore, runTool, tampilkan } from "@simrs/tools";
+import type { Favorite } from "@simha/shared";
+import { jalankanQueryBaca, ResultStore, runTool, tampilkan } from "@simha/tools";
 import { Effect } from "effect";
 
 /** Builds a favorite from a block shown in the chat. Fails with a message for a 404. */

@@ -3,7 +3,7 @@
  * The harness sends `event: <tag>` and `data: <json>` blocks separated by a
  * blank line.
  */
-import type { AgentEvent } from "@simrs/shared";
+import type { AgentEvent } from "@simha/shared";
 
 /** Splits buffered text into complete event blocks; returns the events and the unfinished rest. */
 export const parseSseChunk = (buffer: string): { events: Array<AgentEvent>; rest: string } => {

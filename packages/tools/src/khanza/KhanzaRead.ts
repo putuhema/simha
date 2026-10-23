@@ -34,7 +34,7 @@ export interface KhanzaReadService {
   ) => Effect.Effect<ReadonlyArray<A>, KhanzaQueryError>;
 }
 
-export class KhanzaRead extends Context.Service<KhanzaRead, KhanzaReadService>()("simrs/KhanzaRead") {}
+export class KhanzaRead extends Context.Service<KhanzaRead, KhanzaReadService>()("simha/KhanzaRead") {}
 
 /** Turns a driver error into a short message the AI model and the user can understand. */
 const describeSqlError = (error: SqlError): KhanzaQueryError => {
@@ -75,7 +75,7 @@ const makeKhanzaRead = Effect.fn("makeKhanzaRead")(function* (options: KhanzaRea
   if (unsafe.length > 0) {
     return yield* new KhanzaSetupError({
       message:
-        `KHANZA_DB_READ_USER (${options.connection.username}) can change data, so the harness refuses to use it.\n` +
+        `KHANZA_DB_READ_USER (${options.connection.username}) can change data, so Simha refuses to use it.\n` +
         `Create a SELECT-only user (see README.md) and put it in .env. Grants found:\n  ${unsafe.join("\n  ")}`,
     });
   }

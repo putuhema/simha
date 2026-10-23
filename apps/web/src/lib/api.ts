@@ -42,7 +42,7 @@ export const request = async (method: string, path: string, body?: unknown, sign
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") throw error;
-    throw new ApiError(0, "Server harness tidak bisa dihubungi. Pastikan server berjalan.");
+    throw new ApiError(0, "Server Simha tidak bisa dihubungi. Pastikan server berjalan.");
   }
   if (response.status === 401 && !path.startsWith("/api/auth/")) onUnauthorized();
   if (!response.ok) throw new ApiError(response.status, await errorText(response));

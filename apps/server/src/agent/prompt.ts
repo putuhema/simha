@@ -3,11 +3,11 @@
  * read once at startup. It does not change between requests, so providers
  * with prompt caching can reuse it.
  */
-import { KhanzaNotesPathConfig } from "@simrs/tools";
+import { KhanzaNotesPathConfig } from "@simha/tools";
 import { Context, Effect, FileSystem, Layer } from "effect";
 import * as NodePath from "node:path";
 
-export class SystemPrompt extends Context.Service<SystemPrompt, string>()("simrs/SystemPrompt") {}
+export class SystemPrompt extends Context.Service<SystemPrompt, string>()("simha/SystemPrompt") {}
 
 export const SystemPromptLive = Layer.effect(
   SystemPrompt,

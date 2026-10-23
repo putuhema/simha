@@ -1,4 +1,4 @@
-import type { Ticket } from "@simrs/shared";
+import type { Ticket } from "@simha/shared";
 import { Plus } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Badge } from "../../components/ui/Badge.tsx";

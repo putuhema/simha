@@ -100,7 +100,7 @@ const make = Effect.gen(function* () {
   return { toolCallStarted, toolCallFinished, query } satisfies AuditLogService;
 });
 
-export class AuditLog extends Context.Service<AuditLog, AuditLogService>()("simrs/AuditLog") {}
+export class AuditLog extends Context.Service<AuditLog, AuditLogService>()("simha/AuditLog") {}
 
 const migrations = SqliteMigrator.layer({ loader: Migrator.fromRecord(auditMigrations) });
 

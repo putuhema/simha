@@ -1,10 +1,10 @@
 /**
  * Radiology images from Orthanc, through the server.
  */
-import { fakeTurn } from "@simrs/llm";
-import type { AuditPage, PacsStudies, Transcript } from "@simrs/shared";
+import { fakeTurn } from "@simha/llm";
+import type { AuditPage, PacsStudies, Transcript } from "@simha/shared";
 import { describe, expect, it } from "vitest";
-import { pacsLayer } from "@simrs/tools";
+import { pacsLayer } from "@simha/tools";
 import { FAKE_INSTANCES, FAKE_ORTHANC, FAKE_STUDY, makeFakeOrthanc } from "./fake-orthanc.ts";
 import { makeTestApp, readEvents, testDb } from "./harness.ts";
 

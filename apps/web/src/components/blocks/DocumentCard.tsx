@@ -3,7 +3,7 @@
  * server-made HTML in a sandboxed frame (no scripts), with Print, Open and
  * Download. The HTML comes from Khanza data, not from the AI.
  */
-import type { DocumentInfo } from "@simrs/shared";
+import type { DocumentInfo } from "@simha/shared";
 import { Download, ExternalLink, FileText, Printer } from "lucide-react";
 import { useRef } from "react";
 import { noRawatIn, noRmIn, type KhanzaForm } from "../../lib/desktop.ts";

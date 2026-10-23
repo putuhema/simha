@@ -3,7 +3,7 @@
  * streaming now. When a live run ends, the transcript is reloaded and
  * replaces it, so a reload shows exactly the same thing.
  */
-import type { Fix, Transcript } from "@simrs/shared";
+import type { Fix, Transcript } from "@simha/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { emptyRun, fromTranscript, streamRun, type RunView } from "../../lib/run.ts";
 import { useApi } from "../../lib/useApi.ts";

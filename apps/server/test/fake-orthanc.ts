@@ -5,7 +5,7 @@
  */
 import { Redacted } from "effect";
 import { deflateSync } from "node:zlib";
-import type { PacsOptions } from "@simrs/tools";
+import type { PacsOptions } from "@simha/tools";
 
 export const FAKE_ORTHANC: PacsOptions = { url: "http://orthanc.test:8042", user: "orthanc", pass: Redacted.make("rahasia") };
 export const FAKE_STUDY = "11111111-22222222-33333333-44444444-55555555";

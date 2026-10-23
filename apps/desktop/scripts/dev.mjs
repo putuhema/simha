@@ -1,5 +1,5 @@
 /**
- * pnpm --filter @simrs/desktop dev: builds, then starts the desktop app.
+ * pnpm --filter @simha/desktop dev: builds, then starts the desktop app.
  * Clears ELECTRON_RUN_AS_NODE, which some terminals (inside other Electron
  * apps) set and which would make Electron run as plain Node.
  */

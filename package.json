@@ -1,5 +1,5 @@
 {
-  "name": "@simrs/monorepo",
+  "name": "@simha/monorepo",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.34.7",
@@ -7,19 +7,19 @@
     "node": ">=24"
   },
   "scripts": {
-    "inspect-schema": "pnpm --filter @simrs/scripts inspect-schema",
-    "dump-test-schema": "pnpm --filter @simrs/scripts dump-test-schema",
+    "inspect-schema": "pnpm --filter @simha/scripts inspect-schema",
+    "dump-test-schema": "pnpm --filter @simha/scripts dump-test-schema",
     "tool": "node --env-file-if-exists=.env --disable-warning=ExperimentalWarning scripts/run-tool.ts",
-    "start": "pnpm --filter @simrs/server start",
-    "build": "pnpm --filter @simrs/web build",
-    "dev:web": "pnpm --filter @simrs/web dev",
-    "e2e": "pnpm --filter @simrs/web e2e",
+    "start": "pnpm --filter @simha/server start",
+    "build": "pnpm --filter @simha/web build",
+    "dev:web": "pnpm --filter @simha/web dev",
+    "e2e": "pnpm --filter @simha/web e2e",
     "typecheck": "pnpm -r --parallel typecheck",
     "lint": "oxlint --report-unused-disable-directives",
     "knip": "knip",
     "test": "vitest run",
     "test:watch": "vitest",
-    "extract-khanza-app": "pnpm --filter @simrs/scripts extract-khanza-app"
+    "extract-khanza-app": "pnpm --filter @simha/scripts extract-khanza-app"
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.10.0",

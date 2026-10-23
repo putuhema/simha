@@ -2,8 +2,8 @@
  * The agent loop and HTTP API end to end: real routes, store, tools and audit
  * log, a scripted fake AI provider and the throwaway Khanza test DB.
  */
-import { fakeTurn, type ChatRequest } from "@simrs/llm";
-import type { AgentEvent, Ticket } from "@simrs/shared";
+import { fakeTurn, type ChatRequest } from "@simha/llm";
+import type { AgentEvent, Ticket } from "@simha/shared";
 import { describe, expect, it } from "vitest";
 import { MAX_STEPS } from "../src/agent/Agent.ts";
 import { makeTestApp, readEvents, testDb } from "./harness.ts";

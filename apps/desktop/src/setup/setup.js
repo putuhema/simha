@@ -1,5 +1,5 @@
-// Connection settings page of the desktop app. Talks to the main process through window.simrsDesktop.
-const api = window.simrsDesktop;
+// Connection settings page of the desktop app. Talks to the main process through window.simhaDesktop.
+const api = window.simhaDesktop;
 const $ = (id) => document.getElementById(id);
 const form = $("form");
 
@@ -20,7 +20,7 @@ const load = async () => {
   $("port").value = String(state.port);
   $("envFile").textContent = state.envFile ?? "-";
   $("launcher").textContent = state.khanzaLauncher ?? "Belum dipilih";
-  $("version").textContent = `SIMRS Harness ${state.version}`;
+  $("version").textContent = `Simha ${state.version}`;
   if (state.error) {
     $("error").textContent = state.error;
     $("error").hidden = false;

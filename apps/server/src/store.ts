@@ -1,8 +1,8 @@
 /**
  * Tickets, conversations and agent runs, stored in the audit SQLite DB.
  */
-import type { ChatMessage } from "@simrs/llm";
-import type { CreateTicketRequest, Ticket, TicketStatus } from "@simrs/shared";
+import type { ChatMessage } from "@simha/llm";
+import type { CreateTicketRequest, Ticket, TicketStatus } from "@simha/shared";
 import { Context, Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 
@@ -233,7 +233,7 @@ const make = Effect.gen(function* () {
   };
 });
 
-export class Store extends Context.Service<Store, Effect.Success<typeof make>>()("simrs/Store") {}
+export class Store extends Context.Service<Store, Effect.Success<typeof make>>()("simha/Store") {}
 
 /** Needs the audit DB's SqlClient (provided by AuditLogLive / AuditLogMemory). */
 export const StoreLive = Layer.effect(Store, make);

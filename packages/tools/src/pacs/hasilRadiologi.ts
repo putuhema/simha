@@ -11,8 +11,8 @@
  *
  * When PACS is not set up or not reachable, the readings are still shown.
  */
-import type { PacsStudy, RadiologyExam } from "@simrs/shared";
-import { RadiologyGallery } from "@simrs/shared";
+import type { PacsStudy, RadiologyExam } from "@simha/shared";
+import { RadiologyGallery } from "@simha/shared";
 import { Effect, Schema } from "effect";
 import { ToolError } from "../errors.ts";
 import { KhanzaRead } from "../khanza/KhanzaRead.ts";

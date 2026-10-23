@@ -8,7 +8,7 @@
  * draft card. The desktop app puts the draft into Khanza's own form; the user
  * saves it there. Nothing here writes to Khanza.
  */
-import { FORM_FIELDS, MAX_FIELD_TEXT, type FieldSource, type FormDraft } from "@simrs/shared";
+import { FORM_FIELDS, MAX_FIELD_TEXT, type FieldSource, type FormDraft } from "@simha/shared";
 import { Effect } from "effect";
 import { ToolError } from "../errors.ts";
 import { KhanzaRead } from "../khanza/KhanzaRead.ts";

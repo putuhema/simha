@@ -3,8 +3,8 @@
  * the message's `modelText`, so the stored/visible question stays plain while
  * the model replays the exact text (and the provider cache keeps its prefix).
  */
-import type { ChatMessage } from "@simrs/llm";
-import type { RelevantKnowledge } from "@simrs/tools";
+import type { ChatMessage } from "@simha/llm";
+import type { RelevantKnowledge } from "@simha/tools";
 
 /** Keep the injected block small; the model already has the schema and notes. */
 const MAX_KNOWLEDGE_CHARS = 1_600;

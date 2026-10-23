@@ -1,7 +1,10 @@
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { isLauncher } from "./khanza.ts";
 import { parseEnv } from "./server.ts";
-import { normalizeServerUrl } from "./settings.ts";
+import { migrateDataDir, normalizeServerUrl } from "./settings.ts";
 
 describe("desktop helpers", () => {
   it("reads .env files like the server does", () => {
@@ -39,6 +42,29 @@ describe("desktop helpers", () => {
     expect(isLauncher("C:\\SIMRS\\SIMRS-Khanza.BAT")).toBe(true);
     expect(isLauncher("C:\\SIMRS\\SIMRSKhanza.jar")).toBe(true);
     expect(isLauncher("C:\\SIMRS\\catatan.txt")).toBe(false);
+  });
+
+  it("moves the data folder from before the rename", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "simha-migrate-"));
+    const previous = path.join(root, "SIMRS Harness");
+    const next = path.join(root, "Simha");
+    mkdirSync(previous);
+    writeFileSync(path.join(previous, "settings.json"), '{"mode":"local"}');
+    migrateDataDir(next, previous);
+    expect(readFileSync(path.join(next, "settings.json"), "utf8")).toBe('{"mode":"local"}');
+    expect(existsSync(previous)).toBe(false);
+  });
+
+  it("never overwrites a data folder that already exists", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "simha-migrate-"));
+    const previous = path.join(root, "SIMRS Harness");
+    const next = path.join(root, "Simha");
+    mkdirSync(previous);
+    mkdirSync(next);
+    writeFileSync(path.join(next, "settings.json"), '{"mode":"remote"}');
+    migrateDataDir(next, previous);
+    expect(readFileSync(path.join(next, "settings.json"), "utf8")).toBe('{"mode":"remote"}');
+    expect(existsSync(previous)).toBe(true);
   });
 });
 

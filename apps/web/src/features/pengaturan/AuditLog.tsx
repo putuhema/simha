@@ -2,7 +2,7 @@
  * Audit log: questions (runs), tool calls, queries to Khanza, fix approvals
  * and logins, filterable by text and date.
  */
-import type { AuditKind, AuditPage } from "@simrs/shared";
+import type { AuditKind, AuditPage } from "@simha/shared";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { DataTable } from "../../components/blocks/DataTable.tsx";

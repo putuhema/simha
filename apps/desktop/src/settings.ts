@@ -1,9 +1,9 @@
 /**
  * Desktop settings, stored as JSON in the user's app data folder
- * (%APPDATA%\SIMRS Harness\settings.json on Windows).
+ * (%APPDATA%\Simha\settings.json on Windows).
  */
 import { app } from "electron";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -26,6 +26,19 @@ const DEFAULTS: DesktopSettings = { mode: null, serverUrl: "", port: 8787, khanz
 
 export const dataDir = () => app.getPath("userData");
 const file = () => path.join(dataDir(), "settings.json");
+
+/**
+ * Simha used to be called "SIMRS Harness": move the old data folder into
+ * `next` once, so settings, .env, the audit DB and logs survive the rename.
+ * Does nothing when `next` already exists, and never throws.
+ */
+export const migrateDataDir = (next: string, previous: string): void => {
+  try {
+    if (!existsSync(next) && existsSync(previous)) renameSync(previous, next);
+  } catch {
+    // A failed move only means the app starts empty; never block start-up.
+  }
+};
 
 export const loadSettings = (): DesktopSettings => {
   try {

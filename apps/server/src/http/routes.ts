@@ -1,6 +1,6 @@
 /**
  * HTTP API under /api, plus the web UI at every other path. Request bodies are
- * checked against the Schemas in @simrs/shared. Every route except health,
+ * checked against the Schemas in @simha/shared. Every route except health,
  * login and first-run setup needs a logged-in user (session cookie); the user
  * is who approves fixes, asks questions and creates tickets in the audit log.
  *
@@ -51,7 +51,7 @@
  *   POST   /api/settings/llm/test        try settings without saving (admin)
  *   GET    /api/audit                    audit log (?kind=runs|tools|queries|fixes|events&q=&from=&to=&limit=&offset=)
  */
-import { LlmClient } from "@simrs/llm";
+import { LlmClient } from "@simha/llm";
 import {
   AskRequest,
   AuditKind,
@@ -76,7 +76,7 @@ import {
   UpdateUserRequest,
   formProblems,
   type User,
-} from "@simrs/shared";
+} from "@simha/shared";
 import {
   dokumenPasien,
   FixStore,
@@ -92,7 +92,7 @@ import {
   ResultStore,
   runTool,
   type PacsError,
-} from "@simrs/tools";
+} from "@simha/tools";
 import { Effect, Layer, Option, Schema } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { Agent } from "../agent/Agent.ts";

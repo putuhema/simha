@@ -9,8 +9,8 @@
  * streaming behave the same for Claude, OpenAI-compatible servers and the
  * fake test adapter.
  */
-import { LlmClient, type ChatMessage, type LlmEvent, type ToolCall } from "@simrs/llm";
-import type { AgentEvent, DocumentInfo, FormDraft, RadiologyGallery, RenderBlock, Ticket } from "@simrs/shared";
+import { LlmClient, type ChatMessage, type LlmEvent, type ToolCall } from "@simha/llm";
+import type { AgentEvent, DocumentInfo, FormDraft, RadiologyGallery, RenderBlock, Ticket } from "@simha/shared";
 import {
   AuditLog,
   defaultRegistry,
@@ -26,7 +26,7 @@ import {
   AppDocs,
   SchemaDocs,
   type ToolRegistry,
-} from "@simrs/tools";
+} from "@simha/tools";
 import { Cause, Context, Effect, Exit, Layer, Queue, Stream } from "effect";
 import { Store } from "../store.ts";
 import { compactHistory, HISTORY_TOKEN_BUDGET } from "./history.ts";
@@ -345,6 +345,6 @@ const make = Effect.gen(function* () {
   return { run };
 });
 
-export class Agent extends Context.Service<Agent, Effect.Success<typeof make>>()("simrs/Agent") {}
+export class Agent extends Context.Service<Agent, Effect.Success<typeof make>>()("simha/Agent") {}
 
 export const AgentLive = Layer.effect(Agent, make);

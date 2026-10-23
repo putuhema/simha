@@ -1,6 +1,6 @@
 /**
- * The desktop app's bridge (window.simrsDesktop), present only when the UI
- * runs inside the SIMRS Harness desktop app. In a normal browser `desktop`
+ * The desktop app's bridge (window.simhaDesktop), present only when the UI
+ * runs inside the Simha desktop app. In a normal browser `desktop`
  * is null and desktop-only buttons are not shown.
  */
 
@@ -72,7 +72,7 @@ interface DesktopBridge {
 }
 
 export const desktop: DesktopBridge | null =
-  (globalThis as { readonly simrsDesktop?: DesktopBridge }).simrsDesktop ?? null;
+  (globalThis as { readonly simhaDesktop?: DesktopBridge }).simhaDesktop ?? null;
 
 const NO_RAWAT = /\b\d{4}\/\d{2}\/\d{2}\/\d{6}\b/;
 const NO_RM = /\bRM[:.\s]*(\d{4,10})\b/i;

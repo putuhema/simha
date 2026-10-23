@@ -14,7 +14,7 @@ export const ServerConfig = Config.all({
 
 /** HTTP behaviour that tests and the desktop app may change. */
 export const HttpConfig = Config.all({
-  /** Built web UI (`pnpm --filter @simrs/web build`), served at `/`. Relative to the repo root. */
+  /** Built web UI (`pnpm --filter @simha/web build`), served at `/`. Relative to the repo root. */
   webDir: Config.String("WEB_DIST_DIR").pipe(
     Config.withDefault("apps/web/dist"),
     Config.map((dir) => NodePath.resolve(repoRoot, dir)),
@@ -23,7 +23,7 @@ export const HttpConfig = Config.all({
   secureCookie: Config.Boolean("COOKIE_SECURE").pipe(Config.withDefault(false)),
 });
 export class HttpSettings extends Context.Service<HttpSettings, Config.Success<typeof HttpConfig>>()(
-  "simrs/HttpSettings",
+  "simha/HttpSettings",
 ) {}
 
 export const HttpSettingsLive = Layer.effect(

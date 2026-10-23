@@ -3,7 +3,7 @@
  * Kept in a store so an answer keeps streaming while the user looks at
  * another tab.
  */
-import type { Favorite, RenderBlock, Transcript } from "@simrs/shared";
+import type { Favorite, RenderBlock, Transcript } from "@simha/shared";
 import { create } from "zustand";
 import { api, errorMessage } from "../lib/api.ts";
 import { emptyRun, fromTranscript, streamRun, type RunView } from "../lib/run.ts";

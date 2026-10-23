@@ -12,7 +12,7 @@ const listen = <A extends Array<unknown>>(channel: string, callback: (...args: A
   return () => void ipcRenderer.removeListener(channel, handler);
 };
 
-contextBridge.exposeInMainWorld("simrsTerminal", {
+contextBridge.exposeInMainWorld("simhaTerminal", {
   create: (kind: Kind, cols: number, rows: number): Promise<{ id: number; title: string }> =>
     ipcRenderer.invoke("terminal:create", kind, cols, rows),
   write: (id: number, data: string) => ipcRenderer.send("terminal:write", id, data),

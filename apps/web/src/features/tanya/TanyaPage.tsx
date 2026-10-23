@@ -4,7 +4,7 @@
  * SQL). Threads and favorites live in the sidebar.
  */
 import { Collapsible } from "@base-ui/react/collapsible";
-import type { FormDraft } from "@simrs/shared";
+import type { FormDraft } from "@simha/shared";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { Check, ChevronRight, Copy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";

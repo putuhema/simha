@@ -6,7 +6,7 @@
  * filled with the draft; the user saves it there.
  */
 import { Collapsible } from "@base-ui/react/collapsible";
-import { FORM_FIELDS, FORM_TITLES, fieldProblem, type FieldSource, type FormDraft, type FormField } from "@simrs/shared";
+import { FORM_FIELDS, FORM_TITLES, fieldProblem, type FieldSource, type FormDraft, type FormField } from "@simha/shared";
 import { AppWindow, ChevronRight, FilePenLine } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, errorMessage } from "../../lib/api.ts";
@@ -229,7 +229,7 @@ export const DraftCard = ({ draft: initial }: { readonly draft: FormDraft }) => 
             <AppWindow className="size-4" /> Isi di Khanza
           </button>
         ) : (
-          <p className="text-[12.5px] text-ink-3">Buka percakapan ini di aplikasi desktop SIMRS Harness untuk mengisi form ini di Khanza.</p>
+          <p className="text-[12.5px] text-ink-3">Buka percakapan ini di aplikasi desktop Simha untuk mengisi form ini di Khanza.</p>
         )}
         <p className="text-[12px] text-ink-3">Tidak tersimpan otomatis ke Khanza: periksa form di Khanza, lalu klik Simpan di sana.</p>
         {saveError ? <p className="w-full text-[12.5px] text-red">{saveError}</p> : null}

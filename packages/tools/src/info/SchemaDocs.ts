@@ -61,7 +61,7 @@ const parseNotes = (markdown: string): ReadonlyArray<string> =>
     .map((l) => l.trim())
     .filter((l) => l !== "" && !/\bTODO\b/.test(l));
 
-export class SchemaDocs extends Context.Service<SchemaDocs, SchemaDocsService>()("simrs/SchemaDocs") {}
+export class SchemaDocs extends Context.Service<SchemaDocs, SchemaDocsService>()("simha/SchemaDocs") {}
 
 /** Docs from text (tests). */
 export const schemaDocsLayer = (texts: { readonly schema: string; readonly notes: string }) =>

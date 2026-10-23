@@ -4,8 +4,8 @@
  * moderate, and the next question carries the matching knowledge into the AI
  * turn (as modelText, so the visible question stays clean).
  */
-import { fakeTurn, type ChatRequest } from "@simrs/llm";
-import type { AgentEvent, Knowledge } from "@simrs/shared";
+import { fakeTurn, type ChatRequest } from "@simha/llm";
+import type { AgentEvent, Knowledge } from "@simha/shared";
 import { describe, expect, it } from "vitest";
 import { knowledgePrompt, userTurn } from "../src/agent/knowledge.ts";
 import { makeTestApp, readEvents, testDb } from "./harness.ts";

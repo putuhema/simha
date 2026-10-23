@@ -26,8 +26,8 @@ import {
   runTool,
   SchemaDocsLive,
   ToolInputError,
-} from "@simrs/tools";
-import type { AppDocs, KhanzaRead, Pacs, ResultStore, SchemaDocs, Tool } from "@simrs/tools";
+} from "@simha/tools";
+import type { AppDocs, KhanzaRead, Pacs, ResultStore, SchemaDocs, Tool } from "@simha/tools";
 import { Console, Effect, Layer } from "effect";
 
 type AnyReadTool = Tool<unknown, unknown, KhanzaRead | ResultStore | SchemaDocs | AppDocs | Pacs>;

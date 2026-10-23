@@ -67,7 +67,7 @@ Daftar lengkap hak → menu ada di [index.json](index.json) (`rights`), dan hak 
 6. **Bukan masalah hak**: tiga tombol INACBG (`btnInaCBGKlaimBaruOtomatis/Manual/Manual2`) membuka
    panel web PHP, bukan form desktop; `btnfee_rujukan_ranap` handler-nya masih `// TODO`.
 
-## Catatan untuk harness
+## Catatan untuk Simha
 
 Agent tidak boleh mengubah hak sendiri. Kalau perbaikan data menyentuh menu/hak, jawab dengan menu
 yang harus dibuka IT (mis. **T/Set User**) dan jelaskan kolom yang perlu di-set — jangan menulis

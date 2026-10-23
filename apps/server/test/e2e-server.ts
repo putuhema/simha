@@ -18,9 +18,9 @@
  * PACS is a fake Orthanc with one synthetic chest X-ray study for RM 000002.
  */
 import { NodeFileSystem, NodeHttpServer, NodeRuntime } from "@effect/platform-node";
-import { fakeTurn, makeFakeClient, type ChatRequest, type FakeTurn } from "@simrs/llm";
-import { AppDocsLive, AuditLogMemory, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, pacsLayer, KnowledgeStoreLive, ResultStoreLive, SchemaDocsLive } from "@simrs/tools";
-import { startTestDb } from "@simrs/tools/testing/db";
+import { fakeTurn, makeFakeClient, type ChatRequest, type FakeTurn } from "@simha/llm";
+import { AppDocsLive, AuditLogMemory, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, pacsLayer, KnowledgeStoreLive, ResultStoreLive, SchemaDocsLive } from "@simha/tools";
+import { startTestDb } from "@simha/tools/testing/db";
 import { Duration, Effect, Layer, Redacted } from "effect";
 import { HttpRouter } from "effect/http";
 import { createServer } from "node:http";

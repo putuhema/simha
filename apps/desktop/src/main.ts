@@ -1,5 +1,5 @@
 /**
- * SIMRS Harness desktop app (Electron).
+ * Simha desktop app (Electron).
  *
  * One window with two views:
  * - the app view: the harness web UI, from a server on the hospital network
@@ -8,7 +8,7 @@
  * - the terminal panel (Ctrl+`), a page built into the app that runs real
  *   shells on this PC.
  *
- * The web UI gets a small bridge (window.simrsDesktop): Buka di Khanza,
+ * The web UI gets a small bridge (window.simhaDesktop): Buka di Khanza,
  * open the terminal panel. It can never type into a shell; only the terminal
  * panel page can.
  */
@@ -26,18 +26,26 @@ import {
   type WebContents,
 } from "electron";
 import path from "node:path";
-import { FORM_FIELDS, formProblems } from "@simrs/shared/forms";
+import { FORM_FIELDS, formProblems } from "@simha/shared/forms";
 import { fillKhanza, isLauncher, openKhanza, type KhanzaExit } from "./khanza.ts";
 import { parseTarget, pingBridge } from "./khanza-bridge.ts";
 import { createTerminal, killAllTerminals, killTerminal, resizeTerminal, startFolder, writeTerminal, type TerminalKind } from "./pty.ts";
 import { checkServer, ensureEnvFile, serverLogTail, startLocalServer, stopLocalServer } from "./server.ts";
-import { dataDir, loadSettings, normalizeServerUrl, saveSettings, type DesktopSettings } from "./settings.ts";
+import { dataDir, loadSettings, migrateDataDir, normalizeServerUrl, saveSettings, type DesktopSettings } from "./settings.ts";
 
-// Before "ready": decides the app data folder (%APPDATA%\SIMRS Harness).
-app.setName("SIMRS Harness");
+// Before "ready": decides the app data folder (%APPDATA%\Simha).
+app.setName("Simha");
 // Tests and trials can use a separate data folder (settings, .env, audit DB).
-if (process.env["SIMRS_DESKTOP_DATA_DIR"]) app.setPath("userData", process.env["SIMRS_DESKTOP_DATA_DIR"]);
-if (process.platform === "win32") app.setAppUserModelId("id.simrs.harness");
+const dataDirOverride = process.env["SIMHA_DESKTOP_DATA_DIR"] ?? process.env["SIMRS_DESKTOP_DATA_DIR"];
+if (dataDirOverride) {
+  app.setPath("userData", dataDirOverride);
+} else {
+  const next = path.join(app.getPath("appData"), "Simha");
+  app.setPath("userData", next);
+  // Simha used to be called "SIMRS Harness": keep the old data on first start.
+  migrateDataDir(next, path.join(app.getPath("appData"), "SIMRS Harness"));
+}
+if (process.platform === "win32") app.setAppUserModelId("id.simha.app");
 
 let win: BaseWindow | null = null;
 let appView: WebContentsView | null = null;
@@ -190,7 +198,7 @@ const createWindow = () => {
     height: 920,
     minWidth: 960,
     minHeight: 620,
-    title: "SIMRS Harness",
+    title: "Simha",
     backgroundColor: "#fffdf8",
     autoHideMenuBar: process.platform !== "darwin",
     // macOS: no title bar; the window buttons sit in the sidebar's top corner
@@ -226,7 +234,7 @@ const createWindow = () => {
   void connect();
 };
 
-// --- Bridge for the web UI and the setup page (window.simrsDesktop) ----------------------------
+// --- Bridge for the web UI and the setup page (window.simhaDesktop) ----------------------------
 
 const fromAppView = (event: IpcMainInvokeEvent | IpcMainEvent) => appView !== null && event.sender === appView.webContents;
 const fromSetup = (event: IpcMainInvokeEvent) => fromAppView(event) && isSetupUrl(event.senderFrame?.url ?? "");

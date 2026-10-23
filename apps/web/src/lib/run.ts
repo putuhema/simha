@@ -3,7 +3,7 @@
  * agent events. Also converts a stored run (transcript) to the same shape, so
  * live and reloaded answers render with the same components.
  */
-import type { AgentEvent, DocumentInfo, FormDraft, RadiologyGallery, RenderBlock, RunTranscript } from "@simrs/shared";
+import type { AgentEvent, DocumentInfo, FormDraft, RadiologyGallery, RenderBlock, RunTranscript } from "@simha/shared";
 import { request } from "./api.ts";
 import { readEventStream } from "./sse.ts";
 import type { StepView } from "./steps.ts";

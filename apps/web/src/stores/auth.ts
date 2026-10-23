@@ -2,7 +2,7 @@
  * Who is logged in. The session is an HttpOnly cookie; this store only knows
  * the user and whether the first admin still has to be created.
  */
-import type { AuthState, User } from "@simrs/shared";
+import type { AuthState, User } from "@simha/shared";
 import { create } from "zustand";
 import { api, ApiError, errorMessage, setUnauthorizedHandler } from "../lib/api.ts";
 

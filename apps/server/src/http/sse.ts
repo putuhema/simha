@@ -1,4 +1,4 @@
-import type { AgentEvent } from "@simrs/shared";
+import type { AgentEvent } from "@simha/shared";
 import { Stream } from "effect";
 import { HttpServerResponse } from "effect/http";
 

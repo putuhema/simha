@@ -1,8 +1,8 @@
 /**
  * Patient documents over HTTP and through the agent.
  */
-import { fakeTurn } from "@simrs/llm";
-import type { AuditPage, DocumentInfo, Transcript } from "@simrs/shared";
+import { fakeTurn } from "@simha/llm";
+import type { AuditPage, DocumentInfo, Transcript } from "@simha/shared";
 import { describe, expect, it } from "vitest";
 import { makeTestApp, readEvents, testDb } from "./harness.ts";
 

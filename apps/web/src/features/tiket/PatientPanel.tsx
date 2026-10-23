@@ -3,7 +3,7 @@
  * DPJP), document and radiology buttons, the visit timeline, and the AI's
  * diagnosis in one paragraph.
  */
-import type { DocumentInfo, DocumentKind } from "@simrs/shared";
+import type { DocumentInfo, DocumentKind } from "@simha/shared";
 import { BedDouble, FileText, Stethoscope, UserRound } from "lucide-react";
 import { useState } from "react";
 import { Markdown } from "../../components/agent/Markdown.tsx";

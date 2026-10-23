@@ -3,7 +3,7 @@
  * patient data is masked. Only admins can save; the API key is never shown.
  */
 import { Switch } from "@base-ui/react/switch";
-import type { LlmSettingsView, LlmTestResult } from "@simrs/shared";
+import type { LlmSettingsView, LlmTestResult } from "@simha/shared";
 import { CheckCircle2, PlugZap, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../../components/ui/Button.tsx";

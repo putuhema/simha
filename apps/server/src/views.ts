@@ -19,8 +19,8 @@ import type {
   Stats,
   ToolStep,
   Transcript,
-} from "@simrs/shared";
-import { KhanzaRead, toDocumentInfo, type DocumentRow } from "@simrs/tools";
+} from "@simha/shared";
+import { KhanzaRead, toDocumentInfo, type DocumentRow } from "@simha/tools";
 import { Context, Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 
@@ -314,7 +314,7 @@ const make = Effect.gen(function* () {
   return { stats, conversation, ticketTranscript, conversations, audit };
 });
 
-export class Views extends Context.Service<Views, Effect.Success<typeof make>>()("simrs/Views") {}
+export class Views extends Context.Service<Views, Effect.Success<typeof make>>()("simha/Views") {}
 
 /** Needs the audit DB's SqlClient and KhanzaRead. */
 export const ViewsLive = Layer.effect(Views, make);

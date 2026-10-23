@@ -2,7 +2,7 @@
  * M5 server features: login and roles, AI settings, transcripts, stats,
  * audit log, patient card, editing a fix, and serving the web UI.
  */
-import { fakeTurn } from "@simrs/llm";
+import { fakeTurn } from "@simha/llm";
 import type {
   AuditPage,
   AuthState,
@@ -13,7 +13,7 @@ import type {
   Stats,
   Transcript,
   User,
-} from "@simrs/shared";
+} from "@simha/shared";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as NodePath from "node:path";
@@ -30,7 +30,7 @@ describe.skipIf(testDb === null)("login", () => {
       const setup = await app.raw("POST", "/api/auth/setup", { username: "kepala-it", displayName: "Kepala IT", password: "panjang-sekali" });
       expect(setup.status).toBe(200);
       const cookie = setup.headers.get("set-cookie") ?? "";
-      expect(cookie).toMatch(/simrs_session=/);
+      expect(cookie).toMatch(/simha_session=/);
       expect(cookie).toMatch(/HttpOnly/i);
       expect(cookie).toMatch(/SameSite=Strict/i);
       expect((await setup.json()) as User).toMatchObject({ username: "kepala-it", role: "admin" });
@@ -106,7 +106,7 @@ describe.skipIf(testDb === null)("login", () => {
 
       const logout = await app.call("POST", "/auth/logout");
       expect(logout.status).toBe(204);
-      expect(logout.headers.get("set-cookie")).toMatch(/simrs_session=;|Max-Age=0|Expires=/i);
+      expect(logout.headers.get("set-cookie")).toMatch(/simha_session=;|Max-Age=0|Expires=/i);
       expect((await app.call("GET", "/tickets")).status).toBe(401);
     } finally {
       await app.dispose();

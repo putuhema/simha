@@ -14,7 +14,7 @@ export interface TestDbInfo {
 }
 
 /** Fixed name so the setup can never drop a real Khanza database. */
-export const TEST_DB_NAME = "simrs_harness_test";
+export const TEST_DB_NAME = "simha_test";
 
 /** Admin for test fixtures: all privileges, but only on the test database. */
 export const TEST_ADMIN = { user: "harness_test_admin", password: "test-admin-pass" } as const;

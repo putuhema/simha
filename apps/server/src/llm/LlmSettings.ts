@@ -18,8 +18,8 @@ import {
   makeLlmClient,
   type LlmClientService,
   type LlmSettings as Settings,
-} from "@simrs/llm";
-import type { LlmSettingsView, LlmTestResult, UpdateLlmSettingsRequest, User } from "@simrs/shared";
+} from "@simha/llm";
+import type { LlmSettingsView, LlmTestResult, UpdateLlmSettingsRequest, User } from "@simha/shared";
 import { Context, Duration, Effect, Layer, Redacted, Stream } from "effect";
 import { SqlClient } from "effect/sql";
 
@@ -155,7 +155,7 @@ const make = (options: LlmSettingsOptions) =>
   });
 
 export class LlmSettingsService extends Context.Service<LlmSettingsService, Effect.Success<ReturnType<typeof make>>>()(
-  "simrs/LlmSettings",
+  "simha/LlmSettings",
 ) {}
 
 /** LlmSettingsService plus LlmClient (the proxy). Needs the audit DB's SqlClient. */

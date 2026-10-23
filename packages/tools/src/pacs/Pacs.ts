@@ -4,7 +4,7 @@
  * own Orthanc form uses). The address and login stay on the server: the
  * browser only sees our /api/pacs routes, which stream images through.
  */
-import type { PacsSeries, PacsStudy } from "@simrs/shared";
+import type { PacsSeries, PacsStudy } from "@simha/shared";
 import { Config, Context, Effect, Layer, Redacted, Schema } from "effect";
 
 const PacsConfig = Config.all({
@@ -49,7 +49,7 @@ export interface PacsService {
   readonly image: (instanceId: string, kind: ImageKind) => Effect.Effect<Response, PacsError>;
 }
 
-export class Pacs extends Context.Service<Pacs, PacsService>()("simrs/Pacs") {}
+export class Pacs extends Context.Service<Pacs, PacsService>()("simha/Pacs") {}
 
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 

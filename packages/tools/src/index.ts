@@ -1,5 +1,5 @@
 /**
- * @simrs/tools: provider-neutral tools, Khanza database access and the audit log.
+ * @simha/tools: provider-neutral tools, Khanza database access and the audit log.
  */
 export { AppDocs, AppDocsLive, appDocsLayer, loadAppDocs, parseAppIndex, parseFlowDoc, parseSynonyms } from "./app/AppDocs.ts";
 export type { AppDocsService, AppFlow, AppFlowStep, AppForm, AppMenu, AppRight, AppSynonym } from "./app/AppDocs.ts";

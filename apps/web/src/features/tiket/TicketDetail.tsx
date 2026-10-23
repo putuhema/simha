@@ -3,7 +3,7 @@
  * the diagnosis, "Saran perbaikan" with the proposed fixes, and a box for
  * follow-up questions.
  */
-import type { Fix, Ticket } from "@simrs/shared";
+import type { Fix, Ticket } from "@simha/shared";
 import { CheckCircle2, CircleSlash, RotateCw, SendHorizontal, Square } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { Markdown } from "../../components/agent/Markdown.tsx";

@@ -1,5 +1,5 @@
 /** The four numbers at the top of Tiket: today's registrations, inpatients, open tickets, fixes waiting. */
-import type { Stats } from "@simrs/shared";
+import type { Stats } from "@simha/shared";
 import { BedDouble, ClipboardList, Ticket, Wrench } from "lucide-react";
 import { useEffect, type ReactNode } from "react";
 import { cn } from "../../lib/cn.ts";

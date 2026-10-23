@@ -10,7 +10,7 @@
  * `relevant` picks the items that match a new question; the agent adds them to
  * the question it sends to the AI. Nothing here is ever used to change Khanza.
  */
-import type { Knowledge, KnowledgeKind, KnowledgeSource, RenderType } from "@simrs/shared";
+import type { Knowledge, KnowledgeKind, KnowledgeSource, RenderType } from "@simha/shared";
 import { Context, Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 import { rank, type Match } from "./search.ts";
@@ -199,7 +199,7 @@ const make = Effect.gen(function* () {
   return { add, get, list, update, remove, forBlock, forRun, deactivateForBlock, hasExample, relevant };
 });
 
-export class KnowledgeStore extends Context.Service<KnowledgeStore, Effect.Success<typeof make>>()("simrs/KnowledgeStore") {}
+export class KnowledgeStore extends Context.Service<KnowledgeStore, Effect.Success<typeof make>>()("simha/KnowledgeStore") {}
 
 /** Needs the audit DB's SqlClient (provided by AuditLogLive / AuditLogMemory). */
 export const KnowledgeStoreLive = Layer.effect(KnowledgeStore, make);

@@ -3,10 +3,10 @@
  * fake AI provider, the throwaway Khanza test DB and an in-memory audit DB.
  */
 import { NodeFileSystem } from "@effect/platform-node";
-import { makeFakeClient, type FakeTurn, type LlmInfo } from "@simrs/llm";
-import type { AgentEvent } from "@simrs/shared";
-import { appDocsLayer, AuditLogMemory, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, pacsLayer, KnowledgeStoreLive, ResultStoreLive, schemaDocsLayer, type Pacs } from "@simrs/tools";
-import { connectionAs, testDb } from "@simrs/tools/testing";
+import { makeFakeClient, type FakeTurn, type LlmInfo } from "@simha/llm";
+import type { AgentEvent } from "@simha/shared";
+import { appDocsLayer, AuditLogMemory, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, pacsLayer, KnowledgeStoreLive, ResultStoreLive, schemaDocsLayer, type Pacs } from "@simha/tools";
+import { connectionAs, testDb } from "@simha/tools/testing";
 import { Duration, Effect, Layer, ManagedRuntime, Redacted } from "effect";
 import { SqlClient } from "effect/sql";
 import { HttpRouter } from "effect/http";
@@ -42,9 +42,9 @@ const TEST_DOCS = {
 /** The session cookie from a login or setup response. */
 const cookieOf = (response: Response) => {
   const header = response.headers.get("set-cookie") ?? "";
-  const value = /simrs_session=([^;]+)/.exec(header)?.[1];
+  const value = /simha_session=([^;]+)/.exec(header)?.[1];
   if (!value) throw new Error(`no session cookie (${response.status})`);
-  return `simrs_session=${value}`;
+  return `simha_session=${value}`;
 };
 
 const DEFAULT_USER = "it-budi";

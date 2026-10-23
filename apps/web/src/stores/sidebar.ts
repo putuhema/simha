@@ -4,7 +4,7 @@
  */
 import { create } from "zustand";
 
-const KEY = "simrs.sidebar";
+const KEY = "simha.sidebar";
 
 const saved = (): boolean => {
   try {

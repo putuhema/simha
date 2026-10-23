@@ -1,4 +1,4 @@
-import type { AgentEvent, RenderBlock } from "@simrs/shared";
+import type { AgentEvent, RenderBlock } from "@simha/shared";
 import { describe, expect, it } from "vitest";
 import { chartOption } from "../components/blocks/chart-options.ts";
 import { rmFromSteps, rmFromText, splitAnswer } from "./answer.ts";

@@ -1,4 +1,4 @@
-import type { ChatMessage } from "@simrs/llm";
+import type { ChatMessage } from "@simha/llm";
 import { describe, expect, it } from "vitest";
 import { compactHistory, estimateTokens, HISTORY_TOKEN_BUDGET } from "../src/agent/history.ts";
 

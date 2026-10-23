@@ -1,17 +1,17 @@
-# SIMRS Harness
+# Simha
 
-AI assistant for hospital IT staff working with **SIMRS Khanza**.
+**Simha** (*simha* = lion, from SIMRS + harness) is an AI assistant for hospital IT staff working with **SIMRS Khanza**. It reads, explains and proposes — it never changes data on its own.
 
 - **Tiket mode:** paste a nurse's complaint. The agent reads the real patient data through safe, read-only tools, explains each check, gives a diagnosis and proposes a fix as SQL. The fix only runs after a person clicks **Approve**, and it can be rolled back.
 - **Tanya Data mode:** ask questions about hospital data in plain Indonesian ("10 obat paling banyak dipakai minggu ini"). The agent writes a guarded `SELECT` and shows the answer as a table, chart or number.
 
-> Status: **M6.6 done**: web UI (Tiket, Tanya Data, Pengetahuan AI, Pengaturan), desktop app with Khanza bridge, resume drafts, app map and AI learning (examples, notes, feedback). See [docs/PLAN.md](docs/PLAN.md).
+> Status: **M6.6 done**: web UI (Tiket, Tanya Data, Pengetahuan AI, Pengaturan), desktop app with Khanza bridge, resume drafts, app map and AI learning (examples, notes, feedback). See [docs/PLAN.md](docs/PLAN.md). Name, tagline and identifiers: [docs/BRAND.md](docs/BRAND.md).
 
 ## Safety model (short version)
 
 | Rule | How |
 |---|---|
-| Read-only by default | Agent tools use a MySQL user with `SELECT` only. The harness checks `SHOW GRANTS` at startup and refuses to run if that user can change data. |
+| Read-only by default | Agent tools use a MySQL user with `SELECT` only. Simha checks `SHOW GRANTS` at startup and refuses to run if that user can change data. |
 | Writes need approval | The AI can only *propose* a fix. After Approve, the server runs it with a separate write user, in a transaction, and rolls back if the affected row count differs from the preview. |
 | Every fix can be undone | The affected rows are saved (before-image) before the change runs. |
 | Audit everything | Questions, tool calls, queries, fixes, approvals, rollbacks and the AI model used are logged in a separate SQLite DB, never in Khanza. |
@@ -33,7 +33,7 @@ cp .env.example .env     # then fill in the values
 
 ### 1. Create the two database users
 
-Run this as a MySQL/MariaDB admin. Replace `sik` with your Khanza database name, and `'10.0.0.%'` with the IP (or range) of the machine that runs the harness server. Use strong passwords.
+Run this as a MySQL/MariaDB admin. Replace `sik` with your Khanza database name, and `'10.0.0.%'` with the IP (or range) of the machine that runs the Simha server. Use strong passwords.
 
 ```sql
 -- Read user: SELECT only. Used by every agent tool, Tanya Data and inspect-schema.
@@ -60,15 +60,15 @@ Notes:
 - These grants are a second safety wall behind that allow-list. Trim both to what you actually need.
 - Every table in the write grants must exist. If one is missing in your schema, remove that line.
 - Check what a user can do with `SHOW GRANTS FOR 'harness_write'@'10.0.0.%';`
-- The harness checks both users at startup: it refuses a read user with any write privilege (including `root`), and a write user with privileges `ON *.*`, `PROXY` or `WITH GRANT OPTION`.
-- Optional on MariaDB, as an extra limit on top of the harness's own 10 s query timeout: `ALTER USER 'harness_read'@'10.0.0.%' WITH MAX_STATEMENT_TIME 30;`
+- Simha checks both users at startup: it refuses a read user with any write privilege (including `root`), and a write user with privileges `ON *.*`, `PROXY` or `WITH GRANT OPTION`.
+- Optional on MariaDB, as an extra limit on top of Simha's own 10 s query timeout: `ALTER USER 'harness_read'@'10.0.0.%' WITH MAX_STATEMENT_TIME 30;`
 
 ### 2. Dump the live schema
 
-Our Khanza schema has local changes, so the harness reads the real schema instead of assuming standard columns.
+Our Khanza schema has local changes, so Simha reads the real schema instead of assuming standard columns.
 
 ```bash
-pnpm inspect-schema                 # tables the harness uses -> docs/schema.md
+pnpm inspect-schema                 # tables Simha uses -> docs/schema.md
 pnpm inspect-schema --all           # also list every table in the database
 pnpm inspect-schema --tables a,b    # also document extra tables in full
 ```
@@ -148,7 +148,7 @@ Open http://127.0.0.1:8787. The first visit asks for the **first admin account**
   - **Riwayat** shows all visits (latest 20) with diagnoses (ICD-10), rooms, tindakan and drugs.
   - **CPPT** shows the SOAP notes from `pemeriksaan_ralan` / `pemeriksaan_ranap`, each with the doctor or nurse who wrote it and the vital signs, plus diagnoses, allergies, lab (abnormal values in red) and radiology.
   - **Resume** shows the resume medis written in Khanza, or a clearly marked draft built from the CPPT, with the empty fields left for the doctor.
-- **Radiology images (PACS).** When `ORTHANC_URL` (plus `ORTHANC_USER` / `ORTHANC_PASS`) is set in `.env`, the patient card gets a **Radiologi** button. It lists the patient's studies from Orthanc (matched by No. RM = DICOM PatientID, newest first, max 50) with a thumbnail per series. Click one to open the full-screen viewer (← → to flick through, Esc to close), download the DICOM file, or open the study in Orthanc's Stone Web Viewer (that link goes to Orthanc directly, so it works only on the hospital network). Images go through the harness server, so the browser never sees Orthanc's address or login. Opening a patient's images and DICOM downloads are written to the audit log (`radiology_viewed`, `dicom_downloaded`).
+- **Radiology images (PACS).** When `ORTHANC_URL` (plus `ORTHANC_USER` / `ORTHANC_PASS`) is set in `.env`, the patient card gets a **Radiologi** button. It lists the patient's studies from Orthanc (matched by No. RM = DICOM PatientID, newest first, max 50) with a thumbnail per series. Click one to open the full-screen viewer (← → to flick through, Esc to close), download the DICOM file, or open the study in Orthanc's Stone Web Viewer (that link goes to Orthanc directly, so it works only on the hospital network). Images go through the Simha server, so the browser never sees Orthanc's address or login. Opening a patient's images and DICOM downloads are written to the audit log (`radiology_viewed`, `dicom_downloaded`).
   You can also ask the AI, e.g. *"hasil radiologi 2026/10/22/000012"* or *"foto thorax RM 037423"*. The `hasilRadiologi` tool shows one card per question: each exam from Khanza (`periksa_radiologi`, name, radiologist) with its reading (`hasil_radiologi`, the *Kesan* highlighted) and the PACS images of that exam (same day or the next, closest in time). For a visit, images are looked up from registration until discharge plus a day. When PACS is not set up, the readings are still shown. The AI does not repeat the card in its answer unless you ask for a summary, and it never sees or interprets the images. Try it from the terminal with `pnpm tool hasilRadiologi '{"noRawat":"2026/10/22/000012"}'`.
 
   The HTML is filled from a fixed template by the server, never written by the AI, and every value is escaped. It is served with a CSP that allows no scripts. Generated documents are kept in the audit DB, and downloads are logged.
@@ -203,13 +203,13 @@ What the server checks:
 **Build the installer** (on any OS; the result is unsigned, so Windows SmartScreen asks once):
 
 ```bash
-pnpm --filter @simrs/desktop dist:win    # apps/desktop/release/SIMRS-Harness-Setup-<version>.exe
+pnpm --filter @simha/desktop dist:win    # apps/desktop/release/Simha-Setup-<version>.exe
 ```
 
 **First start.** The app asks which server to use:
 
 - **Server di jaringan RS** (recommended): enter the address of the server from step 4, e.g. `http://10.0.0.5:8787`. Run that server with `SERVER_HOST=0.0.0.0` so other PCs can reach it. All IT PCs then share one audit log.
-- **Jalankan server di komputer ini**: the app runs the server itself with its built-in Node, so the PC needs no Node.js. Its settings are in `%APPDATA%\SIMRS Harness\.env` (created from `.env.example` on first start; **Buka file .env** opens the folder). The audit DB is `%APPDATA%\SIMRS Harness\data\audit.sqlite` and the server log is `logs\server.log` next to it. If the server does not start, the reason is shown on the setup page.
+- **Jalankan server di komputer ini**: the app runs the server itself with its built-in Node, so the PC needs no Node.js. Its settings are in `%APPDATA%\Simha\.env` (created from `.env.example` on first start; **Buka file .env** opens the folder). The audit DB is `%APPDATA%\Simha\data\audit.sqlite` and the server log is `logs\server.log` next to it. If the server does not start, the reason is shown on the setup page.
 
 Change it later from the menu **Aplikasi → Pengaturan koneksi** or **Pengaturan → Desktop**.
 
@@ -221,7 +221,7 @@ Change it later from the menu **Aplikasi → Pengaturan koneksi** or **Pengatura
 
 **Open a form directly (Khanza bridge).** With a Khanza build that includes `HarnessBridge` (see below), the button opens the form itself in the running Khanza: **Resume medis**, **CPPT / SOAP** (ranap or ralan, picked from the visit) or **Riwayat perawatan**. Documents open their own form (a resume opens the resume); the arrow next to the button lists the others. If Khanza is not open yet, it is started and the form opens after you log in. Khanza checks the logged-in user's own access rights, so the button never opens more than the Khanza menu would. **Pengaturan → Desktop** shows whether the bridge is active and which Khanza user is logged in.
 
-**Resume medis with the AI ("Isi di Khanza").** Ask in Tanya Data, e.g. *"buat resume untuk 2026/10/22/000021"*. The AI calls `buatDraftResume`: the server fills a draft of Khanza's *Resume Pasien Ranap* from Khanza data (diagnoses and procedures by priority, first CPPT entry, vital signs, lab, radiology, tindakan, medicines, discharge status), or starts from the resume already in Khanza, and shows it as an editable card. The AI then asks for what the data cannot answer (jalannya penyakit, keadaan pulang, kontrol, edukasi…) and stores your answers in the same card (`isiDraft`); you can also edit any field in the card. Every value is checked against Khanza's own limits and choices. **Isi di Khanza** (desktop app) opens Khanza's resume form for that visit with everything filled in; check it and click **Simpan** (or **Ganti** when a resume already exists: its row is selected for you). The harness never saves the resume itself, so Khanza's own rules apply (e.g. only a doctor login may save). Clinical text taken from Khanza is shown in the card but is not sent to an external AI provider (masked by field name); your answers in the chat are.
+**Resume medis with the AI ("Isi di Khanza").** Ask in Tanya Data, e.g. *"buat resume untuk 2026/10/22/000021"*. The AI calls `buatDraftResume`: the server fills a draft of Khanza's *Resume Pasien Ranap* from Khanza data (diagnoses and procedures by priority, first CPPT entry, vital signs, lab, radiology, tindakan, medicines, discharge status), or starts from the resume already in Khanza, and shows it as an editable card. The AI then asks for what the data cannot answer (jalannya penyakit, keadaan pulang, kontrol, edukasi…) and stores your answers in the same card (`isiDraft`); you can also edit any field in the card. Every value is checked against Khanza's own limits and choices. **Isi di Khanza** (desktop app) opens Khanza's resume form for that visit with everything filled in; check it and click **Simpan** (or **Ganti** when a resume already exists: its row is selected for you). Simha never saves the resume itself, so Khanza's own rules apply (e.g. only a doctor login may save). Clinical text taken from Khanza is shown in the card but is not sent to an external AI provider (masked by field name); your answers in the chat are.
 
 Under an answer, **Buka di Khanza** appears only when the answer is about a form Khanza has (resume, CPPT/SOAP, riwayat) and names the visit or patient.
 
@@ -231,15 +231,15 @@ Under an answer, **Buka di Khanza** appears only when the answer is about a form
 node integrations/khanza-bridge/apply.mjs ~/Work/simrsmt   # adds HarnessBridge.java + 2 lines in frmUtama.java
 ```
 
-Then build Khanza as usual (NetBeans: **Clean and Build**) and copy `dist/SIMRSKhanza.jar` to the PCs. Run the script again after every Khanza update: it only adds what is missing. How it works: after a login, Khanza listens on `127.0.0.1` (a free port) and writes the port and a random token to `~/.simrs-harness/khanza-bridge.properties` (readable only by that Windows/macOS user, removed at logout). Only the forms above can be opened, only with a no. rawat / no. RM; nothing is written to the database.
+Then build Khanza as usual (NetBeans: **Clean and Build**) and copy `dist/SIMRSKhanza.jar` to the PCs. Run the script again after every Khanza update: it only adds what is missing. How it works: after a login, Khanza listens on `127.0.0.1` (a free port) and writes the port and a random token to `~/.simha/khanza-bridge.properties` (readable only by that Windows/macOS user, removed at logout). A bridge patched before the rename still writes `~/.simrs-harness/…`; the desktop app reads both, and a newly patched bridge writes both so an older desktop app keeps working. Only the forms above can be opened, only with a no. rawat / no. RM; nothing is written to the database.
 
-Khanza runs on its own (it keeps running when SIMRS Harness quits). Everything it prints is saved to `logs/khanza.log` in the app data folder. If it stops within 15 seconds of a start, a banner says so, with **Lihat output**.
+Khanza runs on its own (it keeps running when Simha quits). Everything it prints is saved to `logs/khanza.log` in the app data folder. If it stops within 15 seconds of a start, a banner says so, with **Lihat output**.
 
-**Terminal** (Ctrl+`, or **Aplikasi → Terminal** in the desktop menu). A panel at the bottom with tabs of real shells on that PC: PowerShell on Windows, your login shell (zsh) on macOS, with the same PATH and Java as a normal terminal. New shells start in the Khanza folder, so `./Aplikasi.bat` (macOS) or `.\Aplikasi.bat` (Windows) works right away. **Lihat output Khanza** opens a tab that follows `khanza.log`. Drag the panel's top edge to resize it. The panel is a page built into the app: the harness web UI (which may come from a network server) can open it but cannot type into it.
+**Terminal** (Ctrl+`, or **Aplikasi → Terminal** in the desktop menu). A panel at the bottom with tabs of real shells on that PC: PowerShell on Windows, your login shell (zsh) on macOS, with the same PATH and Java as a normal terminal. New shells start in the Khanza folder, so `./Aplikasi.bat` (macOS) or `.\Aplikasi.bat` (Windows) works right away. **Lihat output Khanza** opens a tab that follows `khanza.log`. Drag the panel's top edge to resize it. The panel is a page built into the app: the Simha web UI (which may come from a network server) can open it but cannot type into it.
 
-**macOS** (e.g. an IT laptop with Khanza): `pnpm --filter @simrs/desktop dist:mac` builds `apps/desktop/release/mac-arm64/SIMRS Harness.app`. Choose `Aplikasi.bat` (run with `sh` from its folder, like `./Aplikasi.bat` in a terminal), a `.sh`, or `SIMRSKhanza.jar` (started with the same Java settings as `Aplikasi.bat`) as the Khanza file, and a running Khanza is found by its jar name (macOS asks once to allow "System Events" to bring it to the front).
+**macOS** (e.g. an IT laptop with Khanza): `pnpm --filter @simha/desktop dist:mac` builds `apps/desktop/release/mac-arm64/Simha.app`. Choose `Aplikasi.bat` (run with `sh` from its folder, like `./Aplikasi.bat` in a terminal), a `.sh`, or `SIMRSKhanza.jar` (started with the same Java settings as `Aplikasi.bat`) as the Khanza file, and a running Khanza is found by its jar name (macOS asks once to allow "System Events" to bring it to the front).
 
-**Develop:** `pnpm --filter @simrs/desktop dev` builds the UI bundle and starts the app. While developing it uses the repo's `.env`. Set `SIMRS_DESKTOP_DATA_DIR` to keep settings and the audit DB in another folder.
+**Develop:** `pnpm --filter @simha/desktop dev` builds the UI bundle and starts the app. While developing it uses the repo's `.env`. Set `SIMHA_DESKTOP_DATA_DIR` (the old `SIMRS_DESKTOP_DATA_DIR` still works) to keep settings and the audit DB in another folder.
 
 ### HTTP API
 
@@ -411,11 +411,11 @@ pnpm e2e         # build the UI and run the Playwright smoke tests
 - a scripted "AI";
 - the built UI.
 
-Open it to try the UI without a real AI or real patient data. The scripted AI understands a ticket about "RM 000002" and the questions "… per poli" and "… hari ini". `pnpm e2e` runs Playwright against that server; the first time, install the browser with `pnpm --filter @simrs/web exec playwright install chromium`.
+Open it to try the UI without a real AI or real patient data. The scripted AI understands a ticket about "RM 000002" and the questions "… per poli" and "… hari ini". `pnpm e2e` runs Playwright against that server; the first time, install the browser with `pnpm --filter @simha/web exec playwright install chromium`.
 
 ### Test database
 
-Database tests never use the real Khanza DB. They create a database named `simrs_harness_test`, load the table structure from `packages/tools/test/fixtures/khanza-schema.sql` and made-up rows from `seed.sql`, and create a read user and a write user with the README grants. The test DB comes from, in order:
+Database tests never use the real Khanza DB. They create a database named `simha_test`, load the table structure from `packages/tools/test/fixtures/khanza-schema.sql` and made-up rows from `seed.sql`, and create a read user and a write user with the README grants. The test DB comes from, in order:
 
 1. **Your own server**: set `KHANZA_TEST_DB_HOST`, `KHANZA_TEST_DB_PORT`, `KHANZA_TEST_DB_ADMIN_USER` (default `root`) and `KHANZA_TEST_DB_ADMIN_PASS`. With Docker: `docker compose up -d`, then `KHANZA_TEST_DB_HOST=127.0.0.1 KHANZA_TEST_DB_PORT=3307 KHANZA_TEST_DB_ADMIN_PASS=test pnpm test`.
 2. **A temporary MariaDB** started by the tests in a temp folder, if `mariadbd` is installed (`brew install mariadb` on macOS). It is deleted after the run.

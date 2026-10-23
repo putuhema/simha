@@ -3,8 +3,8 @@
  * test DB. Each test creates its own rows (room codes TST-..., visit numbers
  * 2099/...), so tests do not disturb each other or the seed data.
  */
-import { fakeTurn } from "@simrs/llm";
-import type { Fix, FixDetail } from "@simrs/shared";
+import { fakeTurn } from "@simha/llm";
+import type { Fix, FixDetail } from "@simha/shared";
 import { Effect } from "effect";
 import mysql from "mysql2/promise";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

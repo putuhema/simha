@@ -3,7 +3,7 @@
  * build): asks the running, logged-in Khanza to open a form for a visit.
  *
  * Khanza writes its port and a random token to
- * ~/.simrs-harness/khanza-bridge.properties after a login (owner-only) and
+ * ~/.simha/khanza-bridge.properties after a login (owner-only) and
  * removes it at logout. One request per connection, one tab-separated line:
  *   TOKEN \t ping                    -> "OK <user>"
  *   TOKEN \t open \t FORM \t VALUE   -> "OK" or "ERR <reason>"
@@ -47,11 +47,19 @@ export const FORM_LABELS: Readonly<Record<BridgeForm, string>> = {
   soap_ralan: "CPPT / SOAP ralan",
 };
 
-const bridgeFile = () => path.join(os.homedir(), ".simrs-harness", "khanza-bridge.properties");
+/**
+ * Where the bridge writes its info file. New Khanza builds write the first
+ * path; the second is the pre-rename path, for installs that have not run
+ * apply.mjs again yet.
+ */
+const bridgeFiles = () => [
+  path.join(os.homedir(), ".simha", "khanza-bridge.properties"),
+  path.join(os.homedir(), ".simrs-harness", "khanza-bridge.properties"),
+];
 
-const readBridge = async (): Promise<{ port: number; token: string } | null> => {
+const readBridgeFile = async (file: string): Promise<{ port: number; token: string } | null> => {
   try {
-    const text = await readFile(bridgeFile(), "utf8");
+    const text = await readFile(file, "utf8");
     const values = Object.fromEntries(
       text
         .split(/\r?\n/)
@@ -65,6 +73,14 @@ const readBridge = async (): Promise<{ port: number; token: string } | null> => 
   } catch {
     return null;
   }
+};
+
+const readBridge = async (): Promise<{ port: number; token: string } | null> => {
+  for (const file of bridgeFiles()) {
+    const bridge = await readBridgeFile(file);
+    if (bridge) return bridge;
+  }
+  return null;
 };
 
 /** Sends one line; resolves with Khanza's answer, or null when no bridge answers (not running, not logged in, old build). */

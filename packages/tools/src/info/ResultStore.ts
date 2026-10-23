@@ -5,7 +5,7 @@
  * Query results are kept so `tampilkan` shows exactly the rows the database
  * returned (the AI never copies data into a chart), with the SQL that ran.
  */
-import type { DocumentInfo, Favorite, FieldSource, FormDraft, RenderBlock, RenderType } from "@simrs/shared";
+import type { DocumentInfo, Favorite, FieldSource, FormDraft, RenderBlock, RenderType } from "@simha/shared";
 import { Context, Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 
@@ -302,7 +302,7 @@ const make = Effect.gen(function* () {
   };
 });
 
-export class ResultStore extends Context.Service<ResultStore, Effect.Success<typeof make>>()("simrs/ResultStore") {}
+export class ResultStore extends Context.Service<ResultStore, Effect.Success<typeof make>>()("simha/ResultStore") {}
 
 /** Needs the audit DB's SqlClient (provided by AuditLogLive / AuditLogMemory). */
 export const ResultStoreLive = Layer.effect(ResultStore, make);

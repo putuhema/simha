@@ -11,7 +11,7 @@
  * before the next one, so an assistant's tool calls are never separated from
  * their results.
  */
-import type { ChatMessage } from "@simrs/llm";
+import type { ChatMessage } from "@simha/llm";
 
 /** Input tokens of replayed history to keep. The system prompt and tools are on top of this. */
 export const HISTORY_TOKEN_BUDGET = 24_000;

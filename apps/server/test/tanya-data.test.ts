@@ -3,8 +3,8 @@
  * SELECT, shows the result as a render block with its SQL, and the result can
  * be saved as a favorite and re-run without the AI.
  */
-import { fakeTurn, type ChatRequest } from "@simrs/llm";
-import type { AgentEvent, Favorite, RenderBlock } from "@simrs/shared";
+import { fakeTurn, type ChatRequest } from "@simha/llm";
+import type { AgentEvent, Favorite, RenderBlock } from "@simha/shared";
 import { describe, expect, it } from "vitest";
 import { makeTestApp, readEvents, testDb } from "./harness.ts";
 

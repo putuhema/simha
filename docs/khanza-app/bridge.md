@@ -1,12 +1,12 @@
-# Jembatan SIMRS Harness ↔ aplikasi Khanza desktop
+# Jembatan Simha ↔ aplikasi Khanza desktop
 
-Harness tidak bisa mengubah data di Khanza. Yang bisa dilakukannya: **membuka form Khanza yang sudah
+Simha tidak bisa mengubah data di Khanza. Yang bisa dilakukannya: **membuka form Khanza yang sudah
 ada** untuk satu kunjungan, dan **mengisi draf** ke form resume (tanpa menyimpan). Semua lewat
 `HarnessBridge.java`, satu kelas yang ditempel ke build Khanza rumah sakit.
 
 Berkas: [`integrations/khanza-bridge/HarnessBridge.java`](../../integrations/khanza-bridge/HarnessBridge.java) ·
 pemasang: [`apply.mjs`](../../integrations/khanza-bridge/apply.mjs) ·
-sisi harness: `apps/desktop/src/khanza-bridge.ts`.
+sisi Simha: `apps/desktop/src/khanza-bridge.ts`.
 
 ## Cara kerjanya
 
@@ -14,8 +14,9 @@ sisi harness: `apps/desktop/src/khanza-bridge.ts`.
    `frmUtama.java`: `HarnessBridge.start()` setelah `akses.setData(...)` (login berhasil) dan
    `HarnessBridge.stop()` setelah `akses.setLogOut()`.
 2. Setelah login, bridge mendengarkan di **127.0.0.1** pada port acak dan menulis `port`, token 48 hex,
-   dan nama user ke `~/.simrs-harness/khanza-bridge.properties` (hanya bisa dibaca pemilik, `rw-------`).
-3. Aplikasi desktop harness membaca berkas itu, mengirim **satu baris** per koneksi, lalu menutupnya.
+   dan nama user ke `~/.simha/khanza-bridge.properties` (hanya bisa dibaca pemilik, `rw-------`).
+   Build Khanza yang dipasangi sebelum ganti nama masih menulis ke `~/.simrs-harness/…`. Aplikasi desktop membaca keduanya, dan bridge baru menulis keduanya agar desktop lama tetap menemukannya.
+3. Aplikasi desktop Simha membaca berkas itu, mengirim **satu baris** per koneksi, lalu menutupnya.
    Token dibandingkan constant-time; perintah lain ditolak.
 4. Form dibuka di thread Swing seperti klik menu Khanza, lengkap dengan pemeriksaan hak Khanza sendiri.
    Kalau user tidak berhak, bridge menjawab `ERR` dan tidak membuka apa pun.
@@ -56,7 +57,7 @@ Peta menu lengkapnya ada di [menu/M.md](menu/M.md) dan [menu/A.md](menu/A.md); f
 
 ## Kalau bridge tidak menjawab
 
-Harness jatuh ke mode lama: jendela Khanza yang sedang berjalan difokuskan (PowerShell mencari proses
+Simha jatuh ke mode lama: jendela Khanza yang sedang berjalan difokuskan (PowerShell mencari proses
 `java`/`javaw` berjudul `Khanza|^SIM `), lalu nomor kunjungan disalin ke clipboard untuk ditempel.
 Penyebab umum: Khanza belum login, build Khanza belum dipasangi bridge (atau baru saja di-update),
 aplikasi Khanza tidak berjalan, atau berkas `khanza-bridge.properties` sudah dihapus saat logout.
@@ -68,4 +69,4 @@ aplikasi Khanza tidak berjalan, atau berkas `khanza-bridge.properties` sudah dih
 - Bridge harus dipasang ulang setelah setiap update Khanza: `node integrations/khanza-bridge/apply.mjs <folder-khanza>`,
   lalu build ulang di NetBeans (Clean and Build).
 - Bridge hanya mendengarkan loopback; tidak ada koneksi keluar dan tidak ada data pasien yang dikirim
-  ke harness — harness hanya mengirim perintah dan nomor kunjungan (plus isi draf saat `fill`).
+  ke Simha — Simha hanya mengirim perintah dan nomor kunjungan (plus isi draf saat `fill`).

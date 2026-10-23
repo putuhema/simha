@@ -3,7 +3,7 @@
  * wrote itself, staff notes and 👎 corrections. Admins can verify, disable,
  * edit or delete items; everyone can add a note.
  */
-import type { Knowledge } from "@simrs/shared";
+import type { Knowledge } from "@simha/shared";
 import { BookOpen, Check, Eye, EyeOff, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { SqlDisclosure } from "../../components/blocks/SqlSlip.tsx";

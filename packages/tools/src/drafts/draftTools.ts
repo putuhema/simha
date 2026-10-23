@@ -4,7 +4,7 @@
  * the AI. The user checks the card and fills Khanza's form from it (desktop
  * app), then saves in Khanza.
  */
-import { formProblems, FormDraft, type FieldSource } from "@simrs/shared";
+import { formProblems, FormDraft, type FieldSource } from "@simha/shared";
 import { Effect, Schema } from "effect";
 import { ToolError } from "../errors.ts";
 import { ResultStore } from "../info/ResultStore.ts";

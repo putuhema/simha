@@ -8,7 +8,7 @@
  * `hasilRadiologi` (RadiologyCard).
  */
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
-import type { PacsStudies, PacsStudy, RadiologyExam, RadiologyGallery } from "@simrs/shared";
+import type { PacsStudies, PacsStudy, RadiologyExam, RadiologyGallery } from "@simha/shared";
 import { ChevronLeft, ChevronRight, Download, ExternalLink, ScanLine, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "../../lib/cn.ts";

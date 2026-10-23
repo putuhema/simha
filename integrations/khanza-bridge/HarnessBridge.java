@@ -32,11 +32,11 @@ import rekammedis.RMDataResumePasienRanap;
 import rekammedis.RMRiwayatPerawatan;
 
 /**
- * Bridge for the SIMRS Harness desktop app: lets "Buka di Khanza" open a
+ * Bridge for the Simha desktop app: lets "Buka di Khanza" open a
  * given form for a given visit in this running Khanza.
  *
  * After a login it listens on 127.0.0.1 (a free port) and writes the port and
- * a random token to ~/.simrs-harness/khanza-bridge.properties, readable only
+ * a random token to ~/.simha/khanza-bridge.properties, readable only
  * by this OS user. One request per connection, one line, tab-separated:
  *
  *   TOKEN \t ping                    -> "OK <user>"
@@ -98,9 +98,22 @@ public final class HarnessBridge {
     private HarnessBridge() {
     }
 
+    /**
+     * The files the desktop app reads to find the bridge: the current one and
+     * the pre-rename one, so a desktop app that has not been updated yet still
+     * finds a bridge patched with this class.
+     */
+    private static File[] infoFiles() {
+        File home = new File(System.getProperty("user.home"));
+        return new File[] {
+            new File(new File(home, ".simha"), "khanza-bridge.properties"),
+            new File(new File(home, ".simrs-harness"), "khanza-bridge.properties"),
+        };
+    }
+
     /** The file the desktop app reads to find the bridge. */
     public static File infoFile() {
-        return new File(new File(System.getProperty("user.home"), ".simrs-harness"), "khanza-bridge.properties");
+        return infoFiles()[0];
     }
 
     /** Starts listening after a successful login. Never throws: Khanza works the same without the bridge. */
@@ -125,11 +138,11 @@ public final class HarnessBridge {
                 public void run() {
                     accept(listening);
                 }
-            }, "simrs-harness-bridge");
+            }, "simha-bridge");
             acceptor.setDaemon(true);
             acceptor.start();
         } catch (Exception e) {
-            System.out.println("SIMRS Harness bridge tidak aktif: " + e);
+            System.out.println("Simha bridge tidak aktif: " + e);
             stop();
         }
     }
@@ -146,16 +159,26 @@ public final class HarnessBridge {
         server = null;
         acceptor = null;
         token = null;
-        infoFile().delete();
+        for (File file : infoFiles()) {
+            file.delete();
+        }
     }
 
     private static void writeInfo(int port) throws IOException {
-        File file = infoFile();
+        String content = "port=" + port + "\ntoken=" + token + "\nuser=" + akses.getkode() + "\n";
+        writeInfoFile(infoFile(), content);
+        try {
+            writeInfoFile(infoFiles()[1], content);
+        } catch (IOException e) {
+            // The legacy copy is best-effort; the current file is what matters.
+        }
+    }
+
+    private static void writeInfoFile(File file, String content) throws IOException {
         File dir = file.getParentFile();
         if (!dir.isDirectory() && !dir.mkdirs()) {
             throw new IOException("Tidak bisa membuat " + dir);
         }
-        String content = "port=" + port + "\ntoken=" + token + "\nuser=" + akses.getkode() + "\n";
         try (OutputStream out = new FileOutputStream(file)) {
             out.write(content.getBytes(StandardCharsets.UTF_8));
         }
@@ -263,7 +286,7 @@ public final class HarnessBridge {
 
     private static String fill(final String form, final String noRawat, final String payload) {
         if (!form.equals("resume_ranap")) {
-            return "ERR Form " + form + " belum bisa diisi dari SIMRS Harness.";
+            return "ERR Form " + form + " belum bisa diisi dari Simha.";
         }
         FutureTask<String> task = new FutureTask<String>(() -> {
             try {
@@ -322,7 +345,7 @@ public final class HarnessBridge {
                 }
             }
         } catch (Exception e) {
-            System.out.println("SIMRS Harness: resume tersimpan tidak bisa dipilih: " + e);
+            System.out.println("Simha: resume tersimpan tidak bisa dipilih: " + e);
         }
     }
 
@@ -347,7 +370,7 @@ public final class HarnessBridge {
                 }
             }
         } catch (Exception e) {
-            System.out.println("SIMRS Harness: field " + name + " tidak bisa diisi: " + e);
+            System.out.println("Simha: field " + name + " tidak bisa diisi: " + e);
         }
     }
 

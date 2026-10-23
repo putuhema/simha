@@ -4,7 +4,7 @@
  * Rollback. Every action asks for confirmation and shows who did what.
  */
 import { Collapsible } from "@base-ui/react/collapsible";
-import type { Fix, FixDetail } from "@simrs/shared";
+import type { Fix, FixDetail } from "@simha/shared";
 import { Check, ChevronRight, Pencil, RotateCcw, X } from "lucide-react";
 import { useState } from "react";
 import { DataTable } from "../../components/blocks/DataTable.tsx";

@@ -99,7 +99,7 @@ export interface AppDocsService {
   readonly synonyms: ReadonlyArray<AppSynonym>;
 }
 
-export class AppDocs extends Context.Service<AppDocs, AppDocsService>()("simrs/AppDocs") {}
+export class AppDocs extends Context.Service<AppDocs, AppDocsService>()("simha/AppDocs") {}
 
 const EMPTY: AppDocsService = {
   source: { commit: "unknown", generatedAt: "", root: "" },

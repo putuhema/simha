@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 /**
  * Smoke tests of the built UI against the e2e server: real API, agent and
  * fix executor on the throwaway synthetic test DB, with a scripted AI.
- * Run `pnpm --filter @simrs/web build` first (the `e2e` script does).
+ * Run `pnpm --filter @simha/web build` first (the `e2e` script does).
  */
 const PORT = Number(process.env["E2E_PORT"] ?? 8799);
 

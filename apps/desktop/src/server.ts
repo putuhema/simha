@@ -151,7 +151,7 @@ export const checkServer = async (url: string): Promise<{ readonly ok: boolean; 
     const res = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) return { ok: false, message: `Server menjawab ${res.status}.` };
     const body = (await res.json()) as { khanza?: { connected?: boolean } };
-    if (!body || typeof body !== "object" || !("khanza" in body)) return { ok: false, message: "Alamat ini bukan server SIMRS Harness." };
+    if (!body || typeof body !== "object" || !("khanza" in body)) return { ok: false, message: "Alamat ini bukan server Simha." };
     return { ok: true, message: body.khanza?.connected ? "Terhubung. Khanza DB terhubung." : "Terhubung, tapi server belum terhubung ke Khanza DB." };
   } catch (error) {
     return { ok: false, message: `Tidak bisa dihubungi: ${error instanceof Error ? error.message : String(error)}` };

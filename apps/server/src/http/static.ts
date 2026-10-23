@@ -57,7 +57,7 @@ export const serveWebApp = (webDir: string) =>
     const index = yield* tryRead(NodePath.join(root, "index.html"));
     if (!index) {
       return HttpServerResponse.text(
-        "Web UI belum dibangun. Jalankan `pnpm --filter @simrs/web build`, atau `pnpm dev` untuk mode pengembangan.",
+        "Web UI belum dibangun. Jalankan `pnpm --filter @simha/web build`, atau `pnpm dev` untuk mode pengembangan.",
         { status: 404 },
       );
     }

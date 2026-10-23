@@ -7,7 +7,7 @@
  * and may summarise the returned data in its answer. The model sees the data
  * but free clinical text is masked for external providers (privacy/mask.ts).
  */
-import { DocumentInfo, DocumentKind } from "@simrs/shared";
+import { DocumentInfo, DocumentKind } from "@simha/shared";
 import { Effect, Schema } from "effect";
 import { ToolError } from "../errors.ts";
 import { CurrentActor, CurrentSession, CurrentToolCall } from "../khanza/current-tool-call.ts";

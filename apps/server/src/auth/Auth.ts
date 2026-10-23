@@ -9,19 +9,19 @@
  * - Failed logins: after MAX_FAILURES wrong passwords for a username, that
  *   username is locked for LOCK_SECONDS. Every login attempt is logged.
  */
-import type { CreateUserRequest, Role, UpdateUserRequest, User } from "@simrs/shared";
+import type { CreateUserRequest, Role, UpdateUserRequest, User } from "@simha/shared";
 import { Context, Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 import { createHash, randomBytes } from "node:crypto";
 import { hashPassword, verifyPassword } from "./password.ts";
 
-export const SESSION_COOKIE = "simrs_session";
+export const SESSION_COOKIE = "simha_session";
 export const SESSION_HOURS = 12;
 const MAX_FAILURES = 5;
 const LOCK_SECONDS = 60;
 
 /** The logged-in user of the current request. */
-export class CurrentUser extends Context.Service<CurrentUser, User>()("simrs/CurrentUser") {}
+export class CurrentUser extends Context.Service<CurrentUser, User>()("simha/CurrentUser") {}
 
 /** A request the user may not make; `status` is the HTTP status. */
 export class AuthError extends Error {
@@ -221,7 +221,7 @@ const make = Effect.gen(function* () {
   };
 });
 
-export class Auth extends Context.Service<Auth, Effect.Success<typeof make>>()("simrs/Auth") {}
+export class Auth extends Context.Service<Auth, Effect.Success<typeof make>>()("simha/Auth") {}
 
 /** Needs the audit DB's SqlClient. */
 export const AuthLive = Layer.effect(Auth, make);

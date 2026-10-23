@@ -1,11 +1,11 @@
 /**
  * The only bridge between the web UI and the desktop app. The page gets
- * `window.simrsDesktop` with a few functions; it never gets Node or Electron.
+ * `window.simhaDesktop` with a few functions; it never gets Node or Electron.
  * The main process checks which page each call comes from.
  */
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 
-contextBridge.exposeInMainWorld("simrsDesktop", {
+contextBridge.exposeInMainWorld("simhaDesktop", {
   /** "darwin", "win32"…: the page adjusts its layout (macOS has no title bar). */
   platform: process.platform,
   /** App version, platform and connection settings. */

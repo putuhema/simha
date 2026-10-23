@@ -2,7 +2,7 @@
  * Tiket view: ticket list | investigation | patient. Columns stack on a
  * narrow window.
  */
-import type { Ticket } from "@simrs/shared";
+import type { Ticket } from "@simha/shared";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef } from "react";
 import { Empty } from "../../components/ui/Spinner.tsx";

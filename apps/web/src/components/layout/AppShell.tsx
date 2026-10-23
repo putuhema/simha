@@ -4,7 +4,7 @@
  *
  * Shortcuts: ⇧⌘S sidebar, ⇧⌘O new chat, ⌘, settings (Ctrl on Windows/Linux).
  */
-import type { Stats } from "@simrs/shared";
+import type { Stats } from "@simha/shared";
 import { Outlet, useNavigate } from "@tanstack/react-router";
 import { Menu as MenuIcon, SquarePen } from "lucide-react";
 import { useEffect } from "react";
@@ -103,7 +103,7 @@ export const AppShell = () => {
             <TipButton label="Buka menu" onClick={() => setDrawer(true)} className="grid size-9 place-items-center rounded-lg text-ink-2 hover:bg-paper-2">
               <MenuIcon className="size-5" />
             </TipButton>
-            <span className="font-display text-[15px] font-semibold">SIMRS Harness</span>
+            <span className="font-display text-[15px] font-semibold">Simha</span>
             <TipButton label="Percakapan baru" onClick={newChat} className="ml-auto grid size-9 place-items-center rounded-lg text-ink-2 hover:bg-paper-2">
               <SquarePen className="size-[18px]" />
             </TipButton>

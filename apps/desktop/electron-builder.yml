@@ -1,7 +1,7 @@
-# Windows installer for SIMRS Harness (pnpm --filter @simrs/desktop dist:win).
-appId: id.simrs.harness
-productName: SIMRS Harness
-copyright: SIMRS Harness
+# Windows installer for Simha (pnpm --filter @simha/desktop dist:win).
+appId: id.simha.app
+productName: Simha
+copyright: Simha
 directories:
   output: release
   buildResources: resources
@@ -40,8 +40,8 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
-  shortcutName: SIMRS Harness
-  artifactName: SIMRS-Harness-Setup-${version}.${ext}
+  shortcutName: Simha
+  artifactName: Simha-Setup-${version}.${ext}
 mac:
   target: dir
   icon: resources/icon.png

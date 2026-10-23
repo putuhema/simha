@@ -3,7 +3,7 @@
  * The data comes from the database result (by queryId), never from the AI,
  * so the numbers on screen are exactly what the query returned.
  */
-import { RenderBlock, RenderType } from "@simrs/shared";
+import { RenderBlock, RenderType } from "@simha/shared";
 import { Effect, Schema } from "effect";
 import { ToolError } from "../errors.ts";
 import { CurrentSession, CurrentToolCall } from "../khanza/current-tool-call.ts";
