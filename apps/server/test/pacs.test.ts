@@ -78,49 +78,64 @@ describe.skipIf(testDb === null)("radiology images (PACS)", () => {
     }
   });
 
-  it("the agent shows a visit's images in the chat, and reads PACS instead of Khanza tables", async () => {
+  it("one card shows Khanza's reading with the PACS images, and the AI is told not to repeat it", async () => {
     const app = makeTestApp(
       [
-        fakeTurn("", [{ name: "gambarRadiologi", args: { noRawat: "2026/10/21/000002" } }]),
-        fakeTurn("Ada 1 studi thorax tanggal 21 Okt 2026 dengan 3 gambar."),
+        fakeTurn("", [{ name: "hasilRadiologi", args: { noRawat: "2026/10/21/000002" } }]),
+        fakeTurn("Berikut hasil radiologi kunjungan 2026/10/21/000002."),
       ],
       undefined,
       undefined,
       { pacs: pacsLayer(FAKE_ORTHANC, makeFakeOrthanc().fetch) },
     );
     try {
-      const events = await readEvents(await app.call("POST", "/ask", { question: "tampilkan foto thorax 2026/10/21/000002" }));
+      const events = await readEvents(await app.call("POST", "/ask", { question: "hasil baca radiologi 2026/10/21/000002" }));
       const shown = events.find((e) => e._tag === "radiology");
       expect(shown).toMatchObject({
-        gallery: { noRkmMedis: "000002", noRawat: "2026/10/21/000002", cocokKunjungan: true, studies: [{ id: FAKE_STUDY }] },
+        gallery: {
+          noRkmMedis: "000002",
+          noRawat: "2026/10/21/000002",
+          pacsCatatan: null,
+          pemeriksaan: [
+            { tanggal: "2026-10-21", jam: "09:30", nama: "Thorax PA", dokter: "drg. Sari Fiktif", hasil: expect.stringContaining("Kesan: normal") },
+          ],
+          studies: [{ id: FAKE_STUDY }],
+        },
       });
-      expect(app.fake.requests[0]?.tools.map((t) => t.name)).toContain("gambarRadiologi");
+      expect(app.fake.requests[0]?.tools.map((t) => t.name)).toContain("hasilRadiologi");
+      expect(app.fake.requests[0]?.tools.map((t) => t.name)).not.toContain("gambarRadiologi");
 
-      // The model gets a summary, not image IDs or the PACS address.
+      // The model gets the exam list and image counts, not image IDs or the PACS address,
+      // and the reading under a field name that is masked for external providers.
       const sent = JSON.stringify(app.fake.requests[1]?.messages);
-      expect(sent).toContain("jumlahGambar");
+      expect(sent).toContain("Thorax PA");
+      expect(sent).toContain("laporanRadiologi");
+      expect(sent).toContain("Jangan ulangi");
       expect(sent).not.toContain(FAKE_INSTANCES[0]);
       expect(sent).not.toContain("orthanc.test");
 
       // Reopening the conversation shows the card again.
-      const done = events.find((e) => e._tag === "run_started");
-      const conversationId = done?._tag === "run_started" ? done.conversationId : "";
+      const started = events.find((e) => e._tag === "run_started");
+      const conversationId = started?._tag === "run_started" ? started.conversationId : "";
       const transcript = (await (await app.call("GET", `/conversations/${conversationId}`)).json()) as Transcript;
+      expect(transcript.runs[0]?.radiology[0]?.pemeriksaan[0]?.nama).toBe("Thorax PA");
       expect(transcript.runs[0]?.radiology[0]?.studies[0]?.id).toBe(FAKE_STUDY);
     } finally {
       await app.dispose();
     }
   });
 
-  it("tells the AI when PACS is not set up", async () => {
+  it("still shows the reading when PACS is not set up", async () => {
     const app = makeTestApp([
-      fakeTurn("", [{ name: "gambarRadiologi", args: { noRkmMedis: "000002" } }]),
-      fakeTurn("PACS belum diatur."),
+      fakeTurn("", [{ name: "hasilRadiologi", args: { noRkmMedis: "000002" } }]),
+      fakeTurn("Berikut hasil radiologi pasien RM 000002."),
     ]);
     try {
-      const events = await readEvents(await app.call("POST", "/ask", { question: "foto rontgen RM 000002" }));
-      expect(events.find((e) => e._tag === "tool_finished")).toMatchObject({ ok: false, error: expect.stringContaining("ORTHANC_URL") });
-      expect(events.some((e) => e._tag === "radiology")).toBe(false);
+      const events = await readEvents(await app.call("POST", "/ask", { question: "hasil radiologi RM 000002" }));
+      const shown = events.find((e) => e._tag === "radiology");
+      expect(shown).toMatchObject({
+        gallery: { pacsCatatan: expect.stringContaining("belum diatur"), studies: [], pemeriksaan: [{ nama: "Thorax PA" }] },
+      });
     } finally {
       await app.dispose();
     }

@@ -17,7 +17,7 @@ import {
   KhanzaReadLive,
   lihatSkema,
   buatDraftResume,
-  gambarRadiologi,
+  hasilRadiologi,
   PacsLive,
   readTools,
   ResultStoreLive,
@@ -29,7 +29,7 @@ import type { KhanzaRead, Pacs, ResultStore, SchemaDocs, Tool } from "@simrs/too
 import { Console, Effect, Layer } from "effect";
 
 type AnyReadTool = Tool<unknown, unknown, KhanzaRead | ResultStore | SchemaDocs | Pacs>;
-const tools = [...readTools, lihatSkema, jalankanQueryBaca, buatDraftResume, gambarRadiologi] as unknown as ReadonlyArray<AnyReadTool>;
+const tools = [...readTools, lihatSkema, jalankanQueryBaca, buatDraftResume, hasilRadiologi] as unknown as ReadonlyArray<AnyReadTool>;
 
 const [name, json = "{}"] = process.argv.slice(2);
 

@@ -155,8 +155,15 @@ INSERT INTO detail_periksa_lab (no_rawat, kd_jenis_prw, tgl_periksa, jam, id_tem
   ('2026/10/21/000002', 'LAB01', '2026-10-21', '10:00:00', 1, '14.2', '12-15', '', 0, 0, 0, 0, 0, 0),
   ('2026/10/21/000002', 'LAB01', '2026-10-21', '10:00:00', 2, '12.8', '4-10', 'H', 0, 0, 0, 0, 0, 0);
 
+INSERT INTO jns_perawatan_radiologi (kd_jenis_prw, nm_perawatan, bagian_rs, bhp, tarif_perujuk, tarif_tindakan_dokter, tarif_tindakan_petugas, kso, menejemen, total_byr, kd_pj, status, kelas) VALUES
+  ('RAD01', 'Thorax PA', 0, 0, 0, 0, 0, 0, 0, 0, 'BPJ', '1', '-');
+
+INSERT INTO periksa_radiologi (no_rawat, nip, kd_jenis_prw, tgl_periksa, jam, dokter_perujuk, bagian_rs, bhp, tarif_perujuk, tarif_tindakan_dokter, tarif_tindakan_petugas, biaya, kd_dokter, status, proyeksi, kV, mAS, FFD, BSF, inak, jml_penyinaran, dosis) VALUES
+  ('2026/10/21/000002', 'P001', 'RAD01', '2026-10-21', '09:30:00', 'D001', 0, 0, 0, 0, 0, 0, 'D002', 'Ranap', 'PA', '', '', '', '', '', '', '');
+
 INSERT INTO hasil_radiologi (no_rawat, tgl_periksa, jam, hasil) VALUES
-  ('2026/09/15/000004', '2026-09-16', '09:00:00', 'Foto thorax PA: cor dan pulmo dalam batas normal.');
+  ('2026/09/15/000004', '2026-09-16', '09:00:00', 'Foto thorax PA: cor dan pulmo dalam batas normal.'),
+  ('2026/10/21/000002', '2026-10-21', '09:30:00', 'Foto thorax PA: cor tidak membesar, pulmo tidak tampak infiltrat. Kesan: normal.');
 
 INSERT INTO databarang (kode_brng, nama_brng, kode_satbesar, kode_sat, dasar, isi, kapasitas, status) VALUES
   ('B001', 'Paracetamol 500 mg', 'BOX', 'TAB', 500, 1, 1, '1'),

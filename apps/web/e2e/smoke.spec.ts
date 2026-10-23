@@ -123,20 +123,25 @@ test("the agent makes a patient history document that can be printed", async () 
   await expect(card.getByRole("button", { name: "Cetak / PDF" })).toBeEnabled();
 });
 
-test("the agent shows a visit's radiology images in the chat", async () => {
-  await page.getByLabel("Pertanyaan").fill("tampilkan foto thorax 2026/10/21/000002");
+test("asking for a radiology result shows the reading and the images in one card", async () => {
+  await page.getByLabel("Pertanyaan").fill("hasil baca radiologi 2026/10/21/000002");
   await page.getByLabel("Pertanyaan").press("Enter");
   const card = page.getByTestId("radiology-card");
   await expect(card).toContainText("RM 000002 · 2026/10/21/000002");
-  await expect(card.getByTestId("pacs-study")).toContainText("2 seri · 3 gambar");
-  await card.getByRole("button", { name: /Seri 1/ }).click();
-  await expect(page.getByTestId("pacs-viewer")).toContainText("1 / 3");
+  const exam = card.getByTestId("radiology-exam");
+  await expect(exam).toContainText("Thorax PA");
+  await expect(exam).toContainText("drg. Sari Fiktif");
+  await expect(exam).toContainText("Kesan: normal.");
+  await exam.getByRole("button", { name: /Seri 2/ }).click();
+  await expect(page.getByTestId("pacs-viewer")).toContainText("3 / 3");
   await page.keyboard.press("Escape");
-  await expect(page.getByText("Ada 1 studi thorax")).toBeVisible();
+  await expect(page.getByText("Berikut hasil radiologi kunjungan")).toBeVisible();
+  // No separate table for the same data.
+  await expect(page.getByTestId("tanya-turn").last().getByTestId("render-block")).toHaveCount(0);
 
   // Kept when the conversation is reopened.
   await page.reload();
-  await expect(page.getByTestId("radiology-card")).toContainText("3 gambar");
+  await expect(page.getByTestId("radiology-exam")).toContainText("Thorax PA");
 });
 
 test("the patient card makes CPPT / SOAP without the AI", async () => {

@@ -4,12 +4,14 @@
  * series; a thumbnail opens a full-screen viewer that flicks through every
  * image of the study. Images come through the harness server
  * (/api/pacs/instances/...), which logs who opened them. The same study list
- * is shown in the chat when the AI calls `gambarRadiologi` (RadiologyCard).
+ * is shown in the chat, next to Khanza's readings, when the AI calls
+ * `hasilRadiologi` (RadiologyCard).
  */
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
-import type { PacsStudies, PacsStudy, RadiologyGallery } from "@simrs/shared";
+import type { PacsStudies, PacsStudy, RadiologyExam, RadiologyGallery } from "@simrs/shared";
 import { ChevronLeft, ChevronRight, Download, ExternalLink, ScanLine, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { cn } from "../../lib/cn.ts";
 import { useApi } from "../../lib/useApi.ts";
 import { Button } from "../ui/Button.tsx";
 import { Dialog } from "../ui/Dialog.tsx";
@@ -139,6 +141,53 @@ const Viewer = ({
   );
 };
 
+/** One thumbnail per series; a click opens the viewer at that series' first image. */
+const StudyThumbs = ({
+  study,
+  onOpen,
+  className,
+}: {
+  readonly study: PacsStudy;
+  readonly onOpen: (index: number) => void;
+  readonly className?: string;
+}) => {
+  // Index of each series' first image in the viewer's flat list.
+  const firstIndex = study.series.map((_, i) => study.series.slice(0, i).reduce((n, s) => n + s.instances.length, 0));
+  return (
+    <ul className={cn("grid grid-cols-3 gap-3 sm:grid-cols-5", className)}>
+      {study.series.map((se, i) => (
+        <li key={se.id}>
+          <button
+            type="button"
+            className="group w-full text-left disabled:opacity-50"
+            disabled={se.instances.length === 0}
+            onClick={() => onOpen(firstIndex[i] ?? 0)}
+          >
+            <span className="relative block aspect-square overflow-hidden rounded-md bg-[#0b0f0f] ring-teal transition-shadow group-hover:ring-2">
+              {se.instances[0] ? (
+                <img
+                  src={image(se.instances[0], "thumb")}
+                  alt={`Seri ${se.number} ${se.description}`}
+                  loading="lazy"
+                  className="size-full object-contain"
+                />
+              ) : null}
+              {se.instances.length > 1 ? (
+                <span className="absolute right-1.5 bottom-1.5 rounded bg-black/60 px-1.5 font-mono text-[11px] text-white">
+                  {se.instances.length}
+                </span>
+              ) : null}
+            </span>
+            <span className="mt-1 block truncate text-[12px] text-ink-2">
+              Seri {se.number} · {se.description || se.bodyPart || se.modality || "–"}
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+};
+
 const StudyBlock = ({
   study,
   viewerBase,
@@ -150,8 +199,6 @@ const StudyBlock = ({
 }) => {
   const imageCount = study.series.reduce((n, s) => n + s.instances.length, 0);
   const stone = stoneUrl(viewerBase, study);
-  // Index of each series' first image in the viewer's flat list.
-  const firstIndex = study.series.map((_, i) => study.series.slice(0, i).reduce((n, s) => n + s.instances.length, 0));
   return (
     <section className="rounded-lg border border-line bg-card" data-testid="pacs-study">
       <header className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-line-2 px-4 py-2.5">
@@ -167,37 +214,7 @@ const StudyBlock = ({
           </a>
         ) : null}
       </header>
-      <ul className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-4">
-        {study.series.map((se, i) => (
-          <li key={se.id}>
-            <button
-              type="button"
-              className="group w-full text-left disabled:opacity-50"
-              disabled={se.instances.length === 0}
-              onClick={() => onOpen(firstIndex[i] ?? 0)}
-            >
-              <span className="relative block aspect-square overflow-hidden rounded-md bg-[#0b0f0f] ring-teal transition-shadow group-hover:ring-2">
-                {se.instances[0] ? (
-                  <img
-                    src={image(se.instances[0], "thumb")}
-                    alt={`Seri ${se.number} ${se.description}`}
-                    loading="lazy"
-                    className="size-full object-contain"
-                  />
-                ) : null}
-                {se.instances.length > 1 ? (
-                  <span className="absolute right-1.5 bottom-1.5 rounded bg-black/60 px-1.5 font-mono text-[11px] text-white">
-                    {se.instances.length}
-                  </span>
-                ) : null}
-              </span>
-              <span className="mt-1 block truncate text-[12px] text-ink-2">
-                Seri {se.number} · {se.description || se.bodyPart || se.modality || "–"}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
+      <StudyThumbs study={study} onOpen={onOpen} className="p-3" />
     </section>
   );
 };
@@ -242,33 +259,128 @@ const StudyList = ({ studies, viewerBase }: { readonly studies: ReadonlyArray<Pa
   );
 };
 
-const day = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+/** The reading, with the radiologist's conclusion ("Kesan") set apart when there is one. */
+const Reading = ({ text }: { readonly text: string }) => {
+  const match = /\bkesan\s*:/i.exec(text);
+  const body = (match ? text.slice(0, match.index) : text).trim();
+  const kesan = match ? text.slice(match.index + match[0].length).trim() : null;
+  return (
+    <div className="space-y-2 text-[13.5px] leading-relaxed">
+      {body ? <p className="whitespace-pre-wrap text-ink-2">{body}</p> : null}
+      {kesan ? (
+        <p className="rounded-md bg-teal-soft/60 px-3 py-2 whitespace-pre-wrap text-ink">
+          <span className="font-semibold">Kesan: </span>
+          {kesan}
+        </p>
+      ) : null}
+    </div>
+  );
+};
 
-/** Radiology images in the chat (from the AI's `gambarRadiologi` tool). */
-export const RadiologyCard = ({ gallery }: { readonly gallery: RadiologyGallery }) => (
-  <figure className="animate-rise space-y-2" data-testid="radiology-card">
-    <figcaption className="flex items-center gap-2 text-[13px] text-ink-2">
-      <span className="grid size-7 place-items-center rounded-md bg-teal-soft text-teal">
-        <ScanLine className="size-4" />
-      </span>
-      <span>
-        Gambar radiologi · RM <span className="font-mono">{gallery.noRkmMedis}</span>
-        {gallery.noRawat ? <> · <span className="font-mono">{gallery.noRawat}</span></> : null}
-        {gallery.rentang && gallery.cocokKunjungan ? ` · ${day(gallery.rentang.dari)} – ${day(gallery.rentang.sampai)}` : null}
-      </span>
-    </figcaption>
-    {gallery.noRawat && !gallery.cocokKunjungan && gallery.studies.length > 0 ? (
-      <p className="text-[12.5px] text-ink-3">Tidak ada studi pada tanggal kunjungan ini; ditampilkan semua studi pasien.</p>
-    ) : null}
-    {gallery.studies.length === 0 ? (
-      <p className="rounded-lg border border-line bg-card px-4 py-3 text-[13px] text-ink-3">
-        Tidak ada studi DICOM untuk RM {gallery.noRkmMedis} di PACS.
-      </p>
-    ) : (
-      <StudyList studies={gallery.studies} viewerBase={gallery.viewerBase} />
-    )}
-  </figure>
-);
+/** Minutes since epoch for a date and HH:MM (00:00 when no time). */
+const minutes = (date: string, time: string) => Date.parse(`${date}T${/^\d{2}:\d{2}/.test(time) ? time.slice(0, 5) : "00:00"}:00Z`) / 60_000;
+
+/**
+ * PACS studies matched to the Khanza exam they belong to: an exam on the same
+ * day or the day before (night exams), the closest in time. Studies left over
+ * are shown on their own.
+ */
+const matchStudies = (exams: ReadonlyArray<RadiologyExam>, studies: ReadonlyArray<PacsStudy>) => {
+  const byExam = new Map<RadiologyExam, Array<PacsStudy>>();
+  const rest: Array<PacsStudy> = [];
+  for (const study of studies) {
+    const at = minutes(study.date, study.time);
+    const exam = study.date
+      ? exams
+          .filter((e) => e.tanggal === study.date || (e.tanggal !== "" && day(e.tanggal, 1) === study.date))
+          .toSorted((x, y) => Math.abs(minutes(x.tanggal, x.jam) - at) - Math.abs(minutes(y.tanggal, y.jam) - at))[0]
+      : undefined;
+    if (exam) byExam.set(exam, [...(byExam.get(exam) ?? []), study]);
+    else rest.push(study);
+  }
+  return { byExam, rest };
+};
+
+const dayLabel = (iso: string) =>
+  iso ? new Date(`${iso}T00:00:00`).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "Tanpa tanggal";
+/** YYYY-MM-DD plus `add` days. */
+const day = (iso: string, add: number) => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + add);
+  return d.toISOString().slice(0, 10);
+};
+
+/**
+ * Radiology in the chat (from the AI's `hasilRadiologi` tool): each Khanza
+ * exam with its reading and the PACS images of that exam, in one card.
+ */
+export const RadiologyCard = ({ gallery }: { readonly gallery: RadiologyGallery }) => {
+  const [viewing, setViewing] = useState<{ readonly study: PacsStudy; readonly index: number } | null>(null);
+  const { byExam, rest } = matchStudies(gallery.pemeriksaan, gallery.studies);
+  const open = (study: PacsStudy) => (index: number) => setViewing({ study, index });
+  const empty = gallery.pemeriksaan.length === 0 && gallery.studies.length === 0;
+  return (
+    <figure className="animate-rise overflow-hidden rounded-lg border border-line bg-card" data-testid="radiology-card">
+      <figcaption className="flex items-center gap-3 border-b border-line-2 px-4 py-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-md bg-teal-soft text-teal">
+          <ScanLine className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <h3 className="font-display text-[16px] leading-tight font-semibold">Hasil radiologi</h3>
+          <p className="truncate text-[12.5px] text-ink-2">
+            RM <span className="font-mono">{gallery.noRkmMedis}</span>
+            {gallery.noRawat ? <> · <span className="font-mono">{gallery.noRawat}</span></> : null}
+          </p>
+        </div>
+      </figcaption>
+
+      <div className="divide-y divide-line-2">
+        {gallery.pemeriksaan.map((exam) => {
+          const studies = byExam.get(exam) ?? [];
+          return (
+            <section key={`${exam.noRawat}|${exam.tanggal}|${exam.jam}`} className="space-y-3 px-4 py-3.5" data-testid="radiology-exam">
+              <header className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                <h4 className="font-display text-[15px] font-semibold">{exam.nama ?? "Pemeriksaan radiologi"}</h4>
+                <span className="font-mono text-[12px] text-ink-2">
+                  {dayLabel(exam.tanggal)} · {exam.jam}
+                </span>
+                {exam.dokter ? <span className="text-[12px] text-ink-3">{exam.dokter}</span> : null}
+                {!gallery.noRawat ? <span className="font-mono text-[11.5px] text-ink-3">{exam.noRawat}</span> : null}
+              </header>
+              {exam.hasil ? <Reading text={exam.hasil} /> : <p className="text-[13px] text-ink-3">Belum ada hasil baca.</p>}
+              {studies.map((study) => (
+                <StudyThumbs key={study.id} study={study} onOpen={open(study)} />
+              ))}
+            </section>
+          );
+        })}
+
+        {rest.map((study) => (
+          <section key={study.id} className="space-y-3 px-4 py-3.5">
+            <header className="flex flex-wrap items-baseline gap-x-3">
+              <h4 className="font-display text-[15px] font-semibold">{study.description || "Gambar PACS"}</h4>
+              <span className="font-mono text-[12px] text-ink-2">{dateLabel(study)}</span>
+            </header>
+            <StudyThumbs study={study} onOpen={open(study)} />
+          </section>
+        ))}
+
+        {empty ? <p className="px-4 py-3.5 text-[13px] text-ink-3">Tidak ada pemeriksaan radiologi.</p> : null}
+        {gallery.pacsCatatan ? <p className="px-4 py-2.5 text-[12.5px] text-ink-3">{gallery.pacsCatatan}</p> : null}
+        {!gallery.pacsCatatan && gallery.pemeriksaan.length > 0 && gallery.studies.length === 0 ? (
+          <p className="px-4 py-2.5 text-[12.5px] text-ink-3">Belum ada gambar di PACS untuk kunjungan ini.</p>
+        ) : null}
+      </div>
+
+      <Viewer
+        study={viewing?.study ?? null}
+        start={viewing?.index ?? 0}
+        viewerBase={gallery.viewerBase}
+        onClose={() => setViewing(null)}
+      />
+    </figure>
+  );
+};
 
 /** "Radiologi" button for the patient card. Renders nothing when the server has no PACS. */
 export const RadiologyButton = ({ rm }: { readonly rm: string }) => {

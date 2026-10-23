@@ -138,11 +138,32 @@ export const PacsStudies = Schema.Struct({
 });
 export type PacsStudies = typeof PacsStudies.Type;
 
+/** One radiology exam in Khanza (periksa_radiologi) with its reading (hasil_radiologi). */
+export const RadiologyExam = Schema.Struct({
+  noRawat: Schema.String,
+  /** YYYY-MM-DD */
+  tanggal: Schema.String,
+  /** HH:MM */
+  jam: Schema.String,
+  /** Exam names, e.g. "Thorax PA"; null when only a reading exists. */
+  nama: Schema.NullOr(Schema.String),
+  /** Radiologist. */
+  dokter: Schema.NullOr(Schema.String),
+  /** The reading text; null when not written yet. */
+  hasil: Schema.NullOr(Schema.String),
+});
+export type RadiologyExam = typeof RadiologyExam.Type;
+
 /**
- * Radiology images of a patient (or of one visit), shown as a card in the chat
- * by the `gambarRadiologi` tool. Images load from /api/pacs/instances/...
+ * Radiology of a visit (or a patient), shown as one card in the chat by the
+ * `hasilRadiologi` tool: Khanza's exams and readings with the PACS images of
+ * the same day. Images load from /api/pacs/instances/...
  */
 export const RadiologyGallery = Schema.Struct({
+  /** Exams and readings from Khanza, newest first. */
+  pemeriksaan: Schema.Array(RadiologyExam),
+  /** Why there are no images: PACS not set up or not reachable. Null when PACS answered. */
+  pacsCatatan: Schema.NullOr(Schema.String),
   noRkmMedis: Schema.String,
   noRawat: Schema.NullOr(Schema.String),
   /** Dates of the visit the studies were matched to (YYYY-MM-DD), when noRawat is set. */

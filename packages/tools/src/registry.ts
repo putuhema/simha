@@ -13,7 +13,7 @@ import type { ResultStore } from "./info/ResultStore.ts";
 import type { SchemaDocs } from "./info/SchemaDocs.ts";
 import { tampilkan } from "./info/tampilkan.ts";
 import type { KhanzaRead } from "./khanza/KhanzaRead.ts";
-import { gambarRadiologi } from "./pacs/gambarRadiologi.ts";
+import { hasilRadiologi } from "./pacs/hasilRadiologi.ts";
 import type { Pacs } from "./pacs/Pacs.ts";
 import { usulkanPerbaikan } from "./propose/usulkanPerbaikan.ts";
 import { readTools } from "./read/index.ts";
@@ -71,5 +71,5 @@ export const defaultRegistry: ToolRegistry = makeRegistry([
   dokumenPasien,
   buatDraftResume,
   isiDraft,
-  gambarRadiologi,
+  hasilRadiologi,
 ] as unknown as ReadonlyArray<AnyTool>);

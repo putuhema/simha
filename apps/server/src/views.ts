@@ -221,10 +221,11 @@ const make = Effect.gen(function* () {
             drafts: drafts.filter((d) => d.session_id === r.id).map(toDraft),
             // Rebuilt from the tool's stored output (the audit log keeps it).
             radiology: steps
-              .filter((s) => s.session_id === r.id && s.tool === "gambarRadiologi" && s.status === "ok")
+              // (gambarRadiologi = the earlier, images-only version of hasilRadiologi.)
+              .filter((s) => s.session_id === r.id && (s.tool === "hasilRadiologi" || s.tool === "gambarRadiologi") && s.status === "ok")
               .flatMap((s) => {
-                const gallery = (parseJson(s.output_json) as { gallery?: RadiologyGallery } | null)?.gallery;
-                return gallery ? [gallery] : [];
+                const gallery = (parseJson(s.output_json) as { gallery?: Partial<RadiologyGallery> } | null)?.gallery;
+                return gallery ? [{ pemeriksaan: [], pacsCatatan: null, ...gallery } as RadiologyGallery] : [];
               }),
             fixIds: fixes.filter((f) => f.run_id === r.id).map((f) => f.id),
           }),

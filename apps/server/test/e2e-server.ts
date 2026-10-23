@@ -12,7 +12,7 @@
  * - "per poli": a bar chart of visits per clinic;
  * - "hari ini": the number of registrations today;
  * - "riwayat": the history document of RM 000002;
- * - "foto thorax" / "rontgen": the radiology images of 2026/10/21/000002 from the fake PACS;
+ * - "radiologi" / "foto thorax": the reading and images of 2026/10/21/000002 (fake PACS);
  * - anything else: a short text answer.
  *
  * PACS is a fake Orthanc with one synthetic chest X-ray study for RM 000002.
@@ -55,9 +55,9 @@ const respond = (request: ChatRequest): ReturnType<typeof fakeTurn> => {
   const step = results.length;
 
   // Radiology images from the (fake) PACS.
-  if (/foto thorax|rontgen/i.test(question)) {
-    if (step === 0) return fakeTurn("", [{ name: "gambarRadiologi", args: { noRawat: "2026/10/21/000002" } }]);
-    return fakeTurn("Ada 1 studi thorax (21 Okt 2026) dengan 3 gambar di PACS.");
+  if (/radiologi|foto thorax|rontgen/i.test(question)) {
+    if (step === 0) return fakeTurn("", [{ name: "hasilRadiologi", args: { noRawat: "2026/10/21/000002" } }]);
+    return fakeTurn("Berikut hasil radiologi kunjungan 2026/10/21/000002.");
   }
   // Resume medis: start a draft, ask for what is missing; a follow-up with answers fills the draft.
   if (/buat resume/i.test(question)) {

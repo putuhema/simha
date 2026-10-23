@@ -30,7 +30,7 @@ describe.skipIf(testDb === null)("dokumenPasien", () => {
           jenis: "cppt",
           judul: "CPPT / SOAP",
           subjek: "RM 000002 · SITI AMINAH · 2026/10/21/000002",
-          ringkas: "3 catatan CPPT, 2 diagnosis, 2 hasil lab",
+          ringkas: "3 catatan CPPT, 2 diagnosis, 2 hasil lab, 1 hasil radiologi",
           dibuatOleh: "it-budi",
         });
         expect(html).toContain("RSUD FIKTIF SEHAT");

@@ -240,6 +240,18 @@ export const KHANZA_TABLES: ReadonlyArray<ExpectedTable> = [
     extra: true,
   },
   {
+    name: "periksa_radiologi",
+    purpose: "Radiology exams done in a visit: exam type, radiologist, date and time (hasilRadiologi)",
+    columns: ["no_rawat", "kd_jenis_prw", "tgl_periksa", "jam", "kd_dokter", "dokter_perujuk", "status"],
+    extra: true,
+  },
+  {
+    name: "jns_perawatan_radiologi",
+    purpose: "Radiology exam types (name of the exam, e.g. Thorax PA)",
+    columns: ["kd_jenis_prw", "nm_perawatan"],
+    extra: true,
+  },
+  {
     name: "prosedur_pasien",
     purpose: "Procedures (ICD-9-CM) of a visit, by priority (resume medis)",
     columns: ["no_rawat", "kode", "status", "prioritas"],

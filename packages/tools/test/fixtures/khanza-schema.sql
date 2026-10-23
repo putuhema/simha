@@ -379,6 +379,35 @@ CREATE TABLE `jns_perawatan_lab` (
   KEY `status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
 
+DROP TABLE IF EXISTS `jns_perawatan_radiologi`;
+CREATE TABLE `jns_perawatan_radiologi` (
+  `kd_jenis_prw` varchar(15) NOT NULL,
+  `nm_perawatan` varchar(80) DEFAULT NULL,
+  `bagian_rs` double DEFAULT NULL,
+  `bhp` double NOT NULL,
+  `tarif_perujuk` double NOT NULL,
+  `tarif_tindakan_dokter` double NOT NULL,
+  `tarif_tindakan_petugas` double DEFAULT NULL,
+  `kso` double DEFAULT NULL,
+  `menejemen` double DEFAULT NULL,
+  `total_byr` double DEFAULT NULL,
+  `kd_pj` char(3) NOT NULL,
+  `status` enum('0','1') NOT NULL,
+  `kelas` enum('-','Rawat Jalan','Kelas 1','Kelas 2','Kelas 3','Kelas Utama','Kelas VIP','Kelas VVIP') NOT NULL,
+  PRIMARY KEY (`kd_jenis_prw`),
+  KEY `kd_pj` (`kd_pj`),
+  KEY `nm_perawatan` (`nm_perawatan`),
+  KEY `bagian_rs` (`bagian_rs`),
+  KEY `tarif_perujuk` (`tarif_perujuk`),
+  KEY `tarif_tindakan_dokter` (`tarif_tindakan_dokter`),
+  KEY `tarif_tindakan_petugas` (`tarif_tindakan_petugas`),
+  KEY `total_byr` (`total_byr`),
+  KEY `bhp` (`bhp`),
+  KEY `kso` (`kso`),
+  KEY `menejemen` (`menejemen`),
+  KEY `status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
+
 DROP TABLE IF EXISTS `kamar`;
 CREATE TABLE `kamar` (
   `kd_kamar` varchar(15) NOT NULL,
@@ -605,6 +634,39 @@ CREATE TABLE `periksa_lab` (
   `kd_dokter` varchar(20) NOT NULL,
   `status` enum('Ralan','Ranap') DEFAULT NULL,
   `kategori` enum('PA','PK','MB') NOT NULL,
+  PRIMARY KEY (`no_rawat`,`kd_jenis_prw`,`tgl_periksa`,`jam`),
+  KEY `nip` (`nip`),
+  KEY `kd_jenis_prw` (`kd_jenis_prw`),
+  KEY `kd_dokter` (`kd_dokter`),
+  KEY `dokter_perujuk` (`dokter_perujuk`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci ROW_FORMAT=COMPACT;
+
+DROP TABLE IF EXISTS `periksa_radiologi`;
+CREATE TABLE `periksa_radiologi` (
+  `no_rawat` varchar(17) NOT NULL,
+  `nip` varchar(20) NOT NULL,
+  `kd_jenis_prw` varchar(15) NOT NULL,
+  `tgl_periksa` date NOT NULL,
+  `jam` time NOT NULL,
+  `dokter_perujuk` varchar(20) NOT NULL,
+  `bagian_rs` double NOT NULL,
+  `bhp` double NOT NULL,
+  `tarif_perujuk` double NOT NULL,
+  `tarif_tindakan_dokter` double NOT NULL,
+  `tarif_tindakan_petugas` double NOT NULL,
+  `kso` double DEFAULT NULL,
+  `menejemen` double DEFAULT NULL,
+  `biaya` double NOT NULL,
+  `kd_dokter` varchar(20) NOT NULL,
+  `status` enum('Ranap','Ralan') DEFAULT NULL,
+  `proyeksi` varchar(50) NOT NULL,
+  `kV` varchar(10) NOT NULL,
+  `mAS` varchar(10) NOT NULL,
+  `FFD` varchar(10) NOT NULL,
+  `BSF` varchar(10) NOT NULL,
+  `inak` varchar(10) NOT NULL,
+  `jml_penyinaran` varchar(10) NOT NULL,
+  `dosis` varchar(20) NOT NULL,
   PRIMARY KEY (`no_rawat`,`kd_jenis_prw`,`tgl_periksa`,`jam`),
   KEY `nip` (`nip`),
   KEY `kd_jenis_prw` (`kd_jenis_prw`),
