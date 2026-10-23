@@ -109,9 +109,9 @@ export const berkasDigital = defineTool({
 
     const missing = berkas.filter((file) => !file.ada).length;
     const catatan = !files.configured
-      ? "Folder berkas digital belum diatur di server (KHANZA_BERKAS_DIR), jadi daftar ini belum bisa dibuka."
+      ? "Sumber berkas digital belum diatur di server (KHANZA_BERKAS_URL atau KHANZA_BERKAS_DIR), jadi daftar ini belum bisa dibuka."
       : missing > 0
-        ? `${missing} berkas tidak ditemukan di folder server.`
+        ? `${missing} berkas tidak ditemukan atau tidak bisa dibuka di server (periksa KHANZA_BERKAS_URL/DIR).`
         : rows.length > MAX_FILES
           ? `Hanya ${MAX_FILES} berkas pertama yang ditampilkan.`
           : null;

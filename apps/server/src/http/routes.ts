@@ -661,15 +661,17 @@ const BerkasRoutes = route(
       }
       const safeName = file.namaFile.replaceAll(/[^A-Za-z0-9._-]+/g, "-") || "berkas";
       const inline = !download && file.jenis !== "lainnya";
-      return HttpServerResponse.uint8Array(file.data, {
-        contentType: file.contentType,
-        headers: {
-          "content-disposition": `${inline ? "inline" : "attachment"}; filename="${safeName}"`,
-          "x-content-type-options": "nosniff",
-          "referrer-policy": "no-referrer",
-          "cache-control": "private, max-age=3600",
-        },
-      });
+      return HttpServerResponse.fromWeb(
+        new Response(file.response.body, {
+          headers: {
+            "content-type": file.contentType,
+            "content-disposition": `${inline ? "inline" : "attachment"}; filename="${safeName}"`,
+            "x-content-type-options": "nosniff",
+            "referrer-policy": "no-referrer",
+            "cache-control": "private, max-age=3600",
+          },
+        }),
+      );
     }),
   ),
 );
