@@ -11,7 +11,16 @@ import type {
   ChatCompletionTool,
 } from "openai/resources/chat/completions/completions";
 import { LlmError, streamFrom, type LlmClientService, type LlmInfo } from "../LlmClient.ts";
-import { parseArgs, type ChatMessage, type ChatRequest, type LlmEvent, type StopReason, type ToolCall, type ToolSpec } from "../types.ts";
+import {
+  parseArgs,
+  type ChatMessage,
+  type ChatRequest,
+  type LlmEvent,
+  type StopReason,
+  type ToolCall,
+  type ToolSpec,
+  type Usage,
+} from "../types.ts";
 
 export interface OpenAiCompatOptions {
   readonly info: LlmInfo;
@@ -39,7 +48,7 @@ export const toOpenAiMessages = (system: string, messages: ReadonlyArray<ChatMes
   ...messages.map((m): ChatCompletionMessageParam => {
     switch (m.role) {
       case "user":
-        return { role: "user", content: m.text };
+        return { role: "user", content: m.modelText ?? m.text };
       case "assistant":
         return m.toolCalls.length === 0
           ? { role: "assistant", content: m.text }
@@ -49,7 +58,11 @@ export const toOpenAiMessages = (system: string, messages: ReadonlyArray<ChatMes
               tool_calls: m.toolCalls.map((c) => ({
                 id: c.id,
                 type: "function" as const,
-                function: { name: c.name, arguments: typeof c.args === "string" ? c.args : JSON.stringify(c.args ?? {}) },
+                function: {
+                  name: c.name,
+                  // The raw string keeps the prefix byte-identical for prompt caching.
+                  arguments: c.rawArgs ?? (typeof c.args === "string" ? c.args : JSON.stringify(c.args ?? {})),
+                },
               })),
             };
       case "tool":
@@ -83,7 +96,12 @@ export class ToolCallAccumulator {
     return [...this.parts.entries()]
       .toSorted(([a], [b]) => a - b)
       .filter(([, p]) => p.name !== "")
-      .map(([index, p]) => ({ id: p.id || `call_${index}_${crypto.randomUUID().slice(0, 8)}`, name: p.name, args: parseArgs(p.args) }));
+      .map(([index, p]) => ({
+        id: p.id || `call_${index}_${crypto.randomUUID().slice(0, 8)}`,
+        name: p.name,
+        args: parseArgs(p.args),
+        ...(p.args === "" ? {} : { rawArgs: p.args }),
+      }));
   }
 }
 
@@ -97,6 +115,31 @@ export const reasoningOf = (delta: unknown): string => {
   const value = d.reasoning_content ?? d.reasoning;
   return typeof value === "string" ? value : "";
 };
+
+/**
+ * Cached prompt tokens. OpenAI nests them in `prompt_tokens_details`;
+ * DeepSeek and some gateways report `prompt_cache_hit_tokens` or
+ * `cache_read_input_tokens` at the top level.
+ */
+export const cachedTokensOf = (usage: unknown): number => {
+  if (usage === null || typeof usage !== "object") return 0;
+  const u = usage as {
+    prompt_tokens_details?: { cached_tokens?: unknown };
+    prompt_cache_hit_tokens?: unknown;
+    cache_read_input_tokens?: unknown;
+  };
+  const value = u.prompt_tokens_details?.cached_tokens ?? u.prompt_cache_hit_tokens ?? u.cache_read_input_tokens;
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+};
+
+/**
+ * The value for OpenAI's `prompt_cache_key`, which routes a conversation's
+ * requests to the same cache shard. Other compatible servers cache by prefix
+ * automatically and a strict gateway may reject an unknown field, so only the
+ * real OpenAI provider gets it.
+ */
+export const promptCacheKey = (info: LlmInfo, request: ChatRequest): string | undefined =>
+  info.provider === "openai" ? request.cacheKey : undefined;
 
 export const toStopReason = (finishReason: string | null | undefined, hasToolCalls: boolean): StopReason => {
   // Some servers report "stop" even when they returned tool calls.
@@ -125,6 +168,7 @@ export const makeOpenAiCompatClient = (options: OpenAiCompatOptions): LlmClientS
 
   async function* run(request: ChatRequest): AsyncGenerator<LlmEvent> {
     const controller = new AbortController();
+    const cacheKey = promptCacheKey(info, request);
     try {
       const stream = await client.chat.completions.create(
         {
@@ -132,13 +176,14 @@ export const makeOpenAiCompatClient = (options: OpenAiCompatOptions): LlmClientS
           stream: true,
           messages: toOpenAiMessages(request.system, request.messages),
           ...(request.tools.length > 0 ? { tools: toOpenAiTools(request.tools) } : {}),
+          ...(cacheKey === undefined ? {} : { prompt_cache_key: cacheKey }),
         },
         { signal: controller.signal },
       );
       const calls = new ToolCallAccumulator();
       let text = "";
       let finishReason: string | null = null;
-      let usage: { inputTokens: number; outputTokens: number } | undefined;
+      let usage: Usage | undefined;
       for await (const chunk of stream) {
         yield* calls.add(chunk);
         for (const choice of chunk.choices) {
@@ -151,7 +196,14 @@ export const makeOpenAiCompatClient = (options: OpenAiCompatOptions): LlmClientS
           }
           if (choice.finish_reason) finishReason = choice.finish_reason;
         }
-        if (chunk.usage) usage = { inputTokens: chunk.usage.prompt_tokens, outputTokens: chunk.usage.completion_tokens };
+        if (chunk.usage) {
+          const cached = cachedTokensOf(chunk.usage);
+          usage = {
+            inputTokens: chunk.usage.prompt_tokens,
+            outputTokens: chunk.usage.completion_tokens,
+            ...(cached > 0 ? { cachedInputTokens: cached } : {}),
+          };
+        }
       }
       const toolCalls = calls.calls();
       const stopReason = toStopReason(finishReason, toolCalls.length > 0);

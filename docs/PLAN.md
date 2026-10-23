@@ -151,7 +151,7 @@ Each one ends with tests passing and a stop for you to test.
 
 - **Schema** (`packages/tools/src/knowledge/KnowledgeStore.ts`, table `knowledge`, migration `0008_knowledge`): `kind` (`example` / `note`), `source` (`auto`, `feedback`, `ai`, `staff`), `text` (question for an example, note text otherwise), `sql`, `render_type`, `title`, `verified`, `active`, `block_id`, `run_id`, `created_by`, `uses`, `last_used_at`.
 - **Search** (`knowledge/search.ts`): no FTS5; lower-case tokens, Indonesian stopwords, a light `-an/-kan/-nya` suffix and `me-/ber-/ter-/di-/ke-/se-` prefix stemmer, IDF-weighted cosine overlap. Verified ×1.25; staff/feedback ×1.1, AI ×0.95, automatic ×0.9. Notes need 0.25, examples 0.35.
-- **Retrieval**: before each turn, up to 5 active items are added to the **current user message** as `[Pengetahuan dari pertanyaan sebelumnya]` (max 1,600 chars). The stored conversation keeps the plain question, so follow-ups do not replay old context.
+- **Retrieval**: before each turn, up to 5 active items are added to the **current user message** as `[Pengetahuan dari pertanyaan sebelumnya]` (max 1,600 chars). The block is stored as the turn's `modelText` (the visible/stored question stays plain), so a follow-up replays the exact prompt and the provider cache keeps its prefix; the history budget in `history.ts` bounds the growth.
 - **Feedback**: under result blocks by `blockId`; under text-only answers (app-map, documents, summaries) by `runId`. A run-level 👍 stores the question + answer as a verified note; a run-level 👎 stores the correction. The UI shows one set of thumbs per turn (block feedback when a block exists, otherwise answer feedback).
 - **Learning sources**:
   - auto: first self-contained answer with a block (not a follow-up), unverified, tied to `block_id`/`run_id`;
@@ -161,6 +161,14 @@ Each one ends with tests passing and a stop for you to test.
 - **Privacy**: `personalReason()` refuses no_rawat, RM/NIK/SEP/phone numbers and emails in notes, examples, feedback and auto-saves. Knowledge never changes Khanza.
 - **UI**: thumbs under every render block; **Pengetahuan AI** page (`/pengetahuan`) lists/filters/searches, adds staff notes, and lets admins verify, edit, deactivate or delete.
 - **Tests**: store/search/tool unit tests and server end-to-end tests cover auto-save, 👍/👎, moderation, privacy rejection, prompt injection and `catatPengetahuan`.
+
+## Caching, streaming and token budget notes
+
+- **Cache-stable prompt**: tools, system prompt and history are unchanged between turns; the knowledge block travels in the user turn's `modelText`, which is stored and replayed verbatim. Claude keeps the top-level `cache_control`; `LLM_PROVIDER=openai` sends `prompt_cache_key` (the conversation id). DeepSeek and other compatible servers cache the prefix automatically.
+- **Telemetry**: `Usage` carries `cachedInputTokens`/`cacheWriteTokens`; the adapters read Anthropic's `cache_read_input_tokens`/`cache_creation_input_tokens` (and add them to `inputTokens`), OpenAI's `prompt_tokens_details.cached_tokens` and DeepSeek's `prompt_cache_hit_tokens`. Runs store both in `agent_runs.cached_input_tokens`/`cache_write_tokens` (migration `0009_cache_usage`) and the audit log shows them.
+- **Token budget**: `history.ts` estimates four characters per token; above 24,000 tokens of replayed history it drops whole oldest turns at user-message boundaries and prepends a one-line question → answer summary. Tool calls/results are never split, the stored conversation is untouched, and the newest turns stay byte-identical for the cache.
+- **Streaming**: `sse.ts` merges the event stream with a 15-second tick of `: keep-alive` comments; comments are ignored by the client parser but keep proxies from closing a quiet tool step.
+- **Tests**: adapter unit tests cover cache usage shapes; `history.test.ts` covers boundaries, pairing and summaries; the agent end-to-end test checks a long follow-up is compacted.
 
 ## M6.2 notes: resume drafts
 

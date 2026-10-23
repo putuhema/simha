@@ -15,6 +15,12 @@ export interface ToolCall {
   readonly id: string;
   readonly name: string;
   readonly args: unknown;
+  /**
+   * The argument JSON exactly as the provider streamed it. Replayed verbatim
+   * when the provider does not keep its own native turn, so the prompt cache
+   * still sees an unchanged prefix.
+   */
+  readonly rawArgs?: string;
 }
 
 /**
@@ -29,7 +35,17 @@ export interface NativeTurn {
 }
 
 export type ChatMessage =
-  | { readonly role: "user"; readonly text: string }
+  | {
+      readonly role: "user";
+      /** What the user typed (and what the UI shows). */
+      readonly text: string;
+      /**
+       * Exact text sent to the model when it differs from `text`, e.g. with the
+       * learned-knowledge block appended. Stored and replayed unchanged, so the
+       * provider's prompt cache sees the same prefix on the next question.
+       */
+      readonly modelText?: string;
+    }
   | {
       readonly role: "assistant";
       readonly text: string;
@@ -49,14 +65,24 @@ export interface ChatRequest {
   readonly system: string;
   readonly messages: ReadonlyArray<ChatMessage>;
   readonly tools: ReadonlyArray<ToolSpec>;
+  /**
+   * Stable id of the conversation, for providers whose cache routing benefits
+   * from it (OpenAI `prompt_cache_key`). Never shown to the user.
+   */
+  readonly cacheKey?: string;
 }
 
 /** Why the model stopped. `refusal` and `max_tokens` end the run; tools must not be run on a truncated turn. */
 export type StopReason = "end_turn" | "tool_use" | "max_tokens" | "refusal" | "other";
 
 export interface Usage {
+  /** Total input tokens, including tokens read from or written to the prompt cache. */
   readonly inputTokens: number;
   readonly outputTokens: number;
+  /** Input tokens served from the provider's prompt cache (billed cheaper or free). */
+  readonly cachedInputTokens?: number;
+  /** Input tokens written into the prompt cache on this turn (Anthropic charges extra for these). */
+  readonly cacheWriteTokens?: number;
 }
 
 export type LlmEvent =

@@ -29,7 +29,8 @@ import {
 } from "@simrs/tools";
 import { Cause, Context, Effect, Exit, Layer, Queue, Stream } from "effect";
 import { Store } from "../store.ts";
-import { knowledgePrompt, withKnowledge } from "./knowledge.ts";
+import { compactHistory, HISTORY_TOKEN_BUDGET } from "./history.ts";
+import { knowledgePrompt, userTurn } from "./knowledge.ts";
 import { SystemPrompt } from "./prompt.ts";
 
 /** Upper bound on model turns per question, so a confused model cannot loop forever. */
@@ -182,19 +183,22 @@ const make = Effect.gen(function* () {
           );
 
         const raw = userText(input, new Date(), yield* latestDataDate);
-        yield* append({ role: "user", text: info.maskPii ? maskText(raw) : raw });
-        const userMessageIndex = history.length - 1;
-        // What earlier questions taught us. The stored message stays plain; the
-        // block is only added to the requests, so follow-ups do not replay it.
+        // What earlier questions taught us. `text` stays the plain question (it
+        // is what the UI shows); the block rides along as `modelText`, so the
+        // next question replays exactly what the model saw and the provider's
+        // prompt cache keeps its prefix.
         const matches = yield* knowledge.relevant(question).pipe(Effect.catchCause(() => Effect.succeed([])));
         const learned = knowledgePrompt(matches);
         const knowledgeBlock = learned === "" ? "" : info.maskPii ? maskText(learned) : learned;
+        yield* append(userTurn(info.maskPii ? maskText(raw) : raw, knowledgeBlock));
 
         let steps = 0;
         let finalText = "";
         let stopReason = "other";
         let inputTokens = 0;
         let outputTokens = 0;
+        let cachedInputTokens = 0;
+        let cacheWriteTokens = 0;
         const blocks: Array<RenderBlock> = [];
 
         const loop = Effect.gen(function* () {
@@ -208,8 +212,12 @@ const make = Effect.gen(function* () {
             const drafts: Array<{ readonly index: number; readonly draftId: string }> = [];
             yield* llm.chat({
               system,
-              messages: withKnowledge(history, userMessageIndex, knowledgeBlock),
+              // Budgeted snapshot: old turns are dropped and summarised, the
+              // newest kept exactly as stored, and the run keeps appending to
+              // `history` while this turn streams.
+              messages: [...compactHistory(history, HISTORY_TOKEN_BUDGET)],
               tools: registry.descriptions,
+              cacheKey: conversationId,
             }).pipe(
               Stream.runForEach((event) => {
                 switch (event.type) {
@@ -238,6 +246,8 @@ const make = Effect.gen(function* () {
             stopReason = done?.stopReason ?? "other";
             inputTokens += done?.usage?.inputTokens ?? 0;
             outputTokens += done?.usage?.outputTokens ?? 0;
+            cachedInputTokens += done?.usage?.cachedInputTokens ?? 0;
+            cacheWriteTokens += done?.usage?.cacheWriteTokens ?? 0;
             yield* append({ role: "assistant", text, toolCalls: calls, native: done?.native });
             if (text.trim() !== "") finalText = text;
 
@@ -306,6 +316,8 @@ const make = Effect.gen(function* () {
               steps,
               inputTokens: inputTokens || null,
               outputTokens: outputTokens || null,
+              cachedInputTokens: cachedInputTokens || null,
+              cacheWriteTokens: cacheWriteTokens || null,
               error,
             }),
             ticketId === null ? Effect.void : store.setTicketStatus(ticketId, status === "ok" ? "diagnosed" : "open"),

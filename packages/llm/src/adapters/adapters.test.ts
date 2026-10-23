@@ -1,9 +1,18 @@
+import type { BetaUsage } from "@anthropic-ai/sdk/resources/beta/messages/messages";
 import type { ChatCompletionChunk } from "openai/resources/chat/completions/completions";
 import { describe, expect, it } from "vitest";
 import type { LlmInfo } from "../LlmClient.ts";
 import type { ChatMessage } from "../types.ts";
-import { toAnthropicMessages, toAnthropicTools } from "./anthropic.ts";
-import { normalizeBaseUrl, reasoningOf, toOpenAiMessages, toStopReason, ToolCallAccumulator } from "./openai-compat.ts";
+import { toAnthropicMessages, toAnthropicTools, toAnthropicUsage } from "./anthropic.ts";
+import {
+  cachedTokensOf,
+  normalizeBaseUrl,
+  promptCacheKey,
+  reasoningOf,
+  toOpenAiMessages,
+  toStopReason,
+  ToolCallAccumulator,
+} from "./openai-compat.ts";
 
 const history: Array<ChatMessage> = [
   { role: "user", text: "Cek kamar RM 000002" },
@@ -36,6 +45,14 @@ describe("Anthropic format", () => {
       { type: "tool_result", tool_use_id: "c1", content: '{"jumlahAktif":2}', is_error: false },
       { type: "tool_result", tool_use_id: "c2", content: "noRawat salah", is_error: true },
     ]);
+  });
+
+  it("sends modelText (question plus knowledge) when it differs from the stored text", () => {
+    const [message] = toAnthropicMessages(
+      [{ role: "user", text: "pertanyaan", modelText: "pertanyaan\n\n[Pengetahuan]\n- contoh" }],
+      claude,
+    );
+    expect(message).toEqual({ role: "user", content: "pertanyaan\n\n[Pengetahuan]\n- contoh" });
   });
 
   it("replays Claude's own content (with thinking blocks) unchanged for the same model", () => {
@@ -71,6 +88,13 @@ describe("Anthropic format", () => {
 });
 
 describe("OpenAI-compatible format", () => {
+  it("sends modelText for a user turn", () => {
+    expect(toOpenAiMessages("SYS", [{ role: "user", text: "q", modelText: "q\n\n[Pengetahuan]" }])[1]).toEqual({
+      role: "user",
+      content: "q\n\n[Pengetahuan]",
+    });
+  });
+
   it("maps history to system/user/assistant(tool_calls)/tool messages", () => {
     const messages = toOpenAiMessages("SYS", history);
     expect(messages.map((m) => m.role)).toEqual(["system", "user", "assistant", "tool", "tool"]);
@@ -83,13 +107,26 @@ describe("OpenAI-compatible format", () => {
     expect(messages[4]).toEqual({ role: "tool", tool_call_id: "c2", content: "ERROR: noRawat salah" });
   });
 
+  it("replays the original tool-call arguments so the prompt prefix stays identical", () => {
+    const messages = toOpenAiMessages("SYS", [
+      {
+        role: "assistant",
+        text: "",
+        toolCalls: [{ id: "c1", name: "jalankanQueryBaca", args: { sql: "SELECT 1" }, rawArgs: '{ "sql" : "SELECT 1" }' }],
+      },
+    ]);
+    expect(messages[1]).toMatchObject({
+      tool_calls: [{ id: "c1", function: { name: "jalankanQueryBaca", arguments: '{ "sql" : "SELECT 1" }' } }],
+    });
+  });
+
   it("assembles tool calls streamed in fragments", () => {
     const acc = new ToolCallAccumulator();
     acc.add(chunk([{ index: 0, id: "call_a", function: { name: "riwayat", arguments: '{"noRa' } }]));
     acc.add(chunk([{ index: 0, function: { name: "Kamar", arguments: 'wat":"x"}' } }]));
     acc.add(chunk([{ index: 1, function: { name: "statusKamar", arguments: "not json" } }]));
     const [a, b] = acc.calls();
-    expect(a).toEqual({ id: "call_a", name: "riwayatKamar", args: { noRawat: "x" } });
+    expect(a).toEqual({ id: "call_a", name: "riwayatKamar", args: { noRawat: "x" }, rawArgs: '{"noRawat":"x"}' });
     expect(b?.name).toBe("statusKamar");
     expect(b?.args).toBe("not json");
     expect(b?.id).toMatch(/^call_1_/);
@@ -125,5 +162,33 @@ describe("OpenAI-compatible format", () => {
     expect(normalizeBaseUrl("https://api.example.ai/v1/chat/completions")).toBe("https://api.example.ai/v1");
     expect(normalizeBaseUrl("http://localhost:11434/v1/")).toBe("http://localhost:11434/v1");
     expect(normalizeBaseUrl("  ")).toBeUndefined();
+  });
+});
+
+describe("prompt cache usage", () => {
+  it("counts Claude cache reads and writes as input tokens and reports the cached part", () => {
+    const usage = toAnthropicUsage({
+      input_tokens: 100,
+      output_tokens: 20,
+      cache_read_input_tokens: 900,
+      cache_creation_input_tokens: 50,
+    } as unknown as BetaUsage);
+    expect(usage).toEqual({ inputTokens: 1_050, outputTokens: 20, cachedInputTokens: 900, cacheWriteTokens: 50 });
+  });
+
+  it("reads cached tokens from OpenAI, DeepSeek and gateway usage shapes", () => {
+    expect(cachedTokensOf({ prompt_tokens_details: { cached_tokens: 640 } })).toBe(640);
+    expect(cachedTokensOf({ prompt_cache_hit_tokens: 512 })).toBe(512);
+    expect(cachedTokensOf({ cache_read_input_tokens: 256 })).toBe(256);
+    expect(cachedTokensOf({ prompt_tokens: 10 })).toBe(0);
+    expect(cachedTokensOf(undefined)).toBe(0);
+  });
+
+  it("sends a conversation cache key only to OpenAI", () => {
+    const openai: LlmInfo = { ...claude, provider: "openai", adapter: "openai-compat" };
+    const request = { system: "", messages: [], tools: [], cacheKey: "conversation-1" };
+    expect(promptCacheKey(openai, request)).toBe("conversation-1");
+    expect(promptCacheKey(claude, request)).toBeUndefined();
+    expect(promptCacheKey(openai, { system: "", messages: [], tools: [] })).toBeUndefined();
   });
 });

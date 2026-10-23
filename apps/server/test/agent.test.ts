@@ -168,6 +168,23 @@ describe.skipIf(testDb === null)("agent over HTTP", () => {
     }
   });
 
+  it("drops old turns from a follow-up when the history exceeds the token budget", async () => {
+    const big = "x".repeat(120_000);
+    const app = makeTestApp([fakeTurn(big), fakeTurn("Lanjut.")]);
+    try {
+      const first = await readEvents(await app.call("POST", "/ask", { question: "Pertanyaan pertama" }));
+      const started = first[0];
+      if (started?._tag !== "run_started") throw new Error("expected run_started");
+      await readEvents(await app.call("POST", "/ask", { question: "Lanjut", conversationId: started.conversationId }));
+      const messages = app.fake.requests[1]?.messages ?? [];
+      expect(messages[0]?.role === "user" && messages[0].text).toContain("[Ringkasan percakapan sebelumnya");
+      expect(messages[0]?.role === "user" && messages[0].text).toContain("Pertanyaan pertama");
+      expect(JSON.stringify(messages)).not.toContain("x".repeat(1_000));
+    } finally {
+      await app.dispose();
+    }
+  });
+
   it("streams a provider failure as an error event", async () => {
     const app = makeTestApp([{ fail: "Claude API 401 error (periksa LLM_API_KEY)" }]);
     try {

@@ -2,12 +2,12 @@
  * The learning loop end to end: a successful result becomes an automatic
  * example, 👍 verifies it, 👎 disables it and stores the correction, staff can
  * moderate, and the next question carries the matching knowledge into the AI
- * turn without persisting it in the conversation.
+ * turn (as modelText, so the visible question stays clean).
  */
 import { fakeTurn, type ChatRequest } from "@simrs/llm";
 import type { AgentEvent, Knowledge } from "@simrs/shared";
 import { describe, expect, it } from "vitest";
-import { knowledgePrompt, withKnowledge } from "../src/agent/knowledge.ts";
+import { knowledgePrompt, userTurn } from "../src/agent/knowledge.ts";
 import { makeTestApp, readEvents, testDb } from "./harness.ts";
 
 const perPoliSql =
@@ -75,17 +75,13 @@ describe("knowledge prompt", () => {
     expect(knowledgePrompt([])).toBe("");
   });
 
-  it("adds the block only to the current user turn, as a copy", () => {
-    const messages = [
-      { role: "user" as const, text: "pertama" },
-      { role: "assistant" as const, text: "jawaban", toolCalls: [] },
-      { role: "user" as const, text: "kedua" },
-    ];
-    const next = withKnowledge(messages, 2, "[Pengetahuan]\n- x");
-    expect(next).not.toBe(messages);
-    expect(messages[2]?.text).toBe("kedua");
-    expect(next[2]?.role === "user" && next[2].text).toContain("kedua\n\n[Pengetahuan]");
-    expect(next[0]).toMatchObject({ role: "user", text: "pertama" });
+  it("keeps the question as text and sends the knowledge block as modelText", () => {
+    expect(userTurn("kedua", "[Pengetahuan]\n- x")).toEqual({
+      role: "user",
+      text: "kedua",
+      modelText: "kedua\n\n[Pengetahuan]\n- x",
+    });
+    expect(userTurn("kedua", "")).toEqual({ role: "user", text: "kedua" });
   });
 });
 
@@ -179,22 +175,34 @@ describe.skipIf(testDb === null)("knowledge over HTTP", () => {
     }
   });
 
-  it("injects matching notes into the next user turn, not the stored conversation", async () => {
+  it("injects matching notes into modelText, not the visible question, and replays it on a follow-up", async () => {
     const app = makeTestApp([fakeTurn("ok"), fakeTurn("ok")]);
     try {
       await app.call("POST", "/knowledge", {
         text: "Pasien BPJS memakai penjab kd_pj = BPJ; pasien umum memakai A09.",
       });
-      await readEvents(await app.call("POST", "/ask", { question: "Berapa pasien BPJS bulan ini?" }));
+      const firstEvents = await readEvents(await app.call("POST", "/ask", { question: "Berapa pasien BPJS bulan ini?" }));
+      const firstStarted = firstEvents[0];
+      if (firstStarted?._tag !== "run_started") throw new Error("expected run_started");
       const first = app.fake.requests[0];
       const firstUser = first?.messages.find((m) => m.role === "user");
-      expect(firstUser?.role === "user" && firstUser.text).toContain("[Pengetahuan dari pertanyaan sebelumnya]");
-      expect(firstUser?.role === "user" && firstUser.text).toContain("kd_pj = BPJ");
+      expect(firstUser?.role === "user" && firstUser.modelText).toContain("[Pengetahuan dari pertanyaan sebelumnya]");
+      expect(firstUser?.role === "user" && firstUser.modelText).toContain("kd_pj = BPJ");
+      expect(firstUser?.role === "user" && firstUser.text).not.toContain("[Pengetahuan");
 
-      // The stored turn is plain: a follow-up does not replay the knowledge block.
-      const started = await readEvents(await app.call("POST", "/ask", { question: "Kalau minggu lalu?" }));
+      // The stored question stays plain; the modelText rides along so the next
+      // request replays exactly what the model saw (and the cache prefix matches).
+      const started = await readEvents(
+        await app.call("POST", "/ask", {
+          question: "Kalau minggu lalu?",
+          conversationId: firstStarted.conversationId,
+        }),
+      );
       const runStarted = started[0];
       if (runStarted?._tag !== "run_started") throw new Error("expected run_started");
+      const replay = app.fake.requests[1]?.messages.find((m) => m.role === "user");
+      expect(replay?.role === "user" && replay.text).not.toContain("[Pengetahuan");
+      expect(replay?.role === "user" && replay.modelText).toContain("[Pengetahuan dari pertanyaan sebelumnya]");
       const transcript = (await (await app.call("GET", `/conversations/${runStarted.conversationId}`)).json()) as {
         runs: ReadonlyArray<{ question: string }>;
       };

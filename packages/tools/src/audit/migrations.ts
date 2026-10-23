@@ -298,6 +298,14 @@ const knowledge = Effect.gen(function* () {
   yield* sql`CREATE INDEX knowledge_block ON knowledge (block_id)`;
 });
 
+const cacheUsage = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  // How much of a run's input came from the provider's prompt cache and how
+  // much it wrote into it, so the audit log can show whether caching works.
+  yield* sql`ALTER TABLE agent_runs ADD COLUMN cached_input_tokens INTEGER`;
+  yield* sql`ALTER TABLE agent_runs ADD COLUMN cache_write_tokens INTEGER`;
+});
+
 export const auditMigrations = {
   "0001_init": init,
   "0002_agent": agent,
@@ -307,4 +315,5 @@ export const auditMigrations = {
   "0006_documents": documents,
   "0007_form_drafts": formDrafts,
   "0008_knowledge": knowledge,
+  "0009_cache_usage": cacheUsage,
 };

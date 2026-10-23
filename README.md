@@ -355,7 +355,8 @@ is saved automatically as an **example** (question + SQL, unverified). The AI's 
 **`catatPengetahuan`** tool, a 👍, and the **Pengetahuan AI** page add notes and verified examples. Before
 each question the server searches this store (keyword + IDF, no embeddings), takes at most five matching
 items, and injects them into the *current user turn* as `[Pengetahuan dari pertanyaan sebelumnya]`. The
-stored conversation stays plain, so follow-ups do not grow with old context.
+block is kept as the turn's `modelText`, so the question stored and shown to the user stays plain while a
+follow-up replays exactly what the model saw.
 
 - **👍 / 👎.** Under every result (table, chart, number) and every text answer. On a result, 👍 verifies
   the example and 👎 turns the automatic example off; on a text answer, 👍 saves the question + answer as
@@ -366,6 +367,27 @@ stored conversation stays plain, so follow-ups do not grow with old context.
 - **Privacy.** Examples/notes with a no. rawat, RM, NIK, SEP or phone number are refused. Verified items
   rank above automatic ones, and auto examples rank slightly below staff/AI notes.
 - **Storage.** The `knowledge` table lives in the audit SQLite DB (migration `0008_knowledge`).
+
+## Caching, streaming and token use
+
+- **Prompt cache.** The system prompt, tool schemas and history go out in the same order and wording on
+  every turn. The knowledge block is stored with its turn (as `modelText`, see above), so the next
+  question replays exactly what the model saw. Claude requests use Anthropic's automatic
+  `cache_control`; for `LLM_PROVIDER=openai` the request also carries a stable `prompt_cache_key` per
+  conversation. OpenAI-compatible servers (DeepSeek, Gemini, gateways) cache the prefix on their own.
+- **Cache accounting.** Each run records `cached_input_tokens` (read from the provider's cache) and
+  `cache_write_tokens` (written to it). The sources are Anthropic's `cache_read_input_tokens` /
+  `cache_creation_input_tokens`, OpenAI's `prompt_tokens_details.cached_tokens` and DeepSeek's
+  `prompt_cache_hit_tokens`. Both columns are visible in **Audit log → Pertanyaan**, so a cache that
+  stops working is easy to spot.
+- **History budget.** A follow-up resends the conversation, and past tool results (a query can return 50
+  rows) are the biggest part of it. Once the replayed history passes about 24,000 estimated tokens
+  (`apps/server/src/agent/history.ts`), the oldest complete turns are dropped and replaced by a one-line
+  question/answer summary; the newest turns stay byte-identical for the cache. The stored conversation
+  is never changed.
+- **Streaming.** `/api/ask` and `/api/tickets/:id/investigate` stream answer text, thinking and
+  half-written tool calls as Server-Sent Events. A `: keep-alive` comment every 15 seconds keeps proxies
+  and mobile networks from dropping the connection while a tool runs.
 
 ## Development
 

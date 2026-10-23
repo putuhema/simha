@@ -8,9 +8,14 @@
  *   classifier declines the request, the API retries on a suitable model.
  */
 import Anthropic, { APIError } from "@anthropic-ai/sdk";
-import type { BetaContentBlockParam, BetaMessageParam, BetaTool } from "@anthropic-ai/sdk/resources/beta/messages/messages";
+import type {
+  BetaContentBlockParam,
+  BetaMessageParam,
+  BetaTool,
+  BetaUsage,
+} from "@anthropic-ai/sdk/resources/beta/messages/messages";
 import { LlmError, streamFrom, type LlmClientService, type LlmInfo } from "../LlmClient.ts";
-import type { ChatMessage, ChatRequest, LlmEvent, StopReason, ToolSpec } from "../types.ts";
+import type { ChatMessage, ChatRequest, LlmEvent, StopReason, ToolSpec, Usage } from "../types.ts";
 
 const MAX_TOKENS = 64_000;
 
@@ -40,7 +45,7 @@ export const toAnthropicMessages = (messages: ReadonlyArray<ChatMessage>, info: 
   const out: Array<BetaMessageParam> = [];
   for (const m of messages) {
     if (m.role === "user") {
-      out.push({ role: "user", content: m.text });
+      out.push({ role: "user", content: m.modelText ?? m.text });
     } else if (m.role === "assistant") {
       const sameModel = m.native?.provider === info.provider && m.native.model === info.model;
       if (sameModel && Array.isArray(m.native?.content)) {
@@ -78,6 +83,23 @@ const toStopReason = (reason: string | null | undefined): StopReason => {
     default:
       return "other";
   }
+};
+
+/**
+ * Claude reports cache reads and writes separately from `input_tokens`, and
+ * charges for them differently. `inputTokens` is the total, so a run's token
+ * count is comparable with OpenAI-style providers (which include cached tokens
+ * in `prompt_tokens`).
+ */
+export const toAnthropicUsage = (usage: BetaUsage): Usage => {
+  const cacheRead = usage.cache_read_input_tokens ?? 0;
+  const cacheWrite = usage.cache_creation_input_tokens ?? 0;
+  return {
+    inputTokens: usage.input_tokens + cacheRead + cacheWrite,
+    outputTokens: usage.output_tokens,
+    cachedInputTokens: cacheRead,
+    cacheWriteTokens: cacheWrite,
+  };
 };
 
 const toLlmError = (provider: string, cause: unknown): LlmError => {
@@ -139,7 +161,7 @@ export const makeAnthropicClient = (options: AnthropicOptions): LlmClientService
         type: "done",
         stopReason,
         native: { provider: info.provider, model: info.model, content: message.content },
-        usage: { inputTokens: message.usage.input_tokens, outputTokens: message.usage.output_tokens },
+        usage: toAnthropicUsage(message.usage),
       };
     } finally {
       stream.abort();

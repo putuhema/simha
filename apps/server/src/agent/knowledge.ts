@@ -1,7 +1,7 @@
 /**
- * The "what we learned" block added to the current user turn. It is built for
- * the model only: the stored conversation keeps the plain question, so a long
- * list of examples is not replayed on every follow-up.
+ * The "what we learned" block added to the current user turn. It is kept in
+ * the message's `modelText`, so the stored/visible question stays plain while
+ * the model replays the exact text (and the provider cache keeps its prefix).
  */
 import type { ChatMessage } from "@simrs/llm";
 import type { RelevantKnowledge } from "@simrs/tools";
@@ -40,14 +40,11 @@ export const knowledgePrompt = (matches: ReadonlyArray<RelevantKnowledge>): stri
   return lines.join("\n");
 };
 
-/** A copy of `messages` with the knowledge block appended to the current user turn. */
-export const withKnowledge = (
-  messages: ReadonlyArray<ChatMessage>,
-  userIndex: number,
-  block: string,
-): ReadonlyArray<ChatMessage> => {
-  if (block === "") return [...messages];
-  return messages.map((message, index) =>
-    index === userIndex && message.role === "user" ? { ...message, text: `${message.text}\n\n${block}` } : message,
-  );
-};
+/**
+ * The user turn sent to the model: `text` is the question (stored and shown to
+ * the user), `modelText` also carries the knowledge block. Keeping the block in
+ * `modelText` means the next question replays exactly what the model saw, so a
+ * provider prompt cache can reuse the prefix instead of missing at this turn.
+ */
+export const userTurn = (text: string, knowledgeBlock: string): ChatMessage =>
+  knowledgeBlock === "" ? { role: "user", text } : { role: "user", text, modelText: `${text}\n\n${knowledgeBlock}` };

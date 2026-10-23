@@ -27,6 +27,10 @@ interface RunEnd {
   readonly steps: number;
   readonly inputTokens: number | null;
   readonly outputTokens: number | null;
+  /** Input tokens served from the provider's prompt cache (part of inputTokens). */
+  readonly cachedInputTokens: number | null;
+  /** Input tokens written to the prompt cache on this run. */
+  readonly cacheWriteTokens: number | null;
   readonly error: string | null;
 }
 
@@ -156,6 +160,8 @@ const make = Effect.gen(function* () {
       steps: run.steps,
       input_tokens: run.inputTokens,
       output_tokens: run.outputTokens,
+      cached_input_tokens: run.cachedInputTokens,
+      cache_write_tokens: run.cacheWriteTokens,
       error: run.error,
       finished_at: now(),
     })} WHERE id = ${run.id}`.pipe(Effect.asVoid, Effect.orDie);

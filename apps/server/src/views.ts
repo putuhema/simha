@@ -68,7 +68,7 @@ const AUDIT: Record<AuditKind, { from: string; time: string; columns: string; se
     from: "agent_runs",
     time: "started_at",
     columns:
-      "id, started_at, kind, question, asked_by, provider, model, mask_pii, status, steps, input_tokens, output_tokens, error",
+      "id, started_at, kind, question, asked_by, provider, model, mask_pii, status, steps, input_tokens, cached_input_tokens, cache_write_tokens, output_tokens, error",
     search: ["question", "asked_by", "model", "provider"],
   },
   tools: {
