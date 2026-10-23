@@ -22,6 +22,8 @@
  *   POST   /api/ask                      Tanya Data question (SSE)
  *   GET    /api/conversations            recent Tanya Data threads (?mine=1)
  *   GET    /api/conversations/:id        one thread with its answers and blocks
+ *   PATCH  /api/conversations/:id        { pinned?, archived? }: pin or archive (owner or admin)
+ *   DELETE /api/conversations/:id        remove a thread and its messages (owner or admin)
  *   GET    /api/patients/:rm             patient card (kartuPasien tool)
  *   GET    /api/patients/:rm/radiologi   the patient's radiology studies in Orthanc PACS (?dari=&sampai=)
  *   GET    /api/pacs/instances/:id/:kind one image through the server: thumb (JPEG), preview (PNG), file (DICOM)
@@ -67,6 +69,7 @@ import {
   RejectFixRequest,
   SetupRequest,
   TicketStatus,
+  UpdateConversationRequest,
   UpdateDraftRequest,
   UpdateKnowledgeRequest,
   UpdateLlmSettingsRequest,
@@ -404,6 +407,66 @@ const TicketRoutes = Layer.mergeAll(
         const transcript = yield* (yield* Views).conversation(yield* id);
         return transcript ? json(transcript) : errorResponse(404, "Percakapan tidak ditemukan.");
       }),
+    ),
+  ),
+
+  route(
+    "PATCH",
+    "/api/conversations/:id",
+    authed(
+      handled(
+        Effect.gen(function* () {
+          const conversationId = yield* id;
+          const user = yield* CurrentUser;
+          const store = yield* Store;
+          const owner = yield* store.conversationOwner(conversationId);
+          if (owner === undefined) return errorResponse(404, "Percakapan tidak ditemukan.");
+          if (owner !== user.username && user.role !== "admin") {
+            return errorResponse(403, "Percakapan ini milik pengguna lain.");
+          }
+          const input = yield* body(UpdateConversationRequest);
+          if (input.pinned === undefined && input.archived === undefined) {
+            return errorResponse(400, "Isi pinned atau archived.");
+          }
+          if (!(yield* store.setConversationFlags(conversationId, input))) {
+            return errorResponse(404, "Percakapan tidak ditemukan.");
+          }
+          const action =
+            input.archived !== undefined
+              ? input.archived
+                ? "conversation_archived"
+                : "conversation_unarchived"
+              : input.pinned
+                ? "conversation_pinned"
+                : "conversation_unpinned";
+          yield* (yield* Auth).logEvent(action, user.username, conversationId);
+          return HttpServerResponse.empty({ status: 204 });
+        }),
+      ),
+    ),
+  ),
+
+  route(
+    "DELETE",
+    "/api/conversations/:id",
+    authed(
+      handled(
+        Effect.gen(function* () {
+          const conversationId = yield* id;
+          const user = yield* CurrentUser;
+          const store = yield* Store;
+          const owner = yield* store.conversationOwner(conversationId);
+          if (owner === undefined) return errorResponse(404, "Percakapan tidak ditemukan.");
+          if (owner !== user.username && user.role !== "admin") {
+            return errorResponse(403, "Percakapan ini milik pengguna lain.");
+          }
+          if (!(yield* store.removeConversation(conversationId))) {
+            return errorResponse(404, "Percakapan tidak ditemukan.");
+          }
+          yield* (yield* Auth).logEvent("conversation_deleted", user.username, conversationId);
+          return HttpServerResponse.empty({ status: 204 });
+        }),
+      ),
     ),
   ),
 

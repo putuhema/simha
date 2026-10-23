@@ -306,6 +306,15 @@ const cacheUsage = Effect.gen(function* () {
   yield* sql`ALTER TABLE agent_runs ADD COLUMN cache_write_tokens INTEGER`;
 });
 
+const threadActions = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  // Pin/archive/remove for Tanya Data threads. Timestamps keep the order and
+  // the audit trail; a removed thread keeps its runs but loses its messages.
+  yield* sql`ALTER TABLE conversations ADD COLUMN pinned_at TEXT`;
+  yield* sql`ALTER TABLE conversations ADD COLUMN archived_at TEXT`;
+  yield* sql`ALTER TABLE conversations ADD COLUMN deleted_at TEXT`;
+});
+
 export const auditMigrations = {
   "0001_init": init,
   "0002_agent": agent,
@@ -316,4 +325,5 @@ export const auditMigrations = {
   "0007_form_drafts": formDrafts,
   "0008_knowledge": knowledge,
   "0009_cache_usage": cacheUsage,
+  "0010_thread_actions": threadActions,
 };

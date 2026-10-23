@@ -8,6 +8,8 @@ import { Menu } from "@base-ui/react/menu";
 import type { ConversationSummary, Favorite, Stats } from "@simrs/shared";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
+  Archive,
+  ArchiveRestore,
   BookOpen,
   ChevronRight,
   FileClock,
@@ -15,11 +17,13 @@ import {
   LogOut,
   MessageSquare,
   MonitorCog,
+  MoreHorizontal,
   PanelLeftClose,
   PanelLeftOpen,
+  Pin,
+  PinOff,
   Search,
   Settings,
-  SquareTerminal,
   SquarePen,
   Star,
   Ticket,
@@ -27,12 +31,12 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { api } from "../../lib/api.ts";
+import { api, errorMessage } from "../../lib/api.ts";
 import { cn } from "../../lib/cn.ts";
 import { desktop } from "../../lib/desktop.ts";
 import { useApi } from "../../lib/useApi.ts";
 import { useAuth } from "../../stores/auth.ts";
-import { bumpFavorites, useVersions } from "../../stores/refresh.ts";
+import { bumpConversations, bumpFavorites, useVersions } from "../../stores/refresh.ts";
 import { useSidebar } from "../../stores/sidebar.ts";
 import { useTanya } from "../../stores/tanya.ts";
 import { TipButton } from "../ui/Tip.tsx";
@@ -157,8 +161,18 @@ const UserMenu = ({ compact, health, onNavigate }: { readonly compact: boolean; 
 };
 
 /** A collapsible group of links ("Favorit", "Percakapan"). */
-const Section = ({ title, children, empty }: { readonly title: string; readonly children: ReactNode; readonly empty?: string | null }) => {
-  const [open, setOpen] = useState(true);
+const Section = ({
+  title,
+  children,
+  empty,
+  defaultOpen = true,
+}: {
+  readonly title: string;
+  readonly children: ReactNode;
+  readonly empty?: string | null;
+  readonly defaultOpen?: boolean;
+}) => {
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <section className="mt-4">
       <button
@@ -176,6 +190,80 @@ const Section = ({ title, children, empty }: { readonly title: string; readonly 
 };
 
 const matches = (text: string, query: string) => query === "" || text.toLowerCase().includes(query.toLowerCase());
+
+interface ConversationRowProps {
+  readonly conversation: ConversationSummary;
+  readonly active: boolean;
+  readonly running: boolean;
+  readonly onNavigate: () => void;
+  readonly onDeleted: (id: string) => void;
+  readonly onError: (message: string | null) => void;
+}
+
+/** One thread: open it, or pin/archive/remove it from the ··· menu. */
+const ConversationRow = ({ conversation, active, running, onNavigate, onDeleted, onError }: ConversationRowProps) => {
+  const setFlags = (flags: { readonly pinned?: boolean; readonly archived?: boolean }) => {
+    void api
+      .patch(`/api/conversations/${conversation.id}`, flags)
+      .then(() => {
+        onError(null);
+        bumpConversations();
+      })
+      .catch((error: unknown) => onError(errorMessage(error)));
+  };
+  const remove = () => {
+    if (!window.confirm("Hapus percakapan ini? Pertanyaan dan jawabannya tidak bisa dibuka lagi.")) return;
+    void api
+      .delete(`/api/conversations/${conversation.id}`)
+      .then(() => {
+        onError(null);
+        onDeleted(conversation.id);
+        bumpConversations();
+      })
+      .catch((error: unknown) => onError(errorMessage(error)));
+  };
+  return (
+    <li className="group/item relative">
+      <Link
+        to="/tanya"
+        search={{ c: conversation.id }}
+        onClick={onNavigate}
+        title={conversation.firstQuestion}
+        className={cn(itemClass, "pr-9 font-normal", active && activeClass)}
+      >
+        {conversation.pinned ? <Pin className="size-3.5 shrink-0 text-amber" aria-hidden /> : null}
+        <span className="truncate">{conversation.firstQuestion}</span>
+        {running ? <span className="ml-auto size-1.5 shrink-0 animate-pulse rounded-full bg-teal" /> : null}
+      </Link>
+      <Menu.Root>
+        <Menu.Trigger
+          aria-label={`Aksi percakapan ${conversation.firstQuestion}`}
+          className="absolute top-1/2 right-1 grid size-6 -translate-y-1/2 place-items-center rounded-md text-ink-3 opacity-100 transition-colors hover:bg-card hover:text-ink focus:opacity-100 data-[popup-open]:bg-card data-[popup-open]:opacity-100 md:opacity-0 md:group-hover/item:opacity-100"
+        >
+          <MoreHorizontal className="size-4" />
+        </Menu.Trigger>
+        <Menu.Portal>
+          <Menu.Positioner side="bottom" align="end" sideOffset={4} className="z-50">
+            <Menu.Popup className="min-w-48 origin-[var(--transform-origin)] rounded-xl border border-line bg-card p-1.5 text-[13px] shadow-[0_16px_40px_-16px_rgb(23_32_30/0.35)] transition-[opacity,transform] duration-150 outline-none data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+              <Menu.Item className={menuItem} onClick={() => setFlags({ pinned: !conversation.pinned })}>
+                {conversation.pinned ? <PinOff className="size-4 text-ink-2" /> : <Pin className="size-4 text-ink-2" />}
+                {conversation.pinned ? "Lepas pin" : "Pin percakapan"}
+              </Menu.Item>
+              <Menu.Item className={menuItem} onClick={() => setFlags({ archived: !conversation.archived })}>
+                {conversation.archived ? <ArchiveRestore className="size-4 text-ink-2" /> : <Archive className="size-4 text-ink-2" />}
+                {conversation.archived ? "Keluarkan dari arsip" : "Arsipkan"}
+              </Menu.Item>
+              <Menu.Separator className="my-1 h-px bg-line-2" />
+              <Menu.Item className={cn(menuItem, "text-red data-[highlighted]:bg-red-soft")} onClick={remove}>
+                <Trash2 className="size-4" /> Hapus percakapan
+              </Menu.Item>
+            </Menu.Popup>
+          </Menu.Positioner>
+        </Menu.Portal>
+      </Menu.Root>
+    </li>
+  );
+};
 
 interface PanelProps {
   readonly health: Health | undefined;
@@ -200,6 +288,7 @@ export const SidebarPanel = ({ health, healthError, stats, onNavigate, onClose, 
   const { conversationId, runFavorite, running } = useTanya();
   const { searching, startSearch, stopSearch } = useSidebar();
   const [query, setQuery] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
   const searchBox = useRef<HTMLInputElement>(null);
 
   const reloadConversations = conversations.reload;
@@ -220,7 +309,12 @@ export const SidebarPanel = ({ health, healthError, stats, onNavigate, onClose, 
   };
   const activeChat = pathname === "/tanya" ? (search.c ?? conversationId) : null;
   const favoriteList = (favorites.data ?? []).filter((f) => matches(`${f.judul} ${f.question}`, query));
-  const chatList = (conversations.data ?? []).filter((c) => matches(c.firstQuestion, query));
+  const conversationList = conversations.data ?? [];
+  const chatList = conversationList.filter((c) => !c.archived && matches(c.firstQuestion, query));
+  const archivedList = conversationList.filter((c) => c.archived && matches(c.firstQuestion, query));
+  const conversationDeleted = (id: string) => {
+    if (id === conversationId || id === search.c) newChat();
+  };
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -274,12 +368,6 @@ export const SidebarPanel = ({ health, healthError, stats, onNavigate, onClose, 
             <Search className="size-4" /> Cari
           </button>
         )}
-        {desktop ? (
-          <button type="button" className={itemClass} onClick={() => void desktop?.toggleTerminal()}>
-            <SquareTerminal className="size-4" /> Terminal
-            <kbd className="ml-auto font-sans text-[11px] text-ink-3 opacity-0 transition-opacity group-hover:opacity-100">Ctrl+`</kbd>
-          </button>
-        ) : null}
         <Link to="/tiket" onClick={onNavigate} className={itemClass} activeProps={{ className: activeClass }}>
           <Ticket className="size-4" /> Tiket
           {stats?.tiketTerbuka ? (
@@ -323,24 +411,39 @@ export const SidebarPanel = ({ health, healthError, stats, onNavigate, onClose, 
             ))}
           </ul>
         </Section>
+        {actionError ? <p className="px-2 pb-1 text-[12.5px] text-red">{actionError}</p> : null}
         <Section title="Percakapan" empty={conversations.data && chatList.length === 0 ? (query ? "Tidak ada yang cocok." : "Belum ada percakapan.") : null}>
           <ul data-testid="conversations">
-            {chatList.slice(0, 50).map((c) => (
-              <li key={c.id}>
-                <Link
-                  to="/tanya"
-                  search={{ c: c.id }}
-                  onClick={onNavigate}
-                  title={c.firstQuestion}
-                  className={cn(itemClass, "font-normal", c.id === activeChat && activeClass)}
-                >
-                  <span className="truncate">{c.firstQuestion}</span>
-                  {c.id === conversationId && running ? <span className="ml-auto size-1.5 shrink-0 animate-pulse rounded-full bg-teal" /> : null}
-                </Link>
-              </li>
+            {chatList.map((c) => (
+              <ConversationRow
+                key={c.id}
+                conversation={c}
+                active={c.id === activeChat}
+                running={c.id === conversationId && running}
+                onNavigate={onNavigate}
+                onDeleted={conversationDeleted}
+                onError={setActionError}
+              />
             ))}
           </ul>
         </Section>
+        {archivedList.length > 0 ? (
+          <Section title={`Arsip (${archivedList.length})`} defaultOpen={false}>
+            <ul data-testid="archived-conversations">
+              {archivedList.map((c) => (
+                <ConversationRow
+                  key={c.id}
+                  conversation={c}
+                  active={c.id === activeChat}
+                  running={c.id === conversationId && running}
+                  onNavigate={onNavigate}
+                  onDeleted={conversationDeleted}
+                  onError={setActionError}
+                />
+              ))}
+            </ul>
+          </Section>
+        ) : null}
       </div>
 
       <div className="shrink-0 space-y-1.5 border-t border-line-2 p-2">
@@ -385,11 +488,6 @@ export const SidebarRail = ({ health, healthError, stats }: Pick<PanelProps, "he
       >
         <BookOpen className="size-[18px]" />
       </TipButton>
-      {desktop ? (
-        <TipButton label="Terminal" shortcut="Ctrl+`" side="right" onClick={() => void desktop?.toggleTerminal()} className={icon}>
-          <SquareTerminal className="size-[18px]" />
-        </TipButton>
-      ) : null}
       <div className="mt-auto flex flex-col items-center gap-2">
         <span
           title={healthError ? "Server tidak terhubung" : health ? "Khanza DB terhubung" : "Memeriksa…"}

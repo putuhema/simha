@@ -106,6 +106,32 @@ test("Tanya Data shows a chart with its SQL and saves a favorite", async () => {
   await expect(page.getByTestId("render-block")).toHaveCount(1);
 });
 
+test("a thread can be pinned, archived and removed from the sidebar", async () => {
+  const label = "Jumlah kunjungan per poli";
+  const item = () => page.getByTestId("conversations").locator("li").filter({ hasText: label });
+  await expect(item()).toHaveCount(1);
+
+  await item().hover();
+  await item().getByRole("button", { name: /^Aksi percakapan/ }).click();
+  await page.getByRole("menuitem", { name: "Pin percakapan" }).click();
+  await expect(page.getByTestId("conversations").locator("li").first()).toContainText(label);
+
+  await item().hover();
+  await item().getByRole("button", { name: /^Aksi percakapan/ }).click();
+  await page.getByRole("menuitem", { name: "Arsipkan" }).click();
+  await expect(page.getByTestId("conversations").getByText(label)).toHaveCount(0);
+  await page.getByRole("button", { name: /^Arsip/ }).click();
+  const archived = page.getByTestId("archived-conversations").locator("li").filter({ hasText: label });
+  await expect(archived).toHaveCount(1);
+
+  await archived.hover();
+  await archived.getByRole("button", { name: /^Aksi percakapan/ }).click();
+  page.once("dialog", (dialog) => void dialog.accept());
+  await page.getByRole("menuitem", { name: "Hapus percakapan" }).click();
+  await expect(page.getByTestId("conversations").getByText(label)).toHaveCount(0);
+  await expect(page.getByTestId("archived-conversations")).toHaveCount(0);
+});
+
 test("the knowledge page shows what the AI learned and accepts a note", async () => {
   await page.getByRole("link", { name: /Pengetahuan AI/ }).click();
   await expect(page.getByRole("heading", { name: "Pengetahuan AI" })).toBeVisible();

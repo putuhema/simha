@@ -604,8 +604,19 @@ export const ConversationSummary = Schema.Struct({
   askedBy: Schema.NullOr(Schema.String),
   runCount: Schema.Number,
   lastAt: Schema.String,
+  /** Kept at the top of the list. */
+  pinned: Schema.Boolean,
+  /** Hidden under "Arsip" until unarchived. */
+  archived: Schema.Boolean,
 });
 export type ConversationSummary = typeof ConversationSummary.Type;
+
+/** PATCH /api/conversations/:id. Omitted fields keep their value. */
+export const UpdateConversationRequest = Schema.Struct({
+  pinned: Schema.optionalKey(Schema.Boolean),
+  archived: Schema.optionalKey(Schema.Boolean),
+});
+export type UpdateConversationRequest = typeof UpdateConversationRequest.Type;
 
 // --- AI provider settings ---------------------------------------------------------------------
 

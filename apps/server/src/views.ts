@@ -235,7 +235,7 @@ const make = Effect.gen(function* () {
 
   const conversation = (id: string) =>
     Effect.gen(function* () {
-      const [row] = yield* sql<{ id: string }>`SELECT id FROM conversations WHERE id = ${id}`.pipe(Effect.orDie);
+      const [row] = yield* sql<{ id: string }>`SELECT id FROM conversations WHERE id = ${id} AND deleted_at IS NULL`.pipe(Effect.orDie);
       return row ? yield* transcriptOf(row.id) : undefined;
     });
 
@@ -245,16 +245,26 @@ const make = Effect.gen(function* () {
       return yield* transcriptOf(row?.id ?? null);
     });
 
-  /** Recent Tanya Data threads; `askedBy` limits them to one user. */
+  /** Tanya Data threads; `askedBy` limits them to one user. Active first, pinned on top. */
   const conversations = (askedBy: string | undefined) =>
-    sql<{ id: string; first_question: string; asked_by: string | null; run_count: number; last_at: string }>`
+    sql<{
+      id: string;
+      first_question: string;
+      asked_by: string | null;
+      run_count: number;
+      last_at: string;
+      pinned_at: string | null;
+      archived_at: string | null;
+    }>`
       SELECT c.id,
         (SELECT question FROM agent_runs WHERE conversation_id = c.id ORDER BY started_at LIMIT 1) AS first_question,
         (SELECT asked_by FROM agent_runs WHERE conversation_id = c.id ORDER BY started_at LIMIT 1) AS asked_by,
-        COUNT(r.id) AS run_count, MAX(r.started_at) AS last_at
+        COUNT(r.id) AS run_count, MAX(r.started_at) AS last_at, c.pinned_at, c.archived_at
       FROM conversations c JOIN agent_runs r ON r.conversation_id = c.id
-      WHERE c.kind = 'ask' ${askedBy ? sql`AND r.asked_by = ${askedBy}` : sql``}
-      GROUP BY c.id ORDER BY last_at DESC LIMIT 50`.pipe(
+      WHERE c.kind = 'ask' AND c.deleted_at IS NULL ${askedBy ? sql`AND r.asked_by = ${askedBy}` : sql``}
+      GROUP BY c.id
+      ORDER BY (c.archived_at IS NOT NULL), (c.pinned_at IS NOT NULL) DESC, last_at DESC
+      LIMIT 100`.pipe(
       Effect.map((rows) =>
         rows.map(
           (r): ConversationSummary => ({
@@ -263,6 +273,8 @@ const make = Effect.gen(function* () {
             askedBy: r.asked_by,
             runCount: r.run_count,
             lastAt: r.last_at,
+            pinned: r.pinned_at !== null,
+            archived: r.archived_at !== null,
           }),
         ),
       ),

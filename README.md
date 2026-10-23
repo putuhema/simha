@@ -235,7 +235,7 @@ Then build Khanza as usual (NetBeans: **Clean and Build**) and copy `dist/SIMRSK
 
 Khanza runs on its own (it keeps running when SIMRS Harness quits). Everything it prints is saved to `logs/khanza.log` in the app data folder. If it stops within 15 seconds of a start, a banner says so, with **Lihat output**.
 
-**Terminal** (Ctrl+`, or **Terminal** in the sidebar). A panel at the bottom with tabs of real shells on that PC: PowerShell on Windows, your login shell (zsh) on macOS, with the same PATH and Java as a normal terminal. New shells start in the Khanza folder, so `./Aplikasi.bat` (macOS) or `.\Aplikasi.bat` (Windows) works right away. **Lihat output Khanza** opens a tab that follows `khanza.log`. Drag the panel's top edge to resize it. The panel is a page built into the app: the harness web UI (which may come from a network server) can open it but cannot type into it.
+**Terminal** (Ctrl+`, or **Aplikasi → Terminal** in the desktop menu). A panel at the bottom with tabs of real shells on that PC: PowerShell on Windows, your login shell (zsh) on macOS, with the same PATH and Java as a normal terminal. New shells start in the Khanza folder, so `./Aplikasi.bat` (macOS) or `.\Aplikasi.bat` (Windows) works right away. **Lihat output Khanza** opens a tab that follows `khanza.log`. Drag the panel's top edge to resize it. The panel is a page built into the app: the harness web UI (which may come from a network server) can open it but cannot type into it.
 
 **macOS** (e.g. an IT laptop with Khanza): `pnpm --filter @simrs/desktop dist:mac` builds `apps/desktop/release/mac-arm64/SIMRS Harness.app`. Choose `Aplikasi.bat` (run with `sh` from its folder, like `./Aplikasi.bat` in a terminal), a `.sh`, or `SIMRSKhanza.jar` (started with the same Java settings as `Aplikasi.bat`) as the Khanza file, and a running Khanza is found by its jar name (macOS asks once to allow "System Events" to bring it to the front).
 
@@ -276,7 +276,9 @@ Send the `conversationId` with the next `/api/ask` for a follow-up.
 | `GET /api/tickets/:id/transcript` | past investigations: steps, answers, blocks, fixes |
 | `POST /api/tickets/:id/investigate` | run the agent; optional `{ question }` for a follow-up (SSE) |
 | `POST /api/ask` | `{ question, conversationId? }` (SSE) |
-| `GET /api/conversations`, `GET /api/conversations/:id` | Tanya Data threads (`?mine=1`) |
+| `GET /api/conversations`, `GET /api/conversations/:id` | Tanya Data threads (`?mine=1`), active first and pinned on top |
+| `PATCH /api/conversations/:id` | `{ pinned?, archived? }`: pin, unpin, archive or unarchive (owner or admin) |
+| `DELETE /api/conversations/:id` | remove a thread and its messages (owner or admin; the audit log keeps its runs) |
 | `GET /api/patients/:rm` | patient card (no NIK, phone or address) |
 | `GET /api/fixes`, `GET /api/fixes/:id` | `?status=pending&ticketId=` |
 | `POST /api/fixes` | `{ title, reason, sql, params?, ticketId?, replaces? }` |

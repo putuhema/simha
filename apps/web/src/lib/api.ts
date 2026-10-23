@@ -56,7 +56,10 @@ export const api = {
     return (response.status === 204 ? undefined : await response.json()) as A;
   },
   put: async <A>(path: string, body: unknown): Promise<A> => (await (await request("PUT", path, body)).json()) as A,
-  patch: async <A>(path: string, body: unknown): Promise<A> => (await (await request("PATCH", path, body)).json()) as A,
+  patch: async <A>(path: string, body: unknown): Promise<A> => {
+    const response = await request("PATCH", path, body);
+    return (response.status === 204 ? undefined : await response.json()) as A;
+  },
   delete: async (path: string): Promise<void> => {
     await request("DELETE", path);
   },

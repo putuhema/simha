@@ -170,6 +170,13 @@ Each one ends with tests passing and a stop for you to test.
 - **Streaming**: `sse.ts` merges the event stream with a 15-second tick of `: keep-alive` comments; comments are ignored by the client parser but keep proxies from closing a quiet tool step.
 - **Tests**: adapter unit tests cover cache usage shapes; `history.test.ts` covers boundaries, pairing and summaries; the agent end-to-end test checks a long follow-up is compacted.
 
+## Thread actions notes
+
+- **Sidebar**: every Tanya Data thread has a `···` menu with pin/unpin, archive/unarchive and delete (delete asks first). Pinned threads sort first; archived ones move to a collapsed **Arsip** group and can be opened or restored from there.
+- **API**: `PATCH /api/conversations/:id` (`{ pinned?, archived? }`) and `DELETE /api/conversations/:id`, both limited to the thread owner or an admin. `conversations` gains `pinned_at`, `archived_at` and `deleted_at` (migration `0010_thread_actions`).
+- **Remove means remove**: the thread disappears from lists and cannot be opened or continued (a stale id starts a new thread); its messages are deleted so the AI cannot reuse them. The `agent_runs` rows stay in the audit log.
+- **Terminal**: the sidebar buttons are gone; Ctrl+` and the desktop **Aplikasi → Terminal** menu still open the panel.
+
 ## M6.2 notes: resume drafts
 
 - **Draft** (`packages/tools/src/drafts`, table `form_drafts`, migration `0007_form_drafts`): one row per draft, fields keyed by `resume_pasien_ranap` column, with the source of each value (`data`, `khanza`, `ai`, `user`). Field definitions, limits and choices in `packages/shared/src/forms.ts`, used by the server (isiDraft, PATCH /api/drafts/:id), the card and the desktop app's checks.

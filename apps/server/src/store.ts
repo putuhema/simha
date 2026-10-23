@@ -106,9 +106,9 @@ const make = Effect.gen(function* () {
   const conversationFor = (options: { readonly kind: "ask" | "ticket"; readonly id?: string; readonly ticketId?: string }) =>
     Effect.gen(function* () {
       const existing = options.ticketId
-        ? yield* sql<{ id: string }>`SELECT id FROM conversations WHERE ticket_id = ${options.ticketId}`
+        ? yield* sql<{ id: string }>`SELECT id FROM conversations WHERE ticket_id = ${options.ticketId} AND deleted_at IS NULL`
         : options.id
-          ? yield* sql<{ id: string }>`SELECT id FROM conversations WHERE id = ${options.id} AND kind = ${options.kind}`
+          ? yield* sql<{ id: string }>`SELECT id FROM conversations WHERE id = ${options.id} AND kind = ${options.kind} AND deleted_at IS NULL`
           : [];
       if (existing[0]) return existing[0].id;
       const id = crypto.randomUUID();
@@ -136,6 +136,48 @@ const make = Effect.gen(function* () {
       message_json: JSON.stringify(message),
       created_at: now(),
     })}`.pipe(Effect.asVoid, Effect.orDie);
+
+  /** Who asked the thread's first question; undefined when it is missing or removed. */
+  const conversationOwner = (id: string) =>
+    sql<{ asked_by: string | null }>`
+      SELECT (SELECT asked_by FROM agent_runs WHERE conversation_id = c.id ORDER BY started_at LIMIT 1) AS asked_by
+      FROM conversations c WHERE c.id = ${id} AND c.kind = 'ask' AND c.deleted_at IS NULL`.pipe(
+      Effect.map((rows) => (rows[0] ? rows[0].asked_by : undefined)),
+      Effect.orDie,
+    );
+
+  /** Pins or archives a thread; false when it no longer exists. */
+  const setConversationFlags = (id: string, flags: { readonly pinned?: boolean; readonly archived?: boolean }) =>
+    Effect.gen(function* () {
+      const at = now();
+      const updates: Record<string, string | null> = {};
+      if (flags.pinned !== undefined) updates["pinned_at"] = flags.pinned ? at : null;
+      if (flags.archived !== undefined) updates["archived_at"] = flags.archived ? at : null;
+      if (Object.keys(updates).length === 0) return true;
+      const rows = yield* sql<{ id: string }>`
+        UPDATE conversations SET ${sql.update(updates)}
+        WHERE id = ${id} AND deleted_at IS NULL RETURNING id`;
+      return rows.length === 1;
+    }).pipe(Effect.orDie);
+
+  /**
+   * Removes a thread from every list and deletes its messages, so the AI cannot
+   * use it as context again. The audit log keeps the runs (they are the audit
+   * trail), but the conversation itself is unreachable.
+   */
+  const removeConversation = (id: string) =>
+    sql
+      .withTransaction(
+        Effect.gen(function* () {
+          const rows = yield* sql<{ id: string }>`
+            UPDATE conversations SET deleted_at = ${now()}, pinned_at = NULL, archived_at = NULL
+            WHERE id = ${id} AND deleted_at IS NULL RETURNING id`;
+          if (rows.length === 0) return false;
+          yield* sql`DELETE FROM conversation_messages WHERE conversation_id = ${id}`;
+          return true;
+        }),
+      )
+      .pipe(Effect.orDie);
 
   const runStarted = (run: RunStart) =>
     sql`INSERT INTO agent_runs ${sql.insert({
@@ -182,6 +224,9 @@ const make = Effect.gen(function* () {
     conversationFor,
     loadMessages,
     appendMessage,
+    conversationOwner,
+    setConversationFlags,
+    removeConversation,
     runStarted,
     runFinished,
     getRun,

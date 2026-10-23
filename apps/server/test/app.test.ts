@@ -3,7 +3,17 @@
  * audit log, patient card, editing a fix, and serving the web UI.
  */
 import { fakeTurn } from "@simrs/llm";
-import type { AuditPage, AuthState, Fix, LlmSettingsView, LlmTestResult, Stats, Transcript, User } from "@simrs/shared";
+import type {
+  AuditPage,
+  AuthState,
+  ConversationSummary,
+  Fix,
+  LlmSettingsView,
+  LlmTestResult,
+  Stats,
+  Transcript,
+  User,
+} from "@simrs/shared";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as NodePath from "node:path";
@@ -205,6 +215,55 @@ describe.skipIf(testDb === null)("views", () => {
       expect(list[0]).toMatchObject({ id: started.conversationId, firstQuestion: "Berapa poli?" });
       expect((await app.callAs("orang-lain", "GET", "/conversations?mine=1").then((r) => r.json())) as Array<unknown>).toEqual([]);
       expect((await app.call("GET", "/conversations/tidak-ada")).status).toBe(404);
+    } finally {
+      await app.dispose();
+    }
+  });
+
+  it("pins, archives and removes a thread, and only its owner may change it", async () => {
+    const app = makeTestApp([fakeTurn("ok"), fakeTurn("ok")]);
+    try {
+      const ask = async (question: string) => {
+        const events = await readEvents(await app.call("POST", "/ask", { question }));
+        const started = events[0];
+        if (started?._tag !== "run_started") throw new Error("no run");
+        return started.conversationId;
+      };
+      const first = await ask("Thread pertama");
+      const second = await ask("Thread kedua");
+      const list = async () =>
+        (await (await app.call("GET", "/conversations?mine=1")).json()) as Array<ConversationSummary>;
+
+      expect((await list()).find((c) => c.id === first)).toMatchObject({ pinned: false, archived: false });
+
+      expect((await app.call("PATCH", `/conversations/${first}`, { pinned: true })).status).toBe(204);
+      let threads = await list();
+      expect(threads[0]).toMatchObject({ id: first, pinned: true });
+      expect(threads.find((c) => c.id === second)).toMatchObject({ pinned: false, archived: false });
+
+      expect((await app.call("PATCH", `/conversations/${second}`, { archived: true })).status).toBe(204);
+      threads = await list();
+      expect(threads.find((c) => c.id === second)).toMatchObject({ archived: true });
+      // An archived thread can still be opened, it is only moved out of the main list.
+      expect((await app.call("GET", `/conversations/${second}`)).status).toBe(200);
+
+      expect((await app.call("PATCH", `/conversations/${second}`, {})).status).toBe(400);
+      expect((await app.call("PATCH", `/conversations/${second}`, { archived: false })).status).toBe(204);
+      expect((await list()).find((c) => c.id === second)).toMatchObject({ archived: false });
+      expect((await app.call("PATCH", `/conversations/${second}`, { archived: true })).status).toBe(204);
+
+      // Only the owner (or an admin) may change a thread.
+      expect((await app.callAs("orang-lain", "PATCH", `/conversations/${first}`, { pinned: false })).status).toBe(403);
+      expect((await app.callAs("orang-lain", "DELETE", `/conversations/${first}`)).status).toBe(403);
+
+      expect((await app.call("DELETE", `/conversations/${second}`)).status).toBe(204);
+      threads = await list();
+      expect(threads.map((c) => c.id)).toEqual([first]);
+      expect((await app.call("GET", `/conversations/${second}`)).status).toBe(404);
+      const [left] = await app.audit<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM conversation_messages WHERE conversation_id = '${second}'`,
+      );
+      expect(left?.n).toBe(0);
     } finally {
       await app.dispose();
     }
