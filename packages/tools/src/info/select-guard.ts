@@ -77,6 +77,44 @@ const rejectComments = (sql: string) => {
   }
 };
 
+/**
+ * Words MariaDB accepts as plain column names and aliases, but the SQL parser
+ * treats as keywords (checked against MariaDB 12: `SELECT 1 AS status` runs).
+ * Khanza has columns like `status`. `end` is left out: it closes CASE.
+ */
+const SOFT_KEYWORDS = new Set(["status", "session", "global", "local", "full", "boolean", "json"]);
+
+/**
+ * Puts backticks around SOFT_KEYWORDS used as names (not inside strings or
+ * backticks, not as a function call), e.g. `stts AS status` -> stts AS `status`.
+ * For MariaDB the query means exactly the same.
+ */
+export const quoteSoftKeywords = (sql: string): string => {
+  let out = "";
+  for (let i = 0; i < sql.length; ) {
+    const c = sql[i] ?? "";
+    if (c === "'" || c === '"' || c === "`") {
+      let j = i + 1;
+      while (j < sql.length && sql[j] !== c) j += sql[j] === "\\" && c !== "`" ? 2 : 1;
+      out += sql.slice(i, j + 1);
+      i = j + 1;
+    } else if (/[A-Za-z_]/.test(c)) {
+      let j = i + 1;
+      while (j < sql.length && /[A-Za-z0-9_$]/.test(sql[j] ?? "")) j++;
+      const word = sql.slice(i, j);
+      const before = sql.slice(0, i).trimEnd().at(-1);
+      const after = sql.slice(j).trimStart()[0];
+      const isName = SOFT_KEYWORDS.has(word.toLowerCase()) && after !== "(" && before !== "@";
+      out += isName ? `\`${word}\`` : word;
+      i = j;
+    } else {
+      out += c;
+      i++;
+    }
+  }
+  return out;
+};
+
 /** Every node in the tree, depth first. */
 const walk = (value: unknown, visit: (node: Node) => void) => {
   if (Array.isArray(value)) {
@@ -88,18 +126,27 @@ const walk = (value: unknown, visit: (node: Node) => void) => {
 };
 
 const parse = (rawSql: string): { sql: string; root: Node } => {
-  const sql = rawSql.trim().replace(/;\s*$/, "");
+  let sql = rawSql.trim().replace(/;\s*$/, "");
   if (sql === "") reject("SQL kosong.");
   rejectComments(sql);
   let ast: unknown;
   try {
     ast = parser.astify(sql, DIALECT);
   } catch (error) {
-    const detail = error instanceof Error ? (error.message.split("\n")[0] ?? "") : String(error);
-    return reject(
-      `SQL tidak bisa dibaca: ${detail}. Pemeriksa SQL kami sedikit lebih ketat dari MariaDB: ` +
-        "pakai alias lain untuk kata seperti status/date/key, atau beri backtick (`status`).",
-    );
+    // Names like `status` are fine in MariaDB but not for the parser: quote them and try again,
+    // instead of sending the AI back for another round.
+    const quoted = quoteSoftKeywords(sql);
+    try {
+      if (quoted === sql) throw error;
+      ast = parser.astify(quoted, DIALECT);
+      sql = quoted;
+    } catch {
+      const detail = error instanceof Error ? (error.message.split("\n")[0] ?? "") : String(error);
+      return reject(
+        `SQL tidak bisa dibaca: ${detail}. Kalau ini nama kolom atau alias yang juga kata kunci SQL, ` +
+          "beri backtick (mis. `key`) atau pakai alias lain.",
+      );
+    }
   }
   const statements = Array.isArray(ast) ? ast : [ast];
   if (statements.length !== 1) reject("Hanya boleh satu query.");

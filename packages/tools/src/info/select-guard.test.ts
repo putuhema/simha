@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkSelect, MAX_QUERY_ROWS, QueryRejected, referencedTables } from "./select-guard.ts";
+import { checkSelect, MAX_QUERY_ROWS, QueryRejected, quoteSoftKeywords, referencedTables } from "./select-guard.ts";
 import { isCredentialTable, protectedColumn } from "./sensitive.ts";
 
 const COLUMNS: Record<string, ReadonlyArray<string>> = {
@@ -48,9 +48,31 @@ describe("checkSelect: only one SELECT", () => {
     expect(rejection(sql)).toMatch(message);
   });
 
-  it("explains how to fix aliases the parser treats as keywords", () => {
-    expect(rejection("SELECT stts AS status FROM reg_periksa")).toMatch(/backtick/);
-    expect(() => check("SELECT stts AS `status` FROM reg_periksa")).not.toThrow();
+  // The three queries the guard used to refuse in real use (audit log, Oct 2026).
+  it.each([
+    [
+      "SELECT pr.tgl_periksa AS tanggal, pr.status AS status, pr.no_rawat AS no_rawat FROM periksa_radiologi pr " +
+        "JOIN reg_periksa rp ON rp.no_rawat = pr.no_rawat WHERE rp.no_rkm_medis = '018412' ORDER BY pr.tgl_periksa",
+      "pr.`status` AS `status`",
+    ],
+    ["SELECT kd_poli, nm_poli, status FROM poliklinik WHERE nm_poli LIKE '%IGD%'", "nm_poli, `status` FROM"],
+    ["SELECT stts_aktif AS status, COUNT(*) AS jumlah FROM pegawai GROUP BY stts_aktif ORDER BY jumlah DESC", "AS `status`,"],
+  ])("accepts names MariaDB allows, like status: %s", (sql, quoted) => {
+    expect(check(sql).sql).toContain(quoted);
+  });
+
+  it("only quotes those names where they are names", () => {
+    expect(quoteSoftKeywords("SELECT status, t.status, 'status' AS s, `status` FROM t WHERE status = 'full' GROUP BY full")).toBe(
+      "SELECT `status`, t.`status`, 'status' AS s, `status` FROM t WHERE `status` = 'full' GROUP BY `full`",
+    );
+    expect(quoteSoftKeywords("SELECT JSON(x), status_lanjut, CASE WHEN a THEN 1 END FROM t")).toBe(
+      "SELECT JSON(x), status_lanjut, CASE WHEN a THEN 1 END FROM t",
+    );
+  });
+
+  it("still explains words MariaDB itself reserves", () => {
+    expect(rejection("SELECT kd_poli AS key FROM poliklinik")).toMatch(/backtick/);
+    expect(() => check("SELECT kd_poli AS `key` FROM poliklinik")).not.toThrow();
   });
 
   it("ignores comment characters and semicolons inside strings", () => {
