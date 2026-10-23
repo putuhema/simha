@@ -55,6 +55,7 @@ const page = (load: () => Promise<ComponentType>) => {
 };
 const TiketPage = page(() => import("./features/tiket/TiketPage.tsx").then((m) => m.TiketPage));
 const TanyaPage = page(() => import("./features/tanya/TanyaPage.tsx").then((m) => m.TanyaPage));
+const PengetahuanPage = page(() => import("./features/pengetahuan/PengetahuanPage.tsx").then((m) => m.PengetahuanPage));
 const PengaturanPage = page(() => import("./features/pengaturan/PengaturanPage.tsx").then((m) => m.PengaturanPage));
 
 const rootRoute = createRootRoute({ component: Root });
@@ -90,6 +91,12 @@ const tanyaRoute = createRoute({
   component: TanyaPage,
 });
 
+const pengetahuanRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/pengetahuan",
+  component: PengetahuanPage,
+});
+
 const TABS: ReadonlyArray<SettingsTab> = ["ai", "audit", "pengguna", "akun", "desktop"];
 const pengaturanRoute = createRoute({
   getParentRoute: () => shellRoute,
@@ -110,7 +117,9 @@ const notFoundRoute = createRoute({
 });
 
 export const router = createRouter({
-  routeTree: rootRoute.addChildren([shellRoute.addChildren([indexRoute, tiketRoute, tanyaRoute, pengaturanRoute, notFoundRoute])]),
+  routeTree: rootRoute.addChildren([
+    shellRoute.addChildren([indexRoute, tiketRoute, tanyaRoute, pengetahuanRoute, pengaturanRoute, notFoundRoute]),
+  ]),
   defaultPreload: false,
 });
 

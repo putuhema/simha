@@ -19,7 +19,7 @@
  */
 import { NodeFileSystem, NodeHttpServer, NodeRuntime } from "@effect/platform-node";
 import { fakeTurn, makeFakeClient, type ChatRequest, type FakeTurn } from "@simrs/llm";
-import { AuditLogMemory, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, pacsLayer, ResultStoreLive, SchemaDocsLive } from "@simrs/tools";
+import { AppDocsLive, AuditLogMemory, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, pacsLayer, KnowledgeStoreLive, ResultStoreLive, SchemaDocsLive } from "@simrs/tools";
 import { startTestDb } from "@simrs/tools/testing/db";
 import { Duration, Effect, Layer, Redacted } from "effect";
 import { HttpRouter } from "effect/http";
@@ -196,8 +196,10 @@ const main = Effect.gen(function* () {
       Layer.mergeAll(
         StoreLive,
         FixStoreLive,
+        KnowledgeStoreLive,
         ResultStoreLive,
         SchemaDocsLive,
+        AppDocsLive,
         AuthLive,
         llmSettingsLayer({
           env: { provider: "fake", model: "skrip-uji", baseUrl: undefined, apiKey: undefined, maskPii: true },

@@ -2,6 +2,8 @@
  * The set of tools offered to the AI model, with their JSON Schemas.
  */
 import { Schema } from "effect";
+import { AppDocs } from "./app/AppDocs.ts";
+import { cariAplikasiKhanza } from "./app/cariAplikasiKhanza.ts";
 import { diagnosaPindahKamar } from "./diagnose/diagnosaPindahKamar.ts";
 import { diagnosaTindakan } from "./diagnose/diagnosaTindakan.ts";
 import { dokumenPasien } from "./documents/dokumenPasien.ts";
@@ -13,6 +15,8 @@ import type { ResultStore } from "./info/ResultStore.ts";
 import type { SchemaDocs } from "./info/SchemaDocs.ts";
 import { tampilkan } from "./info/tampilkan.ts";
 import type { KhanzaRead } from "./khanza/KhanzaRead.ts";
+import { catatPengetahuan } from "./knowledge/catatPengetahuan.ts";
+import type { KnowledgeStore } from "./knowledge/KnowledgeStore.ts";
 import { hasilRadiologi } from "./pacs/hasilRadiologi.ts";
 import type { Pacs } from "./pacs/Pacs.ts";
 import { usulkanPerbaikan } from "./propose/usulkanPerbaikan.ts";
@@ -20,7 +24,7 @@ import { readTools } from "./read/index.ts";
 import type { Tool } from "./tool.ts";
 
 /** Services tool handlers may use. Never the Khanza write pool. */
-export type ToolServices = KhanzaRead | FixStore | ResultStore | SchemaDocs | Pacs;
+export type ToolServices = KhanzaRead | FixStore | ResultStore | SchemaDocs | AppDocs | Pacs | KnowledgeStore;
 
 /** A tool with its parameter and output types erased, for lists of mixed tools. */
 export type AnyTool<R = ToolServices> = Tool<unknown, unknown, R>;
@@ -66,6 +70,8 @@ export const defaultRegistry: ToolRegistry = makeRegistry([
   diagnosaTindakan,
   usulkanPerbaikan,
   lihatSkema,
+  cariAplikasiKhanza,
+  catatPengetahuan,
   jalankanQueryBaca,
   tampilkan,
   dokumenPasien,

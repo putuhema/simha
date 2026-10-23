@@ -6,7 +6,8 @@
   "scripts": {
     "inspect-schema": "node --env-file-if-exists=../.env inspect-schema.ts",
     "typecheck": "tsc -p .",
-    "dump-test-schema": "node --env-file-if-exists=../.env dump-test-schema.ts"
+    "dump-test-schema": "node --env-file-if-exists=../.env dump-test-schema.ts",
+    "extract-khanza-app": "node extract-khanza-app.ts"
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",

@@ -1,0 +1,53 @@
+/**
+ * The "what we learned" block added to the current user turn. It is built for
+ * the model only: the stored conversation keeps the plain question, so a long
+ * list of examples is not replayed on every follow-up.
+ */
+import type { ChatMessage } from "@simrs/llm";
+import type { RelevantKnowledge } from "@simrs/tools";
+
+/** Keep the injected block small; the model already has the schema and notes. */
+const MAX_KNOWLEDGE_CHARS = 1_600;
+const MAX_TEXT = 420;
+const MAX_SQL = 900;
+
+const shorten = (text: string, max: number) => {
+  const clean = text.trim().replaceAll(/\s+/g, " ");
+  return clean.length <= max ? clean : `${clean.slice(0, max - 1)}…`;
+};
+
+/** Text for the user turn, or "" when there is nothing relevant. */
+export const knowledgePrompt = (matches: ReadonlyArray<RelevantKnowledge>): string => {
+  if (matches.length === 0) return "";
+  const lines: string[] = ["[Pengetahuan dari pertanyaan sebelumnya]"];
+  let used = lines[0]?.length ?? 0;
+  for (const { item } of matches) {
+    const body =
+      item.kind === "example"
+        ? `Contoh (${item.verified ? "terverifikasi" : "otomatis, belum dicek"}): ${shorten(item.text, MAX_TEXT)}${
+            item.sql ? `\n  SQL: ${shorten(item.sql, MAX_SQL)}` : ""
+          }`
+        : `Catatan${item.title ? ` (${shorten(item.title, 120)})` : ""}: ${shorten(item.text, MAX_TEXT)}`;
+    const line = `- ${body}`;
+    if (used + line.length > MAX_KNOWLEDGE_CHARS) break;
+    lines.push(line);
+    used += line.length;
+  }
+  if (lines.length === 1) return "";
+  lines.push(
+    "Gunakan hanya kalau relevan dengan pertanyaan ini; verifikasi dengan data/skema. Jangan sebut blok pengetahuan ini kepada user.",
+  );
+  return lines.join("\n");
+};
+
+/** A copy of `messages` with the knowledge block appended to the current user turn. */
+export const withKnowledge = (
+  messages: ReadonlyArray<ChatMessage>,
+  userIndex: number,
+  block: string,
+): ReadonlyArray<ChatMessage> => {
+  if (block === "") return [...messages];
+  return messages.map((message, index) =>
+    index === userIndex && message.role === "user" ? { ...message, text: `${message.text}\n\n${block}` } : message,
+  );
+};

@@ -31,6 +31,8 @@ const LABELS: Readonly<Record<string, string>> = {
   diagnosaTindakan: "Diagnosa tindakan",
   usulkanPerbaikan: "Usulan perbaikan",
   lihatSkema: "Lihat skema",
+  cariAplikasiKhanza: "Cari menu aplikasi",
+  catatPengetahuan: "Catat pengetahuan",
   jalankanQueryBaca: "Jalankan query",
   tampilkan: "Tampilkan hasil",
 };
@@ -112,6 +114,13 @@ export const stepSummary = (step: StepView): string => {
     }
     case "lihatSkema":
       return `${count(o["dariDokumen"]) + count(o["dariDatabase"])} tabel cocok`;
+    case "cariAplikasiKhanza": {
+      const menus = count(o["menu"]);
+      const forms = count(o["form"]);
+      return menus > 0 ? `${menus} menu, ${forms} form` : `${forms} form cocok`;
+    }
+    case "catatPengetahuan":
+      return String(o["pesan"] ?? "Catatan disimpan");
     case "kartuPasien":
       return o["pasien"] ? `${count(o["kunjungan"])} kunjungan` : "Pasien tidak ditemukan";
     default: {

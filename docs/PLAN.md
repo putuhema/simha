@@ -1,13 +1,13 @@
 # Plan
 
-Status: **M5.1 (patient documents) done, waiting for your test.** Next: routine data checks and the agent test set (M5.2), then M6.
+Status: **M6.6 (AI learning) done, waiting for your test.** Next: M7 (MCP over stdio/HTTP) and M5.2 (routine checks and the agent test set).
 
 ## Packages and main modules
 
 | Package | Main modules |
 |---|---|
 | `packages/shared` | `contracts/` (API request/response Schemas), `render.ts` (render block Schema: table, bar, line, pie, stat, list), `ticket.ts`, `fix.ts`, `audit.ts`, `sse.ts` (stream event Schema) |
-| `packages/tools` | `audit/` (SQLite audit log + migrations, shared by server and MCP), `khanza/` (read and write pools, grants check, query timeout), `registry.ts` (`Tool` = name, description, params Schema, kind, handler), `read/` (cariPasien, kunjunganAktif, riwayatKamar, statusKamar, daftarTindakan, statusBilling, dataSep, suratKontrol), `diagnose/` (diagnosaPindahKamar, diagnosaTindakan), `propose/usulkanPerbaikan.ts`, `info/` (lihatSkema, jalankanQueryBaca, tampilkan), `guards/` (select guard, write guard, column deny-list, PII masking), `services/` (KhanzaRead, KhanzaWrite, AuditLog, FixStore as Effect services) |
+| `packages/tools` | `audit/` (SQLite audit log + migrations, shared by server and MCP), `khanza/` (read and write pools, grants check, query timeout), `registry.ts` (`Tool` = name, description, params Schema, kind, handler), `read/` (cariPasien, kunjunganAktif, riwayatKamar, statusKamar, daftarTindakan, statusBilling, dataSep, suratKontrol), `diagnose/` (diagnosaPindahKamar, diagnosaTindakan), `propose/usulkanPerbaikan.ts`, `info/` (lihatSkema, jalankanQueryBaca, tampilkan), `app/` (cariAplikasiKhanza + generated map), `knowledge/` (examples/notes, search, catatPengetahuan), `guards/` (select guard, write guard, column deny-list, PII masking), `services/` (KhanzaRead, KhanzaWrite, AuditLog, FixStore as Effect services) |
 | `packages/llm` | `LlmClient.ts` (service: `chat(messages, tools) -> Stream<LlmEvent>`), `adapters/anthropic.ts`, `adapters/openai-compat.ts`, `adapters/fake.ts`, `layer.ts` (picks adapter from `LLM_PROVIDER`) |
 | `packages/mcp` | `server.ts` (registers the tool registry with `@modelcontextprotocol/sdk`), `stdio.ts`, `http.ts` |
 | `apps/server` | `config.ts`, `agent/` (loop, `system-prompt.md`), `fixes/` (approve, execute, rollback), `auth/` (local login), `http/` (routes, SSE), `main.ts` |
@@ -27,6 +27,8 @@ Each one ends with tests passing and a stop for you to test.
 - **M5.2. Routine data checks and agent test set.** Scheduled checks for known data problems with "Buat tiket"; fixed scenarios with known answers to score each AI provider/model.
 - **M6. Desktop. ✅ Done.** Electron app wrapping the UI (remote server or a local server it starts), setup page, "Buka di Khanza", Windows installer.
 - **M6.2. Resume drafts. ✅ Done.** The AI drafts the resume medis rawat inap from Khanza data, asks for the rest, and "Isi di Khanza" fills Khanza's own form (see M6.2 notes).
+- **M6.5. App map: menu, flows, rights. ✅ Done.** `pnpm extract-khanza-app` reads `frmUtama.java` and writes `docs/khanza-app/` (explicit: 20 groups [A]–[T], every button, form, access right and table). Hand-written flows cover registrasi, rawat inap, IGD, lab, radiologi, farmasi, kasir, BPJS, master data and reports. The agent uses `cariAplikasiKhanza`; `synonyms.json` maps staff words ("pindah kamar", "SEP") to real menu paths.
+- **M6.6. AI learning (knowledge). ✅ Done.** Successful answers become unverified examples; 👍 verifies them, 👎 disables them and saves a correction note. `catatPengetahuan` lets the AI save durable hospital facts; the agent retrieves at most five matching examples/notes and injects them into the current user turn. **Pengetahuan AI** page for review, and authenticated knowledge/feedback endpoints. Patient/visit numbers are refused.
 - **M6.1. Khanza bridge. ✅ Done.** `HarnessBridge.java` in the hospital's Khanza build (applied with `integrations/khanza-bridge/apply.mjs`): "Buka di Khanza" opens resume, CPPT/SOAP or riwayat for the visit in the running Khanza (see M6.1 notes).
 - **M7. MCP.** Same tools over stdio and streamable HTTP, README section for Claude Desktop / Claude Code.
 
@@ -134,6 +136,31 @@ Each one ends with tests passing and a stop for you to test.
 - **Order.** Checks (rights, visit exists) run on the Swing thread and are answered right away; the form then opens like a menu click, including Khanza's own warnings (e.g. "User login bukan dokter"), which no longer block the answer.
 - **Tested** against the real Khanza code and the local `sik` database (stand-in login): all five forms open on the requested visit; wrong token, unknown form, missing right and unknown visit are refused with a message; the info file is removed at logout. Not yet tested: a real login in the built Khanza, and on a Windows PC.
 - **Later:** billing ranap/ralan and SEP (Khanza runs extra prompts and depot logic before opening them).
+
+## M6.5 notes: app map
+
+- **Generated, not guessed.** `scripts/extract-khanza-app.ts` parses `frmUtama.java` (`isCombo()` per `cmbMenu` group, `Panelmenu.add`, `*ActionPerformed`) and each form's SQL strings, filtered by the 1,026 table names in `sik.sql`. Output: `docs/khanza-app/index.json` + `menu/`, `forms/`, README. `--check` fails when the source commit or menu count changed.
+- **Hand-written:** `flows/*.md` (narrative + steps), `roles.md` (rights model), `bridge.md` (desktop ↔ harness), `cara-pakai.md` (group A–T, path and dialog naming), `synonyms.json`. `group-names.json` is an input for short group names. The generator never overwrites these.
+- **In-form buttons:** each form's `btn*.setText` labels ("Simpan", "Pindah", "Pulang") are in `index.json` (`forms[].actions`) and in `forms/*.md`, so the agent can say which button to click inside the dialog, not just which menu.
+- **Dialog titles:** the generator reads the `internalFrame1` border / `setTitle`, ignores NetBeans' `::[ About Program ]::` placeholder, and falls back to the menu label when the caller sets the title later (`DlgBerkasRawat` → "Berkas Digital Perawatan").
+- **Coverage:** 1,094 menu buttons, 1,090 resolve to a form; the 3 INACBG buttons open the PHP panel and `btnfee_rujukan_ranap` is a TODO stub. 1,079 forms, 1,072 rights; 1,052 rights gate exactly one button. Every form also carries the tables it writes/reads (static SQL hints), which is how "form apa yang mengisi kamar_inap" is answered.
+- **Tool:** `cariAplikasiKhanza` searches the map offline (no DB, no Khanza pool) and returns menu path, form, rights, tables and flow steps. A table question gets `tabel[]` (forms that write/read it) and `bagian: "tabel"` finds forms by table; `form[].tulis`/`baca` are capped so a 200-table registration form does not flood the model. `AppDocs` loads at startup, like `SchemaDocs`.
+- **Prompt:** the system prompt tells the agent to call it for "di menu mana", flow, form and access-right questions, and never to invent a menu. `docs/khanza_notes.md` carries a short pointer so the rule survives prompt caching.
+
+## M6.6 notes: AI learning
+
+- **Schema** (`packages/tools/src/knowledge/KnowledgeStore.ts`, table `knowledge`, migration `0008_knowledge`): `kind` (`example` / `note`), `source` (`auto`, `feedback`, `ai`, `staff`), `text` (question for an example, note text otherwise), `sql`, `render_type`, `title`, `verified`, `active`, `block_id`, `run_id`, `created_by`, `uses`, `last_used_at`.
+- **Search** (`knowledge/search.ts`): no FTS5; lower-case tokens, Indonesian stopwords, a light `-an/-kan/-nya` suffix and `me-/ber-/ter-/di-/ke-/se-` prefix stemmer, IDF-weighted cosine overlap. Verified ×1.25; staff/feedback ×1.1, AI ×0.95, automatic ×0.9. Notes need 0.25, examples 0.35.
+- **Retrieval**: before each turn, up to 5 active items are added to the **current user message** as `[Pengetahuan dari pertanyaan sebelumnya]` (max 1,600 chars). The stored conversation keeps the plain question, so follow-ups do not replay old context.
+- **Feedback**: under result blocks by `blockId`; under text-only answers (app-map, documents, summaries) by `runId`. A run-level 👍 stores the question + answer as a verified note; a run-level 👎 stores the correction. The UI shows one set of thumbs per turn (block feedback when a block exists, otherwise answer feedback).
+- **Learning sources**:
+  - auto: first self-contained answer with a block (not a follow-up), unverified, tied to `block_id`/`run_id`;
+  - 👍: verifies the example (creates one from the block if missing) and changes its source to `feedback`;
+  - 👎: deactivates the example and, with a comment, saves a note; no approval needed;
+  - `catatPengetahuan`: AI note, active immediately but unverified; admin review on the page.
+- **Privacy**: `personalReason()` refuses no_rawat, RM/NIK/SEP/phone numbers and emails in notes, examples, feedback and auto-saves. Knowledge never changes Khanza.
+- **UI**: thumbs under every render block; **Pengetahuan AI** page (`/pengetahuan`) lists/filters/searches, adds staff notes, and lets admins verify, edit, deactivate or delete.
+- **Tests**: store/search/tool unit tests and server end-to-end tests cover auto-save, 👍/👎, moderation, privacy rejection, prompt injection and `catatPengetahuan`.
 
 ## M6.2 notes: resume drafts
 

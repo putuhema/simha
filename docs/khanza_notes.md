@@ -24,6 +24,17 @@ The agent's `lihatSkema` tool reads this file together with `docs/schema.md` bef
 - Drugs given: `detail_pemberian_obat.jml` is the quantity, `tgl_perawatan` the date, `status` `Ralan`/`Ranap`; drug name is `databarang.nama_brng`.
 (Codes checked on our DB, Oct 2026.)
 
+## Aplikasi (menu & alur)
+
+- Menu desktop: klik **Menu**, pilih grup `[A]`–`[T]` di `cmbMenu`, lalu klik tombolnya. Huruf itu hanya kode grup — sebut namanya (A Registrasi & Billing, M Rekam Medis, P Surat, K Tarif & Keuangan). Peta lengkap: `docs/khanza-app/` (tool `cariAplikasiKhanza`).
+- Judul dialog (mis. "Data Resume Medis Pasien Rawat Inap") adalah yang terlihat di jendela; nama kelas Java seperti `RMDataResumePasienRanap` hanya untuk teknisi.
+- Navigasi punya tiga lapis: toolbar atas (Registrasi, IGD/UGD, Laborat, Radiologi, Farmasi, Rawat Inap, Rawat Jalan, Operasi), grid Menu A–T, lalu klik kanan baris pasien di daftar.
+- Billing dan resep pulang hanya ada di klik kanan: **Billing/Pembayaran Pasien**, **Obat → Input Resep Pulang**, **Obat → Data Pemberian Obat/BHP**. Bukan tombol Cetak.
+- Hak akses = kolom boolean di tabel `user` (login `admin` = semua hak). Tombol yang tidak diizinkan tidak ditambahkan ke grid, jadi "menu hilang" hampir selalu hak di `user` atau user perlu login ulang.
+- Pindah kamar dan pulang: menu `A/Rawat Inap` (`DlgKamarInap`), bukan dari form registrasi.
+- Resume medis: `M/Resume Pasien Ranap`; CPPT/SOAP ada di dalam `A/Tindakan Ranap` / `A/Tindakan Ralan`.
+- "Form apa yang mengisi tabel X" dijawab `cariAplikasiKhanza` (`bagian: "tabel"`): `form[].tulis` = tabel yang ditulis form itu, `form[].baca` = hanya dibaca. Ini petunjuk statis dari SQL form, bukan jaminan runtime.
+
 ## Local schema changes
 
 List columns or tables we added or changed compared to standard Khanza.

@@ -4,7 +4,7 @@
  *   pnpm start   (from the repo root)
  */
 import { NodeFileSystem, NodeHttpServer, NodeRuntime } from "@effect/platform-node";
-import { AuditLogLive, FixStoreLive, KhanzaReadLive, KhanzaWriteLive, PacsLive, ResultStoreLive, SchemaDocsLive } from "@simrs/tools";
+import { AppDocsLive, AuditLogLive, FixStoreLive, KhanzaReadLive, KhanzaWriteLive, PacsLive, KnowledgeStoreLive, ResultStoreLive, SchemaDocsLive } from "@simrs/tools";
 import { Effect, Layer } from "effect";
 import { HttpRouter } from "effect/http";
 import { createServer } from "node:http";
@@ -27,8 +27,10 @@ export const AppLive = Layer.mergeAll(AgentLive, FixExecutorLive, ViewsLive).pip
     Layer.mergeAll(
       StoreLive,
       FixStoreLive,
+      KnowledgeStoreLive,
       ResultStoreLive,
       SchemaDocsLive,
+      AppDocsLive,
       AuthLive,
       HttpSettingsLive,
       KhanzaReadLive,

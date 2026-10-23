@@ -91,6 +91,9 @@ test("Tanya Data shows a chart with its SQL and saves a favorite", async () => {
   await expect(block).toContainText("FROM reg_periksa r JOIN poliklinik p");
   await expect(block).toContainText("LIMIT 501");
 
+  await block.getByRole("button", { name: "Jawaban ini benar" }).click();
+  await expect(block.getByText(/Terima kasih/)).toBeVisible();
+
   await block.getByRole("button", { name: "Simpan ke favorit" }).click();
   await expect(block.getByRole("button", { name: "Tersimpan" })).toBeDisabled();
 
@@ -101,6 +104,28 @@ test("Tanya Data shows a chart with its SQL and saves a favorite", async () => {
   await page.getByTestId("favorites").getByRole("button", { name: "Kunjungan per poli", exact: true }).click();
   await expect(page.getByText("★ Jumlah kunjungan per poli")).toBeVisible();
   await expect(page.getByTestId("render-block")).toHaveCount(1);
+});
+
+test("the knowledge page shows what the AI learned and accepts a note", async () => {
+  await page.getByRole("link", { name: /Pengetahuan AI/ }).click();
+  await expect(page.getByRole("heading", { name: "Pengetahuan AI" })).toBeVisible();
+  // The chart result was saved automatically and verified with the thumbs-up.
+  await expect(page.getByText("Terverifikasi").first()).toBeVisible();
+  await page.getByLabel("Aturan atau fakta umum").fill("Kode uji: poli gigi memakai U0010.");
+  await page.getByRole("button", { name: "Simpan catatan" }).click();
+  await expect(page.getByText("Kode uji: poli gigi memakai U0010.")).toBeVisible();
+  await page.goto("/tanya");
+});
+
+test("a text-only answer also takes feedback", async () => {
+  await page.getByRole("button", { name: "Percakapan baru" }).first().click();
+  await page.getByLabel("Pertanyaan").fill("Halo, apa kabar?");
+  await page.getByLabel("Pertanyaan").press("Enter");
+  const turn = page.getByTestId("tanya-turn").last();
+  const up = turn.getByRole("button", { name: "Jawaban ini benar" });
+  await expect(up).toBeVisible();
+  await up.click();
+  await expect(turn.getByText("Tersimpan")).toBeVisible();
 });
 
 test("a number answer is shown as a stat card", async () => {

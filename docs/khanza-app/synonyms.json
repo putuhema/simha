@@ -1,0 +1,619 @@
+[
+  {
+    "terms": [
+      "pindah kamar",
+      "ganti kamar",
+      "mutasi kamar",
+      "pindah ruang"
+    ],
+    "menus": [
+      "A/Rawat Inap"
+    ],
+    "forms": [
+      "DlgKamarInap"
+    ],
+    "tables": [
+      "kamar_inap",
+      "kamar"
+    ],
+    "note": "Pindah kamar dikerjakan di A/Rawat Inap (DlgKamarInap): tutup baris kamar_inap lama dengan stts_pulang 'Pindah Kamar', lalu tambah baris baru. Status kamar ada di kamar.status."
+  },
+  {
+    "terms": [
+      "pasien pulang",
+      "pulang",
+      "status pulang",
+      "discharge"
+    ],
+    "menus": [
+      "A/Rawat Inap"
+    ],
+    "forms": [
+      "DlgKamarInap"
+    ],
+    "tables": [
+      "kamar_inap"
+    ],
+    "note": "Pulang = isi stts_pulang dan tgl_keluar di baris kamar_inap yang aktif (stts_pulang '-')."
+  },
+  {
+    "terms": [
+      "registrasi",
+      "daftar",
+      "pendaftaran",
+      "loket",
+      "pasien baru"
+    ],
+    "menus": [
+      "A/Registrasi"
+    ],
+    "forms": [
+      "DlgReg"
+    ],
+    "tables": [
+      "reg_periksa",
+      "pasien"
+    ],
+    "note": "Satu kunjungan = satu baris reg_periksa (no_rawat). Pasien = pasien (no_rkm_medis)."
+  },
+  {
+    "terms": [
+      "batal registrasi",
+      "hapus registrasi",
+      "salah daftar"
+    ],
+    "menus": [
+      "A/Registrasi"
+    ],
+    "forms": [
+      "DlgReg"
+    ],
+    "tables": [
+      "reg_periksa"
+    ],
+    "note": "Hapus kunjungan lewat DlgReg (tombol Hapus), bukan DELETE langsung: ada tabel turunan yang ikut."
+  },
+  {
+    "terms": [
+      "tindakan ralan",
+      "tindakan rawat jalan",
+      "input tindakan"
+    ],
+    "menus": [
+      "A/Tindakan Ralan"
+    ],
+    "forms": [
+      "DlgRawatJalan"
+    ],
+    "tables": [
+      "rawat_jl_dr",
+      "rawat_jl_pr",
+      "rawat_jl_drpr"
+    ],
+    "note": "Tindakan ralan ada di tiga tabel (_dr, _pr, _drpr); sebagian besar baris ada di _drpr."
+  },
+  {
+    "terms": [
+      "tindakan ranap",
+      "tindakan rawat inap"
+    ],
+    "menus": [
+      "A/Tindakan Ranap"
+    ],
+    "forms": [
+      "DlgRawatInap"
+    ],
+    "tables": [
+      "rawat_inap_dr",
+      "rawat_inap_pr",
+      "rawat_inap_drpr"
+    ],
+    "note": "Tindakan ranap ada di tiga tabel (_dr, _pr, _drpr); sebagian besar baris ada di _drpr."
+  },
+  {
+    "terms": [
+      "hapus tindakan",
+      "batal tindakan",
+      "tindakan dobel"
+    ],
+    "menus": [
+      "A/Tindakan Ralan",
+      "A/Tindakan Ranap"
+    ],
+    "forms": [
+      "DlgRawatJalan",
+      "DlgRawatInap"
+    ],
+    "tables": [
+      "rawat_jl_drpr",
+      "rawat_inap_drpr"
+    ],
+    "note": "Cari barisnya dulu di form tindakan; hapus per baris supaya nota dan jurnal ikut menyesuaikan."
+  },
+  {
+    "terms": [
+      "resep",
+      "e-resep",
+      "resep dokter",
+      "no resep"
+    ],
+    "menus": [
+      "A/No. Resep"
+    ],
+    "forms": [
+      "DlgResepObat"
+    ],
+    "tables": [
+      "resep_obat",
+      "resep_dokter"
+    ],
+    "note": "Resep dibuat di A/No. Resep; penyerahan obatnya di A/Beri Obat/BHP."
+  },
+  {
+    "terms": [
+      "beri obat",
+      "pemberian obat",
+      "input obat",
+      "obat pasien"
+    ],
+    "menus": [
+      "A/Beri Obat/BHP"
+    ],
+    "forms": [
+      "DlgPemberianObat"
+    ],
+    "tables": [
+      "detail_pemberian_obat"
+    ],
+    "note": "Obat yang diberikan dicatat di detail_pemberian_obat (nama obat: databarang.nama_brng).",
+    "shortcut": "Obat → Data Pemberian Obat/BHP"
+  },
+  {
+    "terms": [
+      "lab",
+      "laboratorium",
+      "lab pk",
+      "hasil lab",
+      "periksa lab"
+    ],
+    "menus": [
+      "A/Periksa Lab PK",
+      "A/Permintaan Lab PK"
+    ],
+    "forms": [
+      "DlgCariPeriksaLab",
+      "DlgCariPermintaanLab"
+    ],
+    "tables": [
+      "periksa_lab",
+      "detail_periksa_lab"
+    ],
+    "note": "Permintaan di permintaan_lab, hasil di periksa_lab + detail_periksa_lab (nilai per template_laboratorium)."
+  },
+  {
+    "terms": [
+      "radiologi",
+      "rontgen",
+      "thorax",
+      "x-ray",
+      "usg",
+      "ct scan"
+    ],
+    "menus": [
+      "A/Periksa Radiologi",
+      "A/Permintaan Radiologi"
+    ],
+    "forms": [
+      "DlgCariPeriksaRadiologi",
+      "DlgCariPermintaanRadiologi"
+    ],
+    "tables": [
+      "periksa_radiologi",
+      "hasil_radiologi"
+    ],
+    "note": "Hasil bacaan ada di hasil_radiologi; gambar tidak disimpan di tabel Khanza (PACS/Orthanc)."
+  },
+  {
+    "terms": [
+      "sep",
+      "vclaim",
+      "bridging bpjs",
+      "kartu bpjs"
+    ],
+    "menus": [
+      "L/Data Bridging SEP VClaim",
+      "L/Cek Nomor SEP"
+    ],
+    "forms": [],
+    "tables": [
+      "bridging_sep"
+    ],
+    "note": "SEP BPJS ada di bridging_sep (no_sep). Data SEP yang gagal biasanya karena rujukan/kartu; cek dulu di L."
+  },
+  {
+    "terms": [
+      "surat kontrol",
+      "skdp",
+      "kontrol bpjs"
+    ],
+    "menus": [
+      "L/Surat Kontrol VClaim"
+    ],
+    "forms": [],
+    "tables": [
+      "bridging_surat_kontrol_bpjs"
+    ],
+    "note": "Surat kontrol BPJS tersimpan di bridging_surat_kontrol_bpjs."
+  },
+  {
+    "terms": [
+      "rujukan keluar",
+      "rujukan masuk",
+      "rujukan"
+    ],
+    "menus": [
+      "A/Rujukan Keluar",
+      "A/Rujukan Masuk"
+    ],
+    "forms": [
+      "DlgRujuk",
+      "DlgRujukMasuk"
+    ],
+    "tables": [
+      "rujukan",
+      "rujukan_masuk"
+    ],
+    "note": "Rujukan keluar dan masuk adalah dua menu berbeda (A/Rujukan Keluar vs A/Rujukan Masuk)."
+  },
+  {
+    "terms": [
+      "billing",
+      "tagihan",
+      "nota",
+      "bill"
+    ],
+    "menus": [
+      "A/Rawat Jalan",
+      "A/Rawat Inap"
+    ],
+    "forms": [
+      "DlgKasirRalan",
+      "DlgKamarInap"
+    ],
+    "tables": [
+      "nota_jalan",
+      "nota_inap"
+    ],
+    "note": "Nota ralan di nota_jalan, nota ranap di nota_inap: satu baris per no_rawat setelah nota dibuat.",
+    "shortcut": "Billing/Pembayaran Pasien"
+  },
+  {
+    "terms": [
+      "kasir",
+      "pembayaran",
+      "bayar",
+      "closing kasir"
+    ],
+    "menus": [
+      "A/Rawat Jalan",
+      "T/Closing Kasir"
+    ],
+    "forms": [
+      "DlgKasirRalan"
+    ],
+    "tables": [
+      "nota_jalan"
+    ],
+    "note": "Pembayaran ralan lewat A/Rawat Jalan (DlgKasirRalan); tutup kasir di T/Closing Kasir."
+  },
+  {
+    "terms": [
+      "deposit",
+      "uang muka",
+      "deposit pasien"
+    ],
+    "menus": [
+      "K/Deposit Pasien"
+    ],
+    "forms": [],
+    "tables": [
+      "deposit_pasien"
+    ],
+    "note": "Deposit pasien di K/Deposit Pasien; pengembaliannya di K/Pengembalian Deposit Pasien."
+  },
+  {
+    "terms": [
+      "piutang",
+      "hutang pasien",
+      "piutang pasien"
+    ],
+    "menus": [
+      "K/Piutang Pasien",
+      "K/Penagihan Piutang Pasien"
+    ],
+    "forms": [],
+    "tables": [
+      "piutang_pasien"
+    ],
+    "note": "Piutang pasien di K; penagihan punya menu sendiri."
+  },
+  {
+    "terms": [
+      "klaim bpjs",
+      "klaim",
+      "inacbg",
+      "verifikasi klaim"
+    ],
+    "menus": [
+      "L/Monitoring Verifikasi Klaim BPJS"
+    ],
+    "forms": [],
+    "tables": [
+      "bridging_klaim_bpjs"
+    ],
+    "note": "Klaim BPJS dan INACBG ada di grup L; tiga tombol INACBG membuka panel web, bukan form desktop."
+  },
+  {
+    "terms": [
+      "antrean",
+      "antrian",
+      "nomor antrean",
+      "display antrean"
+    ],
+    "menus": [
+      "T/Display Antrian Registrasi & Poli",
+      "T/Display Antrian Apotek"
+    ],
+    "forms": [],
+    "tables": [
+      "antriloket",
+      "antripoli"
+    ],
+    "note": "Nomor antrean loket/poli disimpan di antri*; tampilan layar ada di T/Display Antrian."
+  },
+  {
+    "terms": [
+      "resume",
+      "resume medis",
+      "resume pasien"
+    ],
+    "menus": [
+      "M/Resume Pasien Ranap",
+      "M/Resume Pasien Ralan"
+    ],
+    "forms": [
+      "RMDataResumePasienRanap",
+      "RMDataResumePasien"
+    ],
+    "tables": [
+      "resume_pasien_ranap",
+      "resume_pasien"
+    ],
+    "note": "Resume ranap di M/Resume Pasien Ranap (resume_pasien_ranap); harness bisa mengisi draf lewat 'Isi di Khanza' tanpa menyimpan."
+  },
+  {
+    "terms": [
+      "soap",
+      "cppt",
+      "catatan perawatan",
+      "catatan dokter"
+    ],
+    "menus": [
+      "A/Tindakan Ralan",
+      "A/Tindakan Ranap"
+    ],
+    "forms": [
+      "DlgRawatJalan",
+      "DlgRawatInap"
+    ],
+    "tables": [
+      "pemeriksaan_ralan",
+      "pemeriksaan_ranap"
+    ],
+    "note": "SOAP/CPPT ada di tab dalam form tindakan ralan/ranap: pemeriksaan_ralan / pemeriksaan_ranap."
+  },
+  {
+    "terms": [
+      "diagnosa",
+      "diagnosis",
+      "icd",
+      "icd 10"
+    ],
+    "menus": [
+      "M/Diagnosa Pasien",
+      "J/ICD 10"
+    ],
+    "forms": [],
+    "tables": [
+      "diagnosa_pasien",
+      "penyakit"
+    ],
+    "note": "Diagnosa pasien di diagnosa_pasien, dikueri penyakit (ICD-10) dan icd9."
+  },
+  {
+    "terms": [
+      "pasien meninggal",
+      "meninggal",
+      "death"
+    ],
+    "menus": [
+      "M/Pasien Meninggal"
+    ],
+    "forms": [
+      "DlgPasienMati"
+    ],
+    "tables": [
+      "pasien_mati"
+    ],
+    "note": "Pencatatan pasien meninggal di M/Pasien Meninggal (pasien_mati)."
+  },
+  {
+    "terms": [
+      "kamar kosong",
+      "info kamar",
+      "bed",
+      "ketersediaan kamar",
+      "tempat tidur"
+    ],
+    "menus": [
+      "A/Informasi Kamar"
+    ],
+    "forms": [
+      "InformasiAnalisaKamin"
+    ],
+    "tables": [
+      "kamar",
+      "kamar_inap",
+      "bangsal"
+    ],
+    "note": "kamar.status (ISI/KOSONG/...) tidak selalu sinkron dengan kamar_inap; bandingkan dengan baris aktif."
+  },
+  {
+    "terms": [
+      "tarif",
+      "harga",
+      "tarif ralan",
+      "tarif ranap"
+    ],
+    "menus": [
+      "K/Tarif Ralan",
+      "K/Tarif Ranap"
+    ],
+    "forms": [
+      "DlgJnsPerawatanRalan",
+      "DlgJnsPerawatanRanap"
+    ],
+    "tables": [
+      "jns_perawatan",
+      "jns_perawatan_inap"
+    ],
+    "note": "Tarif ralan di jns_perawatan, ranap di jns_perawatan_inap; ubah tarif tidak mengubah transaksi lama."
+  },
+  {
+    "terms": [
+      "dokter",
+      "jadwal dokter",
+      "jadwal praktek",
+      "dpjp"
+    ],
+    "menus": [
+      "C/Dokter",
+      "A/Jadwal Praktek",
+      "A/DPJP Ranap"
+    ],
+    "forms": [
+      "DlgDokter",
+      "DlgJadwal",
+      "DlgDpjp"
+    ],
+    "tables": [
+      "dokter",
+      "jadwal",
+      "dpjp_ranap"
+    ],
+    "note": "Data dokter di dokter; jadwal praktek di jadwal; DPJP ranap di dpjp_ranap."
+  },
+  {
+    "terms": [
+      "hak akses",
+      "menu tidak muncul",
+      "user",
+      "password",
+      "akun"
+    ],
+    "menus": [
+      "T/Set User",
+      "T/Set Admin"
+    ],
+    "forms": [],
+    "tables": [
+      "user",
+      "admin"
+    ],
+    "note": "Hak = kolom boolean di tabel user. Jangan UPDATE password langsung (terenkripsi AES); pakai T/Set User lalu logout/login."
+  },
+  {
+    "terms": [
+      "stok obat",
+      "stok opname",
+      "opname",
+      "stok"
+    ],
+    "menus": [
+      "D/Stok Opname Obat & BHP"
+    ],
+    "forms": [],
+    "tables": [
+      "opname",
+      "databarang"
+    ],
+    "note": "Stok obat ada di grup D (Inventory Obat); opname menyesuaikan databarang."
+  },
+  {
+    "terms": [
+      "vakum",
+      "backup",
+      "bersihkan table"
+    ],
+    "menus": [
+      "T/Vakum Table"
+    ],
+    "forms": [
+      "DlgVakum"
+    ],
+    "tables": [
+      "temporary",
+      "temporary_lab"
+    ],
+    "note": "T/Vakum Table membersihkan tabel temporary; jalankan saat tidak ada input."
+  },
+  {
+    "terms": [
+      "sensus harian",
+      "laporan",
+      "rekap",
+      "rl"
+    ],
+    "menus": [
+      "J/Sensus Harian Ralan",
+      "J/Sensus Harian Poli",
+      "J/RL 4A Morbiditas Ranap"
+    ],
+    "forms": [],
+    "tables": [
+      "reg_periksa",
+      "kamar_inap"
+    ],
+    "note": "Laporan di grup I (tagihan/rekap), J (penyakit & RL), O (dashboard/grafik); semuanya membaca tabel transaksi yang sama."
+  },
+  {
+    "terms": [
+      "grup menu",
+      "huruf menu",
+      "kode grup",
+      "menu a sampai t"
+    ],
+    "menus": [],
+    "forms": [],
+    "tables": [],
+    "note": "A–T adalah 20 grup di dropdown Menu. Sebut namanya, bukan hurufnya: A Registrasi & Billing, C Kepegawaian, D Inventory Obat, I Tagihan & Rekap, J Penyakit & Laporan, K Tarif & Keuangan, L Bridging BPJS, M Rekam Medis, O Analisa & Grafik, P Surat, T Pengaturan."
+  },
+  {
+    "terms": [
+      "input resep pulang",
+      "resep pulang",
+      "obat pulang"
+    ],
+    "menus": [
+      "A/Resep Pulang"
+    ],
+    "forms": [
+      "DlgResepPulang"
+    ],
+    "tables": [
+      "resep_pulang"
+    ],
+    "shortcut": "Obat → Input Resep Pulang",
+    "note": "Resep pulang diinput dari klik kanan pasien di Rawat Inap/Rawat Jalan: Obat → Input Resep Pulang (resep_pulang). Menu A/Resep Pulang adalah daftarnya, bukan input."
+  }
+]

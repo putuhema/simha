@@ -5,7 +5,7 @@
 import { NodeFileSystem } from "@effect/platform-node";
 import { makeFakeClient, type FakeTurn, type LlmInfo } from "@simrs/llm";
 import type { AgentEvent } from "@simrs/shared";
-import { AuditLogMemory, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, pacsLayer, ResultStoreLive, schemaDocsLayer, type Pacs } from "@simrs/tools";
+import { appDocsLayer, AuditLogMemory, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, pacsLayer, KnowledgeStoreLive, ResultStoreLive, schemaDocsLayer, type Pacs } from "@simrs/tools";
 import { connectionAs, testDb } from "@simrs/tools/testing";
 import { Duration, Effect, Layer, ManagedRuntime, Redacted } from "effect";
 import { SqlClient } from "effect/sql";
@@ -75,8 +75,10 @@ export const makeTestApp = (
       Layer.mergeAll(
         StoreLive,
         FixStoreLive,
+        KnowledgeStoreLive,
         ResultStoreLive,
         schemaDocsLayer(docs),
+        appDocsLayer(JSON.stringify({ source: { commit: "test" }, groups: [], forms: {}, rights: {} })),
         khanzaWriteLayer(connectionAs(db, db.writeUser, db.writePass)),
         khanzaReadLayer({ connection: connectionAs(db, db.readUser, db.readPass), timeout: Duration.seconds(5) }),
         llm,

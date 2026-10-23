@@ -160,6 +160,14 @@ const make = Effect.gen(function* () {
       finished_at: now(),
     })} WHERE id = ${run.id}`.pipe(Effect.asVoid, Effect.orDie);
 
+  /** A finished answer, for run-level 👍/👎 knowledge feedback. */
+  const getRun = (id: string) =>
+    sql<{ question: string; final_text: string | null; asked_by: string | null }>`
+      SELECT question, final_text, asked_by FROM agent_runs WHERE id = ${id}`.pipe(
+      Effect.map(([r]) => r),
+      Effect.orDie,
+    );
+
   return {
     createTicket,
     getTicket,
@@ -170,6 +178,7 @@ const make = Effect.gen(function* () {
     appendMessage,
     runStarted,
     runFinished,
+    getRun,
   };
 });
 

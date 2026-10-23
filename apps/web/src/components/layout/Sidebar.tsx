@@ -8,6 +8,7 @@ import { Menu } from "@base-ui/react/menu";
 import type { ConversationSummary, Favorite, Stats } from "@simrs/shared";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
+  BookOpen,
   ChevronRight,
   FileClock,
   KeyRound,
@@ -287,6 +288,9 @@ export const SidebarPanel = ({ health, healthError, stats, onNavigate, onClose, 
             </span>
           ) : null}
         </Link>
+        <Link to="/pengetahuan" onClick={onNavigate} className={itemClass} activeProps={{ className: activeClass }}>
+          <BookOpen className="size-4" /> Pengetahuan AI
+        </Link>
       </nav>
 
       <div className="quiet-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-3">
@@ -372,6 +376,14 @@ export const SidebarRail = ({ health, healthError, stats }: Pick<PanelProps, "he
       <TipButton label="Tiket" side="right" onClick={() => void navigate({ to: "/tiket" })} className={cn(icon, pathname === "/tiket" && "bg-paper-2 text-ink")}>
         <Ticket className="size-[18px]" />
         {stats?.tiketTerbuka ? <span className="absolute top-2 right-2 size-2 rounded-full bg-teal ring-2 ring-paper" /> : null}
+      </TipButton>
+      <TipButton
+        label="Pengetahuan AI"
+        side="right"
+        onClick={() => void navigate({ to: "/pengetahuan" })}
+        className={cn(icon, pathname === "/pengetahuan" && "bg-paper-2 text-ink")}
+      >
+        <BookOpen className="size-[18px]" />
       </TipButton>
       {desktop ? (
         <TipButton label="Terminal" shortcut="Ctrl+`" side="right" onClick={() => void desktop?.toggleTerminal()} className={icon}>

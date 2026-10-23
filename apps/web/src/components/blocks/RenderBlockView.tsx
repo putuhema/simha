@@ -3,13 +3,14 @@
  * number or list, the SQL behind it, and actions (CSV, save as favorite).
  */
 import type { RenderBlock } from "@simrs/shared";
-import { Download, Star } from "lucide-react";
+import { Download, Star, ThumbsDown, ThumbsUp } from "lucide-react";
 import { lazy, Suspense, useMemo, useState } from "react";
 import { api, errorMessage } from "../../lib/api.ts";
 import { downloadCsv, fileNameFor, toCsv } from "../../lib/csv.ts";
 import { formatNumber } from "../../lib/format.ts";
 import { Badge } from "../ui/Badge.tsx";
 import { Button } from "../ui/Button.tsx";
+import { Textarea } from "../ui/Field.tsx";
 import { chartHeight, chartOption } from "./chart-options.ts";
 import { DataTable } from "./DataTable.tsx";
 import { SqlDisclosure } from "./SqlSlip.tsx";
@@ -42,6 +43,11 @@ const StatValue = ({ block }: { readonly block: RenderBlock }) => {
 
 export const RenderBlockView = ({ block, onSaved }: { readonly block: RenderBlock; readonly onSaved?: () => void }) => {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | string>("idle");
+  const [sent, setSent] = useState<"up" | "down" | null>(null);
+  const [correcting, setCorrecting] = useState(false);
+  const [comment, setComment] = useState("");
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
   const option = useMemo(() => (["bar", "line", "pie"].includes(block.tipe) ? chartOption(block) : null), [block]);
 
   const save = async () => {
@@ -52,6 +58,26 @@ export const RenderBlockView = ({ block, onSaved }: { readonly block: RenderBloc
       onSaved?.();
     } catch (error) {
       setSaveState(errorMessage(error));
+    }
+  };
+
+  const sendFeedback = async (rating: "up" | "down") => {
+    setSending(true);
+    setFeedbackError(null);
+    try {
+      const trimmed = comment.trim();
+      await api.post("/api/knowledge/feedback", {
+        blockId: block.id,
+        rating,
+        ...(rating === "down" && trimmed !== "" ? { comment: trimmed } : {}),
+      });
+      setSent(rating);
+      setCorrecting(false);
+      setComment("");
+    } catch (error) {
+      setFeedbackError(errorMessage(error));
+    } finally {
+      setSending(false);
     }
   };
 
@@ -80,8 +106,68 @@ export const RenderBlockView = ({ block, onSaved }: { readonly block: RenderBloc
             <Star className={saveState === "saved" ? "fill-amber text-amber" : ""} />
             {saveState === "saved" ? "Tersimpan" : "Simpan ke favorit"}
           </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label="Jawaban ini benar"
+            title="Jawaban ini benar (simpan sebagai contoh)"
+            onClick={() => void sendFeedback("up")}
+            disabled={sending || sent === "up"}
+            className={sent === "up" ? "text-ok" : ""}
+          >
+            <ThumbsUp className={sent === "up" ? "fill-ok" : ""} />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label="Ada yang salah"
+            title="Ada yang salah (beri koreksi)"
+            onClick={() => setCorrecting(!correcting)}
+            disabled={sending || sent === "down"}
+            className={sent === "down" ? "text-red" : ""}
+          >
+            <ThumbsDown className={sent === "down" ? "fill-red" : ""} />
+          </Button>
         </div>
       </figcaption>
+
+      {correcting ? (
+        <div className="border-b border-line-2 bg-paper/50 px-4 py-3">
+          <p className="text-[12.5px] text-ink-2">
+            Apa yang salah? Tulis aturan umumnya (tanpa nomor pasien), mis. “pasien BPJS memakai penjab BPJ”.
+          </p>
+          <Textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            rows={2}
+            maxLength={1_000}
+            placeholder="Koreksi untuk AI…"
+            aria-label="Koreksi"
+            className="mt-2 text-[13px]"
+          />
+          <div className="mt-2 flex justify-end gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setCorrecting(false);
+                setComment("");
+              }}
+            >
+              Batal
+            </Button>
+            <Button size="sm" variant="primary" onClick={() => void sendFeedback("down")} disabled={sending}>
+              Kirim koreksi
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {sent !== null || feedbackError !== null ? (
+        <p className={`border-b border-line-2 px-4 py-2 text-[12.5px] ${feedbackError ? "bg-red-soft text-red" : "text-ok"}`}>
+          {feedbackError ?? (sent === "up" ? "Terima kasih — contoh ini dipakai untuk pertanyaan serupa." : "Koreksi disimpan. Contoh otomatis untuk hasil ini dimatikan.")}
+        </p>
+      ) : null}
 
       <div className="px-4 py-3">
         {block.tipe === "stat" ? <StatValue block={block} /> : null}

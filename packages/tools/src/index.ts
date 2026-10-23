@@ -1,13 +1,22 @@
 /**
  * @simrs/tools: provider-neutral tools, Khanza database access and the audit log.
  */
+export { AppDocs, AppDocsLive, appDocsLayer, loadAppDocs, parseAppIndex, parseFlowDoc, parseSynonyms } from "./app/AppDocs.ts";
+export type { AppDocsService, AppFlow, AppFlowStep, AppForm, AppMenu, AppRight, AppSynonym } from "./app/AppDocs.ts";
+export { cariAplikasiKhanza } from "./app/cariAplikasiKhanza.ts";
+export { searchApp } from "./app/search.ts";
+export type { AppScope, AppSearchResult } from "./app/search.ts";
 export { AuditLog, AuditLogLive, AuditLogMemory, auditLogLayerFile } from "./audit/AuditLog.ts";
 export type { AuditLogService, QueryRecord, ToolCallEnd, ToolCallStart } from "./audit/AuditLog.ts";
 export * from "./config.ts";
 export * from "./errors.ts";
-export { CurrentToolCall } from "./khanza/current-tool-call.ts";
+export { CurrentActor, CurrentSession, CurrentToolCall } from "./khanza/current-tool-call.ts";
 export { KhanzaRead, KhanzaReadLive, khanzaReadLayer } from "./khanza/KhanzaRead.ts";
 export type { KhanzaReadOptions, KhanzaReadService } from "./khanza/KhanzaRead.ts";
+export { catatPengetahuan } from "./knowledge/catatPengetahuan.ts";
+export { KnowledgeStore, KnowledgeStoreLive, MAX_RELEVANT } from "./knowledge/KnowledgeStore.ts";
+export type { KnowledgeChange, NewKnowledge, RelevantKnowledge } from "./knowledge/KnowledgeStore.ts";
+export { personalReason } from "./knowledge/search.ts";
 export { KhanzaWrite, KhanzaWriteLive, khanzaWriteLayer } from "./khanza/KhanzaWrite.ts";
 export type { KhanzaWriteService } from "./khanza/KhanzaWrite.ts";
 export type { ServerFlavor, ServerInfo } from "./khanza/server.ts";

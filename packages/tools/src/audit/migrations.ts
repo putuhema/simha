@@ -272,6 +272,32 @@ const formDrafts = Effect.gen(function* () {
   yield* sql`CREATE INDEX form_drafts_session ON form_drafts (session_id, created_at)`;
 });
 
+const knowledge = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  // What the AI learned about this hospital: questions with the SQL that answered them, and notes.
+  // The most similar active items are added to each question sent to the AI.
+  yield* sql`
+    CREATE TABLE knowledge (
+      id            TEXT PRIMARY KEY,
+      kind          TEXT NOT NULL CHECK (kind IN ('example', 'note')),
+      source        TEXT NOT NULL CHECK (source IN ('auto', 'feedback', 'ai', 'staff')),
+      text          TEXT NOT NULL,
+      sql           TEXT,
+      render_type   TEXT,
+      title         TEXT,
+      verified      INTEGER NOT NULL DEFAULT 0,
+      active        INTEGER NOT NULL DEFAULT 1,
+      block_id      TEXT,
+      run_id        TEXT,
+      created_by    TEXT,
+      created_at    TEXT NOT NULL,
+      updated_at    TEXT NOT NULL,
+      uses          INTEGER NOT NULL DEFAULT 0,
+      last_used_at  TEXT
+    )`;
+  yield* sql`CREATE INDEX knowledge_block ON knowledge (block_id)`;
+});
+
 export const auditMigrations = {
   "0001_init": init,
   "0002_agent": agent,
@@ -280,4 +306,5 @@ export const auditMigrations = {
   "0005_auth": auth,
   "0006_documents": documents,
   "0007_form_drafts": formDrafts,
+  "0008_knowledge": knowledge,
 };

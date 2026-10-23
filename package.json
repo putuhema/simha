@@ -18,7 +18,8 @@
     "lint": "oxlint --report-unused-disable-directives",
     "knip": "knip",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "extract-khanza-app": "pnpm --filter @simrs/scripts extract-khanza-app"
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.10.0",

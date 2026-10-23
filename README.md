@@ -5,7 +5,7 @@ AI assistant for hospital IT staff working with **SIMRS Khanza**.
 - **Tiket mode:** paste a nurse's complaint. The agent reads the real patient data through safe, read-only tools, explains each check, gives a diagnosis and proposes a fix as SQL. The fix only runs after a person clicks **Approve**, and it can be rolled back.
 - **Tanya Data mode:** ask questions about hospital data in plain Indonesian ("10 obat paling banyak dipakai minggu ini"). The agent writes a guarded `SELECT` and shows the answer as a table, chart or number.
 
-> Status: **M5 done**: web UI (Tiket, Tanya Data, Pengaturan) with login, on top of the database layer, audit log, read/diagnose/Tanya Data tools, AI agent and fixes with approval and rollback. See [docs/PLAN.md](docs/PLAN.md).
+> Status: **M6.6 done**: web UI (Tiket, Tanya Data, Pengetahuan AI, Pengaturan), desktop app with Khanza bridge, resume drafts, app map and AI learning (examples, notes, feedback). See [docs/PLAN.md](docs/PLAN.md).
 
 ## Safety model (short version)
 
@@ -88,7 +88,28 @@ After a schema change, also refresh the test fixture so tests use the same table
 pnpm dump-test-schema    # -> packages/tools/test/fixtures/khanza-schema.sql
 ```
 
-### 3. Try the read tools
+### 3. App map: menu, flows and rights
+
+The desktop app's menu is generated from the Khanza source (not from the database), so the agent can
+answer "di menu mana pindah kamar?", "alur rawat inap sampai billing", or "hak apa yang membuat menu
+kasir tidak muncul".
+
+```bash
+pnpm extract-khanza-app          # reads ~/work/simrsmt, writes docs/khanza-app/
+pnpm extract-khanza-app --check  # fails when the map is stale
+```
+
+It writes `docs/khanza-app/index.json` (the graph the `cariAplikasiKhanza` tool reads) plus
+`menu/`, `forms/` and `README.md`, with every button's form, dialog title, access right, in-form buttons,
+right-click actions, and the tables each form writes/reads. `flows/`, `roles.md`, `bridge.md`,
+`cara-pakai.md` and `synonyms.json` are hand-written (the narrative source of truth; `index.json` stays
+generated). The output is tied to one Khanza commit, shown in `index.json`. Re-run it after a Khanza
+update; the report prints how many buttons resolved to a form and exits non-zero when that drops below
+90%.
+
+See [docs/khanza-app/README.md](docs/khanza-app/README.md).
+
+### 4. Try the read tools
 
 ```bash
 pnpm tool                                              # list the tools
@@ -101,12 +122,14 @@ pnpm tool statusBilling '{"noRawat":"2026/01/15/000123"}'
 pnpm tool dataSep '{"noRawat":"2026/01/15/000123"}'
 pnpm tool suratKontrol '{"noSep":"0001R0010126V000123"}'
 pnpm tool lihatSkema '{"kataKunci":"obat"}'
+pnpm tool cariAplikasiKhanza '{"kataKunci":"pindah kamar"}'
+pnpm tool cariAplikasiKhanza '{"kataKunci":"form apa yang mengisi kamar_inap","bagian":"tabel"}'
 pnpm tool jalankanQueryBaca '{"sql":"SELECT COUNT(*) AS jumlah FROM reg_periksa WHERE tgl_registrasi = CURDATE()","alasan":"coba"}'
 ```
 
 Each run is recorded in the audit log (`data/audit.sqlite`): the tool call with its input and output, and every query with its parameters, row count and duration. Look at it with any SQLite viewer, e.g. `sqlite3 data/audit.sqlite "SELECT tool, status, started_at FROM tool_calls"`.
 
-### 4. Build the UI and start the server
+### 5. Build the UI and start the server
 
 ```bash
 pnpm build       # web UI -> apps/web/dist (once, and after updates)
@@ -130,6 +153,7 @@ Open http://127.0.0.1:8787. The first visit asks for the **first admin account**
 
   The HTML is filled from a fixed template by the server, never written by the AI, and every value is escaped. It is served with a CSP that allows no scripts. Generated documents are kept in the audit DB, and downloads are logged.
 - **Tanya Data.** Ask in plain Indonesian. Answers show tables (sortable, CSV export), charts and numbers, each with an assumption line and "Query yang dipakai". **Simpan ke favorit** saves the question and SQL; favorites re-run without the AI.
+- **Pengetahuan AI.** See what the AI learned: examples saved automatically, AI/staff notes and 👎 corrections. 👍 verifies an example; admins can verify, edit, deactivate or delete items.
 - **Pengaturan.** The tabs are:
   - **AI:** provider, model, base URL, API key, "samarkan data" and **Tes koneksi**. Saving switches the AI without a restart and overrides `.env`; admins only.
   - **Audit log:** questions, tool calls, queries, fix approvals, logins, filterable.
@@ -145,7 +169,7 @@ Security notes:
 - **Wrong passwords:** after 5 wrong tries a username is locked for a minute.
 - **API key:** an API key saved on the settings page is stored in `data/audit.sqlite`. Keep that file readable only by the account that runs the server.
 
-### 5. Fixes: approve and roll back
+### 6. Fixes: approve and roll back
 
 When the agent finds data to fix, it calls `usulkanPerbaikan`. That only **stores a proposal** (status `pending`) with the exact SQL and a preview of the rows it will change. Nothing touches Khanza until someone approves it in the UI. The user who approves is recorded in the audit log.
 
@@ -172,7 +196,7 @@ What the server checks:
 - **Edit.** **Edit** saves a corrected proposal, which is checked again, and rejects the original.
 - **Rollback.** The server refuses if the rows changed since the fix ran. Otherwise it restores the before-image in one transaction.
 
-### 6. Desktop app (Windows)
+### 7. Desktop app (Windows)
 
 `apps/desktop` wraps the UI in an Electron window and adds **Buka di Khanza**.
 
@@ -260,6 +284,9 @@ Send the `conversationId` with the next `/api/ask` for a follow-up.
 | `POST /api/documents` | `{ jenis: "riwayat" \| "cppt" \| "resume", noRkmMedis?, noRawat? }`: make a patient document |
 | `GET /api/documents/:id` | its HTML (`?download=1` to save it) |
 | `GET /api/favorites`, `POST /api/favorites` (`{ blockId, question? }`), `DELETE /api/favorites/:id`, `POST /api/favorites/:id/run` | |
+| `GET /api/knowledge`, `POST /api/knowledge` (`{ text }`) | what the AI learned; staff note |
+| `PATCH /api/knowledge/:id`, `DELETE /api/knowledge/:id` | verify / deactivate / edit / delete (admin) |
+| `POST /api/knowledge/feedback` | `{ blockId \| runId, rating: "up" \| "down", comment? }` |
 | `GET /api/settings/llm`, `PUT /api/settings/llm`, `POST /api/settings/llm/test` | AI provider (changes: admin) |
 | `GET /api/audit` | `?kind=runs\|tools\|queries\|fixes\|events&q=&from=&to=&limit=&offset=` |
 
@@ -320,6 +347,25 @@ The agent answers data questions with three tools:
 3. **`tampilkan(tipe, judul, queryId, asumsi?, opsi?)`** shows a stored result as `table`, `bar`, `line`, `pie`, `stat` or `list`, with the SQL and a one-line assumption ("bulan ini = 1–22 Okt 2026, hanya rawat jalan"). The brief named this argument `data`; here it is a `queryId`, so the numbers on screen are exactly what the database returned and the AI never retypes them.
 
 Favorites store the question, the SQL and the chart settings, and re-run through the same guard and audit log.
+
+## AI learning (what the AI remembers)
+
+The AI improves across questions without fine-tuning. A successful Tanya Data answer that showed a result
+is saved automatically as an **example** (question + SQL, unverified). The AI's own
+**`catatPengetahuan`** tool, a 👍, and the **Pengetahuan AI** page add notes and verified examples. Before
+each question the server searches this store (keyword + IDF, no embeddings), takes at most five matching
+items, and injects them into the *current user turn* as `[Pengetahuan dari pertanyaan sebelumnya]`. The
+stored conversation stays plain, so follow-ups do not grow with old context.
+
+- **👍 / 👎.** Under every result (table, chart, number) and every text answer. On a result, 👍 verifies
+  the example and 👎 turns the automatic example off; on a text answer, 👍 saves the question + answer as
+  a verified note and 👎 saves the correction.
+- **Moderation.** AI/staff notes are active immediately but unverified. Admins can verify, edit,
+  deactivate or delete anything on **Pengetahuan AI**; everyone can add a note. Nothing here can change
+  Khanza.
+- **Privacy.** Examples/notes with a no. rawat, RM, NIK, SEP or phone number are refused. Verified items
+  rank above automatic ones, and auto examples rank slightly below staff/AI notes.
+- **Storage.** The `knowledge` table lives in the audit SQLite DB (migration `0008_knowledge`).
 
 ## Development
 

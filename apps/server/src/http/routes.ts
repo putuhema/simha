@@ -39,6 +39,11 @@
  *   POST   /api/favorites                save the question and SQL behind a chat result
  *   DELETE /api/favorites/:id            remove one
  *   POST   /api/favorites/:id/run        re-run it without the AI; returns a render block
+ *   GET    /api/knowledge                what the AI learned (examples and notes)
+ *   POST   /api/knowledge                add a staff note
+ *   PATCH  /api/knowledge/:id            verify / deactivate / edit (admin)
+ *   DELETE /api/knowledge/:id            remove one (admin)
+ *   POST   /api/knowledge/feedback       👍 or 👎 a result or whole answer, with an optional correction
  *   GET    /api/settings/llm             AI provider settings (no API key)
  *   PUT    /api/settings/llm             change them (admin)
  *   POST   /api/settings/llm/test        try settings without saving (admin)
@@ -52,15 +57,18 @@ import {
   CreateDocumentRequest,
   CreateFavoriteRequest,
   CreateFixRequest,
+  CreateKnowledgeRequest,
   CreateTicketRequest,
   CreateUserRequest,
   FixStatus,
   InvestigateRequest,
+  KnowledgeFeedbackRequest,
   LoginRequest,
   RejectFixRequest,
   SetupRequest,
   TicketStatus,
   UpdateDraftRequest,
+  UpdateKnowledgeRequest,
   UpdateLlmSettingsRequest,
   UpdateUserRequest,
   formProblems,
@@ -74,7 +82,9 @@ import {
   isOrthancId,
   kartuPasien,
   KhanzaRead,
+  KnowledgeStore,
   Pacs,
+  personalReason,
   planFix,
   ResultStore,
   runTool,
@@ -659,6 +669,220 @@ const DraftRoutes = Layer.mergeAll(
   ),
 );
 
+/**
+ * What the AI learned: examples saved from results, notes from staff and the
+ * AI, 👍/👎 feedback, and the admin review actions. All of it lives in the
+ * audit DB; none of it can change Khanza.
+ */
+const KnowledgeRoutes = Layer.mergeAll(
+  route(
+    "GET",
+    "/api/knowledge",
+    authed(
+      Effect.gen(function* () {
+        return json(yield* (yield* KnowledgeStore).list);
+      }),
+    ),
+  ),
+
+  route(
+    "POST",
+    "/api/knowledge",
+    authed(
+      handled(
+        Effect.gen(function* () {
+          const input = yield* body(CreateKnowledgeRequest);
+          const reason = personalReason(input.text);
+          if (reason !== null) {
+            return yield* Effect.fail(`Catatan tidak disimpan karena ${reason}. Simpan aturan umum, bukan data satu pasien.`);
+          }
+          const user = yield* CurrentUser;
+          const item = yield* (yield* KnowledgeStore).add({
+            kind: "note",
+            source: "staff",
+            text: input.text,
+            verified: false,
+            createdBy: user.username,
+          });
+          yield* (yield* Auth).logEvent("knowledge_added", user.username, item.id);
+          return json(item, 201);
+        }),
+      ),
+    ),
+  ),
+
+  route(
+    "POST",
+    "/api/knowledge/feedback",
+    authed(
+      handled(
+        Effect.gen(function* () {
+          const input = yield* body(KnowledgeFeedbackRequest);
+          const knowledge = yield* KnowledgeStore;
+          const user = yield* CurrentUser;
+          const blockId = input.blockId;
+          const runId = input.runId;
+          if ((blockId === undefined) === (runId === undefined)) {
+            return yield* Effect.fail("Sertakan blockId (untuk hasil tabel/grafik) atau runId (untuk jawaban teks).");
+          }
+
+          // A whole text answer: store the question + answer as a verified note,
+          // or a correction when 👎. Used when there is no render block to rate.
+          if (runId !== undefined) {
+            const run = yield* (yield* Store).getRun(runId);
+            if (!run) return errorResponse(404, "Jawaban yang dinilai tidak ditemukan.");
+            const answer = run.final_text?.trim() ?? "";
+            if (answer === "") return yield* Effect.fail("Jawaban ini belum selesai; coba lagi setelah selesai.");
+            const reason = personalReason(run.question) ?? personalReason(answer);
+            if (reason !== null) {
+              return yield* Effect.fail(
+                `Jawaban ini tidak disimpan sebagai pengetahuan karena ${reason}. Simpan aturan umum, bukan data satu pasien.`,
+              );
+            }
+            const existing = yield* knowledge.forRun(runId);
+            const comment = input.comment?.trim();
+
+            if (input.rating === "up") {
+              const text = `Pertanyaan: ${run.question}\nJawaban: ${answer}`.slice(0, 1_000);
+              const item = existing
+                ? yield* knowledge.update(existing.id, { text, verified: true, active: true, source: "feedback" })
+                : yield* knowledge.add({
+                    kind: "note",
+                    source: "feedback",
+                    text,
+                    verified: true,
+                    runId,
+                    createdBy: user.username,
+                  });
+              yield* (yield* Auth).logEvent("knowledge_feedback", user.username, `👍 run ${runId}`);
+              return json({ ok: true, knowledge: item ?? null });
+            }
+
+            if (comment !== undefined && comment !== "") {
+              const commentReason = personalReason(comment);
+              if (commentReason !== null) {
+                return yield* Effect.fail(
+                  `Koreksi tidak disimpan karena ${commentReason}. Tulis aturan umumnya, bukan nomor pasien.`,
+                );
+              }
+            }
+            if (existing) yield* knowledge.update(existing.id, { active: false });
+            const note =
+              comment === undefined || comment === ""
+                ? null
+                : yield* knowledge.add({
+                    kind: "note",
+                    source: "feedback",
+                    text: comment,
+                    verified: false,
+                    runId,
+                    createdBy: user.username,
+                  });
+            yield* (yield* Auth).logEvent("knowledge_feedback", user.username, `👎 run ${runId}`);
+            return json({ ok: true, knowledge: note });
+          }
+
+          if (blockId === undefined) return yield* Effect.fail("Sertakan blockId atau runId.");
+          const results = yield* ResultStore;
+          const stored = yield* results.getBlock(blockId);
+          if (!stored) return errorResponse(404, "Hasil yang dinilai tidak ditemukan.");
+          const question = stored.question ?? stored.block.judul;
+
+          if (input.rating === "up") {
+            const reason = personalReason(question) ?? personalReason(stored.block.sql);
+            if (reason !== null) {
+              return yield* Effect.fail(
+                `Contoh ini tidak disimpan sebagai pengetahuan karena ${reason}. Simpan aturan umum, bukan data satu pasien.`,
+              );
+            }
+            const existing = yield* knowledge.forBlock(blockId);
+            const item = existing
+              ? yield* knowledge.update(existing.id, { verified: true, active: true, source: "feedback" })
+              : yield* knowledge.add({
+                  kind: "example",
+                  source: "feedback",
+                  text: question,
+                  sql: stored.block.sql,
+                  renderType: stored.block.tipe,
+                  title: stored.block.judul,
+                  verified: true,
+                  blockId,
+                  runId: stored.sessionId,
+                  createdBy: user.username,
+                });
+            yield* (yield* Auth).logEvent("knowledge_feedback", user.username, `👍 ${blockId}`);
+            return json({ ok: true, knowledge: item ?? null });
+          }
+
+          // 👎: stop using the automatic example, and keep a correction as a note.
+          const comment = input.comment?.trim();
+          if (comment !== undefined && comment !== "") {
+            const reason = personalReason(comment);
+            if (reason !== null) {
+              return yield* Effect.fail(
+                `Koreksi tidak disimpan karena ${reason}. Tulis aturan umumnya, bukan nomor pasien.`,
+              );
+            }
+          }
+          yield* knowledge.deactivateForBlock(blockId);
+          const note =
+            comment === undefined || comment === ""
+              ? null
+              : yield* knowledge.add({
+                  kind: "note",
+                  source: "feedback",
+                  text: comment,
+                  verified: false,
+                  createdBy: user.username,
+                });
+          yield* (yield* Auth).logEvent("knowledge_feedback", user.username, `👎 ${blockId}`);
+          return json({ ok: true, knowledge: note });
+        }),
+      ),
+    ),
+  ),
+
+  route(
+    "PATCH",
+    "/api/knowledge/:id",
+    authed(
+      handled(
+        Effect.gen(function* () {
+          const input = yield* body(UpdateKnowledgeRequest);
+          if (input.text !== undefined) {
+            const reason = personalReason(input.text);
+            if (reason !== null) {
+              return yield* Effect.fail(`Catatan tidak disimpan karena ${reason}. Simpan aturan umum, bukan data satu pasien.`);
+            }
+          }
+          const user = yield* CurrentUser;
+          const item = yield* (yield* KnowledgeStore).update(yield* id, input);
+          if (!item) return errorResponse(404, "Pengetahuan tidak ditemukan.");
+          yield* (yield* Auth).logEvent("knowledge_updated", user.username, `${item.id}: ${input.verified === true ? "verified" : ""}${input.active === false ? " nonaktif" : ""}`.trim());
+          return json(item);
+        }),
+      ),
+      { admin: true },
+    ),
+  ),
+
+  route(
+    "DELETE",
+    "/api/knowledge/:id",
+    authed(
+      Effect.gen(function* () {
+        const user = yield* CurrentUser;
+        const knowledgeId = yield* id;
+        const deleted = yield* (yield* KnowledgeStore).remove(knowledgeId);
+        if (!deleted) return errorResponse(404, "Pengetahuan tidak ditemukan.");
+        yield* (yield* Auth).logEvent("knowledge_deleted", user.username, knowledgeId);
+        return HttpServerResponse.empty({ status: 204 });
+      }),
+      { admin: true },
+    ),
+  ),
+);
+
 const DataRoutes = Layer.mergeAll(
   route("GET", "/api/favorites", authed(Effect.gen(function* () {
       return json(yield* (yield* ResultStore).listFavorites);
@@ -787,4 +1011,4 @@ const WebRoutes = route(
   }),
 );
 
-export const Routes = Layer.mergeAll(AuthRoutes, TicketRoutes, FixRoutes, DocumentRoutes, PacsRoutes, DraftRoutes, DataRoutes, WebRoutes);
+export const Routes = Layer.mergeAll(AuthRoutes, TicketRoutes, FixRoutes, DocumentRoutes, PacsRoutes, DraftRoutes, DataRoutes, KnowledgeRoutes, WebRoutes);

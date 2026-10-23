@@ -16,16 +16,20 @@ import {
   defaultRegistry,
   FixStore,
   KhanzaRead,
+  KnowledgeStore,
   maskPii,
   maskText,
   Pacs,
+  personalReason,
   ResultStore,
   runTool,
+  AppDocs,
   SchemaDocs,
   type ToolRegistry,
 } from "@simrs/tools";
 import { Cause, Context, Effect, Exit, Layer, Queue, Stream } from "effect";
 import { Store } from "../store.ts";
+import { knowledgePrompt, withKnowledge } from "./knowledge.ts";
 import { SystemPrompt } from "./prompt.ts";
 
 /** Upper bound on model turns per question, so a confused model cannot loop forever. */
@@ -84,7 +88,9 @@ const make = Effect.gen(function* () {
   const store = yield* Store;
   const fixes = yield* FixStore;
   const results = yield* ResultStore;
+  const knowledge = yield* KnowledgeStore;
   const docs = yield* SchemaDocs;
+  const appDocs = yield* AppDocs;
   const pacs = yield* Pacs;
   const system = yield* SystemPrompt;
   const registry: ToolRegistry = defaultRegistry;
@@ -117,7 +123,9 @@ const make = Effect.gen(function* () {
         Effect.provideService(AuditLog, audit),
         Effect.provideService(FixStore, fixes),
         Effect.provideService(ResultStore, results),
+        Effect.provideService(KnowledgeStore, knowledge),
         Effect.provideService(SchemaDocs, docs),
+        Effect.provideService(AppDocs, appDocs),
         Effect.provideService(Pacs, pacs),
         Effect.exit,
       );
@@ -165,6 +173,7 @@ const make = Effect.gen(function* () {
         yield* emit({ _tag: "run_started", runId, conversationId, provider: info.provider, model: info.model });
 
         const history: Array<ChatMessage> = [...(yield* store.loadMessages(conversationId))];
+        const followUp = history.length > 0;
         const append = (message: ChatMessage) =>
           store.appendMessage(conversationId, runId, message).pipe(
             Effect.map(() => {
@@ -174,12 +183,19 @@ const make = Effect.gen(function* () {
 
         const raw = userText(input, new Date(), yield* latestDataDate);
         yield* append({ role: "user", text: info.maskPii ? maskText(raw) : raw });
+        const userMessageIndex = history.length - 1;
+        // What earlier questions taught us. The stored message stays plain; the
+        // block is only added to the requests, so follow-ups do not replay it.
+        const matches = yield* knowledge.relevant(question).pipe(Effect.catchCause(() => Effect.succeed([])));
+        const learned = knowledgePrompt(matches);
+        const knowledgeBlock = learned === "" ? "" : info.maskPii ? maskText(learned) : learned;
 
         let steps = 0;
         let finalText = "";
         let stopReason = "other";
         let inputTokens = 0;
         let outputTokens = 0;
+        const blocks: Array<RenderBlock> = [];
 
         const loop = Effect.gen(function* () {
           while (steps < MAX_STEPS) {
@@ -190,7 +206,11 @@ const make = Effect.gen(function* () {
             // Tool calls streamed while being written, in order; the n-th
             // finished call replaces the n-th draft in the UI.
             const drafts: Array<{ readonly index: number; readonly draftId: string }> = [];
-            yield* llm.chat({ system, messages: [...history], tools: registry.descriptions }).pipe(
+            yield* llm.chat({
+              system,
+              messages: withKnowledge(history, userMessageIndex, knowledgeBlock),
+              tools: registry.descriptions,
+            }).pipe(
               Stream.runForEach((event) => {
                 switch (event.type) {
                   case "text_delta":
@@ -232,7 +252,10 @@ const make = Effect.gen(function* () {
                   ? { _tag: "tool_finished", callId: call.id, name: call.name, ok: true, result: outcome.result, durationMs: outcome.durationMs }
                   : { _tag: "tool_finished", callId: call.id, name: call.name, ok: false, error: outcome.error, durationMs: outcome.durationMs },
               );
-              if (outcome.ok && outcome.block) yield* emit({ _tag: "render", callId: call.id, block: outcome.block });
+              if (outcome.ok && outcome.block) {
+                blocks.push(outcome.block);
+                yield* emit({ _tag: "render", callId: call.id, block: outcome.block });
+              }
               if (outcome.ok && outcome.document) yield* emit({ _tag: "document", callId: call.id, document: outcome.document });
               if (outcome.ok && outcome.draft) yield* emit({ _tag: "draft", callId: call.id, draft: outcome.draft });
               if (outcome.ok && outcome.gallery) yield* emit({ _tag: "radiology", callId: call.id, gallery: outcome.gallery });
@@ -248,6 +271,30 @@ const make = Effect.gen(function* () {
           stopReason = "max_steps";
           finalText ||= `Berhenti setelah ${MAX_STEPS} langkah tanpa jawaban akhir.`;
         });
+
+        /** A successful, self-contained question with a result is worth reusing. */
+        const saveKnowledge = Effect.gen(function* () {
+          if (input.kind !== "ask" || followUp || blocks.length === 0) return;
+          const block = blocks[0];
+          if (block === undefined) return;
+          if (personalReason(question) !== null) return;
+          const result = yield* results.getResult(block.queryId);
+          const sql = result?.sqlOriginal ?? block.sql;
+          if (personalReason(sql) !== null) return;
+          if (yield* knowledge.hasExample(question)) return;
+          yield* knowledge.add({
+            kind: "example",
+            source: "auto",
+            text: question,
+            sql,
+            renderType: block.tipe,
+            title: block.judul,
+            verified: false,
+            blockId: block.id,
+            runId,
+            createdBy: input.askedBy,
+          });
+        }).pipe(Effect.catchCause(() => Effect.void));
 
         const finish = (status: "ok" | "error" | "interrupted", error: string | null) =>
           Effect.asVoid(Effect.all([
@@ -267,7 +314,8 @@ const make = Effect.gen(function* () {
         yield* loop.pipe(
           Effect.matchCauseEffect({
             onSuccess: () =>
-              Effect.andThen(finish("ok", null), emit({ _tag: "done", runId, text: finalText, stopReason, steps })).pipe(
+              Effect.andThen(finish("ok", null), saveKnowledge).pipe(
+                Effect.andThen(emit({ _tag: "done", runId, text: finalText, stopReason, steps })),
                 Effect.asVoid,
               ),
             onFailure: (cause) => {

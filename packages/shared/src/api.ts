@@ -243,6 +243,74 @@ export const CreateFavoriteRequest = Schema.Struct({
 });
 export type CreateFavoriteRequest = typeof CreateFavoriteRequest.Type;
 
+// --- AI knowledge (what the AI learned about this hospital) --------------------
+
+/**
+ * - example: a question with the SQL that answered it, reused for similar questions.
+ * - note: a fact about the schema, local codes or how staff want answers.
+ */
+export const KnowledgeKind = Schema.Literals(["example", "note"]);
+export type KnowledgeKind = typeof KnowledgeKind.Type;
+
+/**
+ * - auto: saved by the server after an answer was shown (not checked by anyone).
+ * - feedback: an answer a staff member marked as correct (👍), or their correction (👎).
+ * - ai: a note the AI saved while working.
+ * - staff: written by staff on the knowledge page.
+ */
+export const KnowledgeSource = Schema.Literals(["auto", "feedback", "ai", "staff"]);
+export type KnowledgeSource = typeof KnowledgeSource.Type;
+
+export const Knowledge = Schema.Struct({
+  id: Schema.String,
+  kind: KnowledgeKind,
+  source: KnowledgeSource,
+  /** The question (example) or the note. */
+  text: Schema.String,
+  /** Example only: the SELECT that answered the question. */
+  sql: Schema.NullOr(Schema.String),
+  /** Example only: how it was shown (table, bar, ...). */
+  renderType: Schema.NullOr(RenderType),
+  /** Example only: the title of the result. */
+  title: Schema.NullOr(Schema.String),
+  /** Checked by a person (👍, written or approved by staff). Verified items are preferred. */
+  verified: Schema.Boolean,
+  /** Inactive items are never given to the AI (👎, or turned off on the knowledge page). */
+  active: Schema.Boolean,
+  createdBy: Schema.NullOr(Schema.String),
+  createdAt: Schema.String,
+  /** How many questions it was given to the AI for. */
+  uses: Schema.Number,
+  lastUsedAt: Schema.NullOr(Schema.String),
+});
+export type Knowledge = typeof Knowledge.Type;
+
+/** POST /knowledge: a note written by staff. */
+export const CreateKnowledgeRequest = Schema.Struct({
+  text: NonEmpty.check(Schema.isMaxLength(1_000)),
+});
+export type CreateKnowledgeRequest = typeof CreateKnowledgeRequest.Type;
+
+/** PATCH /knowledge/:id (admin). */
+export const UpdateKnowledgeRequest = Schema.Struct({
+  text: Schema.optionalKey(NonEmpty.check(Schema.isMaxLength(1_000))),
+  verified: Schema.optionalKey(Schema.Boolean),
+  active: Schema.optionalKey(Schema.Boolean),
+});
+export type UpdateKnowledgeRequest = typeof UpdateKnowledgeRequest.Type;
+
+/** POST /knowledge/feedback: 👍 or 👎 on a result, or on a text answer by run. */
+export const KnowledgeFeedbackRequest = Schema.Struct({
+  /** The result block (table/chart/number) being rated. Use this or `runId`. */
+  blockId: Schema.optionalKey(NonEmpty),
+  /** The whole answer, for text-only answers with no render block. Use this or `blockId`. */
+  runId: Schema.optionalKey(NonEmpty),
+  rating: Schema.Literals(["up", "down"]),
+  /** For 👎: what was wrong, saved as a note for the AI. */
+  comment: Schema.optionalKey(NonEmpty.check(Schema.isMaxLength(1_000))),
+});
+export type KnowledgeFeedbackRequest = typeof KnowledgeFeedbackRequest.Type;
+
 // --- Agent stream (Server-Sent Events) ---------------------------------------
 
 /** First event: which run, conversation and AI model this is. */

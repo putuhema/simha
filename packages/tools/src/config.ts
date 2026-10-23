@@ -56,6 +56,12 @@ export const SchemaDocPathConfig: Config.Config<string> = Config.String("SCHEMA_
   Config.map((path) => NodePath.resolve(repoRoot, path)),
 );
 
+/** docs/khanza-app/index.json (from `pnpm extract-khanza-app`), read by cariAplikasiKhanza. */
+export const AppDocPathConfig: Config.Config<string> = Config.String("APP_DOC_PATH").pipe(
+  Config.withDefault("docs/khanza-app/index.json"),
+  Config.map((path) => NodePath.resolve(repoRoot, path)),
+);
+
 /** docs/khanza_notes.md (hand-written by IT), read by lihatSkema and the system prompt. */
 export const KhanzaNotesPathConfig: Config.Config<string> = Config.String("KHANZA_NOTES_PATH").pipe(
   Config.withDefault("docs/khanza_notes.md"),

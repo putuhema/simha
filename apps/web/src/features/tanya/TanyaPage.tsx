@@ -9,6 +9,7 @@ import { useNavigate, useSearch } from "@tanstack/react-router";
 import { Check, ChevronRight, Copy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { StreamingMarkdown } from "../../components/agent/Markdown.tsx";
+import { AnswerFeedback } from "../../components/agent/AnswerFeedback.tsx";
 import { PendingLine, pendingStep, StepList } from "../../components/agent/StepList.tsx";
 import { DocumentCard } from "../../components/blocks/DocumentCard.tsx";
 import { RadiologyCard } from "../../components/pacs/Radiology.tsx";
@@ -75,6 +76,8 @@ const khanzaButtonFor = (turn: RunView): { form: KhanzaForm; noRawat: string | n
 const Turn = ({ turn, drafts }: { readonly turn: RunView; readonly drafts: ReadonlyArray<FormDraft> }) => {
   const khanza = turn.status === "done" ? khanzaButtonFor(turn) : null;
   const running = turn.status === "running";
+  // Text answers have no block to rate, so give them their own 👍/👎.
+  const canRateAnswer = turn.status === "done" && turn.text !== "" && turn.runId !== null && turn.blocks.length === 0;
   // Steps are open while the AI works and fold away when the answer is in.
   const [stepsOpen, setStepsOpen] = useState(running);
   const [wasRunning, setWasRunning] = useState(running);
@@ -126,8 +129,9 @@ const Turn = ({ turn, drafts }: { readonly turn: RunView; readonly drafts: Reado
       {turn.status === "error" ? <ErrorText>{turn.error}</ErrorText> : null}
       {turn.status === "stopped" ? <p className="text-[13px] text-ink-3">Dihentikan.</p> : null}
       {turn.status === "done" && turn.text ? (
-        <div className="-mt-2 flex animate-fade-in items-center gap-1.5">
+        <div className="-mt-2 flex animate-fade-in flex-wrap items-center gap-1.5">
           <CopyButton text={turn.text} />
+          {canRateAnswer && turn.runId !== null ? <AnswerFeedback runId={turn.runId} /> : null}
           {khanza ? <OpenInKhanza noRawat={khanza.noRawat} noRm={khanza.noRm} defaultForm={khanza.form} /> : null}
         </div>
       ) : null}
