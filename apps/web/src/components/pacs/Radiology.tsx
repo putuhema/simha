@@ -265,7 +265,7 @@ const Reading = ({ text }: { readonly text: string }) => {
   const body = (match ? text.slice(0, match.index) : text).trim();
   const kesan = match ? text.slice(match.index + match[0].length).trim() : null;
   return (
-    <div className="space-y-2 text-[13.5px] leading-relaxed">
+    <div className="space-y-2 text-[13px] leading-relaxed">
       {body ? <p className="whitespace-pre-wrap text-ink-2">{body}</p> : null}
       {kesan ? (
         <p className="rounded-md bg-teal-soft/60 px-3 py-2 whitespace-pre-wrap text-ink">
@@ -320,14 +320,14 @@ export const RadiologyCard = ({ gallery }: { readonly gallery: RadiologyGallery 
   const open = (study: PacsStudy) => (index: number) => setViewing({ study, index });
   const empty = gallery.pemeriksaan.length === 0 && gallery.studies.length === 0;
   return (
-    <figure className="animate-rise overflow-hidden rounded-lg border border-line bg-card" data-testid="radiology-card">
-      <figcaption className="flex items-center gap-3 border-b border-line-2 px-4 py-3">
-        <span className="grid size-9 shrink-0 place-items-center rounded-md bg-teal-soft text-teal">
-          <ScanLine className="size-5" />
+    <figure className="animate-rise @container overflow-hidden rounded-xl border border-line bg-card" data-testid="radiology-card">
+      <figcaption className="flex items-center gap-2.5 border-b border-line-2 px-3.5 py-3">
+        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-teal-soft text-teal">
+          <ScanLine className="size-4" />
         </span>
         <div className="min-w-0">
-          <h3 className="font-display text-[16px] leading-tight font-semibold">Hasil radiologi</h3>
-          <p className="truncate text-[12.5px] text-ink-2">
+          <h3 className="font-display text-[14.5px] leading-tight font-semibold">Hasil radiologi</h3>
+          <p className="truncate text-[11.5px] text-ink-2">
             RM <span className="font-mono">{gallery.noRkmMedis}</span>
             {gallery.noRawat ? <> · <span className="font-mono">{gallery.noRawat}</span></> : null}
           </p>
@@ -338,13 +338,13 @@ export const RadiologyCard = ({ gallery }: { readonly gallery: RadiologyGallery 
         {gallery.pemeriksaan.map((exam) => {
           const studies = byExam.get(exam) ?? [];
           return (
-            <section key={`${exam.noRawat}|${exam.tanggal}|${exam.jam}`} className="space-y-3 px-4 py-3.5" data-testid="radiology-exam">
+            <section key={`${exam.noRawat}|${exam.tanggal}|${exam.jam}`} className="space-y-3 px-3.5 py-3.5" data-testid="radiology-exam">
               <header className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                <h4 className="font-display text-[15px] font-semibold">{exam.nama ?? "Pemeriksaan radiologi"}</h4>
-                <span className="font-mono text-[12px] text-ink-2">
+                <h4 className="font-display text-[14px] font-semibold">{exam.nama ?? "Pemeriksaan radiologi"}</h4>
+                <span className="font-mono text-[11.5px] text-ink-2">
                   {dayLabel(exam.tanggal)} · {exam.jam}
                 </span>
-                {exam.dokter ? <span className="text-[12px] text-ink-3">{exam.dokter}</span> : null}
+                {exam.dokter ? <span className="text-[11.5px] text-ink-3">{exam.dokter}</span> : null}
                 {!gallery.noRawat ? <span className="font-mono text-[11.5px] text-ink-3">{exam.noRawat}</span> : null}
               </header>
               {exam.hasil ? <Reading text={exam.hasil} /> : <p className="text-[13px] text-ink-3">Belum ada hasil baca.</p>}
@@ -356,19 +356,19 @@ export const RadiologyCard = ({ gallery }: { readonly gallery: RadiologyGallery 
         })}
 
         {rest.map((study) => (
-          <section key={study.id} className="space-y-3 px-4 py-3.5">
+          <section key={study.id} className="space-y-3 px-3.5 py-3.5">
             <header className="flex flex-wrap items-baseline gap-x-3">
-              <h4 className="font-display text-[15px] font-semibold">{study.description || "Gambar PACS"}</h4>
+              <h4 className="font-display text-[14px] font-semibold">{study.description || "Gambar PACS"}</h4>
               <span className="font-mono text-[12px] text-ink-2">{dateLabel(study)}</span>
             </header>
             <StudyThumbs study={study} onOpen={open(study)} />
           </section>
         ))}
 
-        {empty ? <p className="px-4 py-3.5 text-[13px] text-ink-3">Tidak ada pemeriksaan radiologi.</p> : null}
-        {gallery.pacsCatatan ? <p className="px-4 py-2.5 text-[12.5px] text-ink-3">{gallery.pacsCatatan}</p> : null}
+        {empty ? <p className="px-3.5 py-3.5 text-[12.5px] text-ink-3">Tidak ada pemeriksaan radiologi.</p> : null}
+        {gallery.pacsCatatan ? <p className="px-3.5 py-2.5 text-[11.5px] text-ink-3">{gallery.pacsCatatan}</p> : null}
         {!gallery.pacsCatatan && gallery.pemeriksaan.length > 0 && gallery.studies.length === 0 ? (
-          <p className="px-4 py-2.5 text-[12.5px] text-ink-3">Belum ada gambar di PACS untuk kunjungan ini.</p>
+          <p className="px-3.5 py-2.5 text-[11.5px] text-ink-3">Belum ada gambar di PACS untuk kunjungan ini.</p>
         ) : null}
       </div>
 

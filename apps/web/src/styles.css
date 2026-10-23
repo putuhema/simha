@@ -4,33 +4,32 @@
 @import "@fontsource/ibm-plex-sans/500.css";
 @import "@fontsource/ibm-plex-sans/600.css";
 @import "@fontsource/ibm-plex-sans/400-italic.css";
-@import "@fontsource/ibm-plex-sans-condensed/500.css";
-@import "@fontsource/ibm-plex-sans-condensed/600.css";
-@import "@fontsource/ibm-plex-sans-condensed/700.css";
 @import "@fontsource/ibm-plex-mono/400.css";
 @import "@fontsource/ibm-plex-mono/500.css";
 
 /*
- * "Instrument panel on chart paper": warm paper, dark ink, one teal accent.
- * Amber means "waiting for a person", red means "undo / failed".
+ * "Instrument panel on chart paper", laid out like a modern AI workspace:
+ * a quiet gray rail, a white desk in the middle and one panel for cards.
+ * Warm paper, dark ink, one teal accent. Amber means "waiting for a person",
+ * red means "undo / failed".
  */
 @theme {
   --font-sans: "IBM Plex Sans", ui-sans-serif, sans-serif;
-  --font-display: "IBM Plex Sans Condensed", "IBM Plex Sans", ui-sans-serif, sans-serif;
+  --font-display: "IBM Plex Sans", ui-sans-serif, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
-  --color-paper: #f5f2ea;
-  --color-paper-2: #ece7db;
-  --color-card: #fffdf8;
-  --color-ink: #17201e;
-  --color-ink-2: #44504c;
-  --color-ink-3: #7a837f;
-  --color-line: #d9d2c3;
-  --color-line-2: #e8e2d4;
+  --color-paper: #f7f6f3;
+  --color-paper-2: #efede7;
+  --color-card: #ffffff;
+  --color-ink: #1a1f1e;
+  --color-ink-2: #4d5552;
+  --color-ink-3: #878d8a;
+  --color-line: #e3e0d8;
+  --color-line-2: #efede7;
 
-  --color-teal: #0e6b62;
-  --color-teal-2: #12302c;
-  --color-teal-soft: #d5ebe6;
+  --color-teal: #0f6b61;
+  --color-teal-2: #16342f;
+  --color-teal-soft: #dcebe7;
   --color-led: #22c55e;
 
   --color-amber: #b45309;
@@ -40,12 +39,23 @@
   --color-ok: #15803d;
   --color-ok-soft: #dcf3e2;
 
-  --animate-rise: rise 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-rise: rise 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
   --animate-pulse-led: pulse-led 2.4s ease-in-out infinite;
   --animate-shimmer: shimmer 1.8s linear infinite;
   --animate-caret: caret 1s ease-in-out infinite;
   --animate-fade-in: fade-in 220ms ease-out both;
+  --animate-panel-in: panel-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
 
+  @keyframes panel-in {
+    from {
+      opacity: 0;
+      transform: translateX(14px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
   @keyframes rise {
     from {
       opacity: 0;
@@ -117,7 +127,8 @@
     height: 100%;
   }
   body {
-    @apply bg-card font-sans text-[14px] leading-relaxed text-ink antialiased;
+    @apply bg-paper font-sans text-[14px] leading-relaxed text-ink antialiased;
+    font-feature-settings: "liga" 1, "calt" 1;
   }
   ::selection {
     background: var(--color-teal-soft);

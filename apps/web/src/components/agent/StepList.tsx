@@ -3,7 +3,30 @@
  * found, ✕ failed), a one-line summary, and details on click.
  */
 import { Collapsible } from "@base-ui/react/collapsible";
-import { ChevronRight } from "lucide-react";
+import {
+  AppWindow,
+  ArrowLeftRight,
+  BedDouble,
+  BookOpen,
+  Boxes,
+  CalendarCheck,
+  ChartColumn,
+  ChevronRight,
+  Database,
+  FileCheck,
+  FilePenLine,
+  FileText,
+  History,
+  IdCard,
+  PencilLine,
+  Receipt,
+  ScanLine,
+  ShieldCheck,
+  Stethoscope,
+  Terminal,
+  UserSearch,
+  Wrench,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "../../lib/cn.ts";
 import { formatDuration } from "../../lib/format.ts";
@@ -18,6 +41,31 @@ const MARK: Readonly<Record<StepMark, { readonly symbol: string; readonly classN
 
 const FINDING_TONE: Readonly<Record<string, string>> = { ok: "text-ok", masalah: "text-amber", info: "text-ink-3" };
 
+/** One recognizable glyph per tool, so a long checklist can be scanned by shape. */
+const TOOL_ICON: Readonly<Record<string, typeof Boxes>> = {
+  cariPasien: UserSearch,
+  kunjunganAktif: CalendarCheck,
+  riwayatKamar: History,
+  statusKamar: BedDouble,
+  daftarTindakan: Stethoscope,
+  statusBilling: Receipt,
+  dataSep: ShieldCheck,
+  suratKontrol: FileCheck,
+  kartuPasien: IdCard,
+  dokumenPasien: FileText,
+  buatDraftResume: FilePenLine,
+  isiDraft: PencilLine,
+  hasilRadiologi: ScanLine,
+  diagnosaPindahKamar: ArrowLeftRight,
+  diagnosaTindakan: Stethoscope,
+  usulkanPerbaikan: Wrench,
+  lihatSkema: Database,
+  cariAplikasiKhanza: AppWindow,
+  catatPengetahuan: BookOpen,
+  jalankanQueryBaca: Terminal,
+  tampilkan: ChartColumn,
+};
+
 const Json = ({ value }: { readonly value: unknown }) => (
   <pre className="max-h-64 overflow-auto rounded-md bg-paper-2 p-2 font-mono text-[11.5px] leading-snug whitespace-pre-wrap text-ink-2">
     {JSON.stringify(value, null, 2)}
@@ -29,6 +77,9 @@ const Step = ({ step }: { readonly step: StepView }) => {
   const { symbol, className, label } = MARK[mark];
   const findings = findingsOf(step.output);
   const preview = step.draft !== null ? draftPreview(step.draft) : "";
+  const ToolIcon = TOOL_ICON[step.name] ?? Boxes;
+  const iconTone =
+    mark === "error" ? "text-red" : mark === "warn" ? "text-amber" : mark === "running" ? "text-teal" : "text-ink-3";
   return (
     <li className="relative pl-8" data-testid="step" data-mark={mark}>
       <span
@@ -40,8 +91,11 @@ const Step = ({ step }: { readonly step: StepView }) => {
       <Collapsible.Root>
         <Collapsible.Trigger className="group flex w-full items-start gap-1 text-left">
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-baseline gap-x-2">
-              <span className="font-medium text-ink">{stepLabel(step.name)}</span>
+            <div className="flex flex-wrap items-center gap-x-2">
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                <ToolIcon className={cn("size-3.5 shrink-0", iconTone)} aria-hidden />
+                <span className="font-medium text-ink">{stepLabel(step.name)}</span>
+              </span>
               <span className="truncate font-mono text-[12px] text-ink-3">{stepTarget(step.input)}</span>
             </div>
             <p className={cn("text-[13px]", mark === "error" ? "text-red" : mark === "warn" ? "text-amber" : "text-ink-2")}>

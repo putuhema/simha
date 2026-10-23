@@ -6,6 +6,8 @@ import type { RenderBlock } from "@simha/shared";
 import { Download, Star, ThumbsDown, ThumbsUp } from "lucide-react";
 import { lazy, Suspense, useMemo, useState } from "react";
 import { api, errorMessage } from "../../lib/api.ts";
+import { RENDER_TYPE_LABEL } from "../../lib/cards.ts";
+import { cn } from "../../lib/cn.ts";
 import { downloadCsv, fileNameFor, toCsv } from "../../lib/csv.ts";
 import { formatNumber } from "../../lib/format.ts";
 import { Badge } from "../ui/Badge.tsx";
@@ -18,30 +20,30 @@ import { SqlDisclosure } from "./SqlSlip.tsx";
 // ECharts is large; load it the first time a chart is shown.
 const EChart = lazy(() => import("./EChart.tsx").then((m) => ({ default: m.EChart })));
 
-const TYPE_LABEL: Readonly<Record<RenderBlock["tipe"], string>> = {
-  table: "Tabel",
-  bar: "Grafik batang",
-  line: "Grafik garis",
-  pie: "Grafik pai",
-  stat: "Angka",
-  list: "Daftar",
-};
-
-const StatValue = ({ block }: { readonly block: RenderBlock }) => {
+const StatValue = ({ block, compact }: { readonly block: RenderBlock; readonly compact: boolean }) => {
   const row = block.baris[0] ?? {};
   const value = row[block.y[0] ?? ""];
   return (
-    <div className="flex items-baseline gap-2 py-2">
-      <span className="font-display text-[44px] leading-none font-semibold tracking-tight text-teal-2 tabular-nums">
+    <div className="flex items-baseline gap-2 py-1.5">
+      <span className={cn("font-display leading-none font-semibold tracking-tight text-teal-2 tabular-nums", compact ? "text-[38px]" : "text-[44px]")}>
         {formatNumber(value)}
       </span>
-      {block.satuan ? <span className="text-[15px] text-ink-2">{block.satuan}</span> : null}
-      {block.x ? <span className="ml-2 text-[13px] text-ink-3">{String(row[block.x] ?? "")}</span> : null}
+      {block.satuan ? <span className="text-[14px] text-ink-2">{block.satuan}</span> : null}
+      {block.x ? <span className="ml-2 text-[12.5px] text-ink-3">{String(row[block.x] ?? "")}</span> : null}
     </div>
   );
 };
 
-export const RenderBlockView = ({ block, onSaved }: { readonly block: RenderBlock; readonly onSaved?: () => void }) => {
+export const RenderBlockView = ({
+  block,
+  onSaved,
+  compact = false,
+}: {
+  readonly block: RenderBlock;
+  readonly onSaved?: (() => void) | undefined;
+  /** Panel width: icon-only actions and tighter padding. */
+  readonly compact?: boolean | undefined;
+}) => {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | string>("idle");
   const [sent, setSent] = useState<"up" | "down" | null>(null);
   const [correcting, setCorrecting] = useState(false);
@@ -82,29 +84,48 @@ export const RenderBlockView = ({ block, onSaved }: { readonly block: RenderBloc
   };
 
   return (
-    <figure className="animate-rise overflow-hidden rounded-lg border border-line bg-card" data-testid="render-block">
-      <figcaption className="flex flex-wrap items-start justify-between gap-2 border-b border-line-2 px-4 py-3">
+    <figure className="animate-rise overflow-hidden rounded-xl border border-line bg-card" data-testid="render-block">
+      <figcaption className={cn("flex flex-wrap items-start justify-between gap-2 border-b border-line-2", compact ? "px-3 py-2.5" : "px-4 py-3")}>
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <Badge tone="teal">{TYPE_LABEL[block.tipe]}</Badge>
-            <h3 className="font-display text-[16px] leading-tight font-semibold">{block.judul}</h3>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone="teal">{RENDER_TYPE_LABEL[block.tipe]}</Badge>
+            <h3 className={cn("font-display leading-tight font-semibold", compact ? "text-[13.5px]" : "text-[16px]")}>{block.judul}</h3>
           </div>
-          {block.asumsi ? <p className="mt-1 text-[12.5px] text-ink-2 italic">Asumsi: {block.asumsi}</p> : null}
+          {block.asumsi ? <p className="mt-0.5 text-[11.5px] text-ink-2 italic">Asumsi: {block.asumsi}</p> : null}
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-0.5">
           {block.tipe !== "stat" ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => downloadCsv(fileNameFor(block.judul), toCsv(block.kolom, block.baris))}
-              title="Unduh CSV"
-            >
-              <Download /> CSV
-            </Button>
+            compact ? (
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="Unduh CSV"
+                title="Unduh CSV"
+                onClick={() => downloadCsv(fileNameFor(block.judul), toCsv(block.kolom, block.baris))}
+              >
+                <Download />
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => downloadCsv(fileNameFor(block.judul), toCsv(block.kolom, block.baris))}
+                title="Unduh CSV"
+              >
+                <Download /> CSV
+              </Button>
+            )
           ) : null}
-          <Button size="sm" variant="ghost" onClick={() => void save()} disabled={saveState === "saving" || saveState === "saved"}>
+          <Button
+            size={compact ? "icon" : "sm"}
+            variant="ghost"
+            aria-label={saveState === "saved" ? "Tersimpan" : "Simpan ke favorit"}
+            title={saveState === "saved" ? "Tersimpan" : "Simpan ke favorit"}
+            onClick={() => void save()}
+            disabled={saveState === "saving" || saveState === "saved"}
+          >
             <Star className={saveState === "saved" ? "fill-amber text-amber" : ""} />
-            {saveState === "saved" ? "Tersimpan" : "Simpan ke favorit"}
+            {compact ? null : saveState === "saved" ? "Tersimpan" : "Simpan ke favorit"}
           </Button>
           <Button
             size="icon"
@@ -132,8 +153,8 @@ export const RenderBlockView = ({ block, onSaved }: { readonly block: RenderBloc
       </figcaption>
 
       {correcting ? (
-        <div className="border-b border-line-2 bg-paper/50 px-4 py-3">
-          <p className="text-[12.5px] text-ink-2">
+        <div className={cn("border-b border-line-2 bg-paper/50", compact ? "px-3 py-2.5" : "px-4 py-3")}>
+          <p className="text-[11.5px] text-ink-2">
             Apa yang salah? Tulis aturan umumnya (tanpa nomor pasien), mis. “pasien BPJS memakai penjab BPJ”.
           </p>
           <Textarea
@@ -164,16 +185,16 @@ export const RenderBlockView = ({ block, onSaved }: { readonly block: RenderBloc
       ) : null}
 
       {sent !== null || feedbackError !== null ? (
-        <p className={`border-b border-line-2 px-4 py-2 text-[12.5px] ${feedbackError ? "bg-red-soft text-red" : "text-ok"}`}>
+        <p className={cn("border-b border-line-2 text-[11.5px]", compact ? "px-3 py-1.5" : "px-4 py-2", feedbackError ? "bg-red-soft text-red" : "text-ok")}>
           {feedbackError ?? (sent === "up" ? "Terima kasih — contoh ini dipakai untuk pertanyaan serupa." : "Koreksi disimpan. Contoh otomatis untuk hasil ini dimatikan.")}
         </p>
       ) : null}
 
-      <div className="px-4 py-3">
-        {block.tipe === "stat" ? <StatValue block={block} /> : null}
-        {block.tipe === "table" ? <DataTable columns={block.kolom} rows={block.baris} /> : null}
+      <div className={compact ? "px-3 py-2.5" : "px-4 py-3"}>
+        {block.tipe === "stat" ? <StatValue block={block} compact={compact} /> : null}
+        {block.tipe === "table" ? <DataTable columns={block.kolom} rows={block.baris} maxHeight={compact ? 360 : 420} /> : null}
         {block.tipe === "list" ? (
-          <ol className="list-decimal space-y-0.5 pl-5 text-[14px]">
+          <ol className="list-decimal space-y-0.5 pl-5 text-[13.5px]">
             {block.baris.map((row, i) => (
               <li key={i}>{String(row[block.x ?? ""] ?? "")}</li>
             ))}
@@ -189,14 +210,14 @@ export const RenderBlockView = ({ block, onSaved }: { readonly block: RenderBloc
           )
         ) : null}
         {block.terpotong ? (
-          <p className="mt-2 text-[12.5px] text-amber">Hasil dipotong di 500 baris pertama.</p>
+          <p className="mt-2 text-[11.5px] text-amber">Hasil dipotong di 500 baris pertama.</p>
         ) : null}
         {typeof saveState === "string" && !["idle", "saving", "saved"].includes(saveState) ? (
-          <p className="mt-2 text-[12.5px] text-red">{saveState}</p>
+          <p className="mt-2 text-[11.5px] text-red">{saveState}</p>
         ) : null}
       </div>
 
-      <div className="border-t border-line-2 bg-paper/40 px-4 py-2">
+      <div className={cn("border-t border-line-2 bg-paper/40", compact ? "px-3 py-1.5" : "px-4 py-2")}>
         <SqlDisclosure sql={block.sql} />
       </div>
     </figure>

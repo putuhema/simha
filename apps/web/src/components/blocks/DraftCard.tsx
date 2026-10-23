@@ -72,7 +72,7 @@ const Field = ({
     problem || missing ? "border-red/50" : "border-line-2",
   );
   return (
-    <label className={cn("block", field.type === "textarea" && "sm:col-span-2")} data-field={field.key}>
+    <label className={cn("block", field.type === "textarea" && "@[520px]:col-span-2")} data-field={field.key}>
       <span className="mb-1 flex flex-wrap items-center gap-1.5 text-[12px] text-ink-2">
         <span className="font-medium">{field.label}</span>
         {missing ? <span className="rounded bg-red-soft px-1.5 text-[10.5px] font-medium text-red">wajib</span> : null}
@@ -111,7 +111,14 @@ const Field = ({
   );
 };
 
-export const DraftCard = ({ draft: initial }: { readonly draft: FormDraft }) => {
+export const DraftCard = ({
+  draft: initial,
+  fill = false,
+}: {
+  readonly draft: FormDraft;
+  /** Fill the card panel: fields scroll, the action footer stays visible. */
+  readonly fill?: boolean | undefined;
+}) => {
   const [draft, setDraft] = useState(initial);
   const [values, setValues] = useState<Record<string, string>>(initial.fields);
   const [dirty, setDirty] = useState<ReadonlySet<string>>(new Set());
@@ -142,7 +149,7 @@ export const DraftCard = ({ draft: initial }: { readonly draft: FormDraft }) => 
     }
   };
 
-  const fill = async () => {
+  const fillInKhanza = async () => {
     if (!desktop) return;
     setBusy(true);
     setNote(null);
@@ -161,18 +168,21 @@ export const DraftCard = ({ draft: initial }: { readonly draft: FormDraft }) => 
   };
 
   return (
-    <section className="animate-rise overflow-hidden rounded-2xl border border-line bg-card" data-testid="draft-card">
-      <header className="flex flex-wrap items-start gap-3 border-b border-line-2 px-4 py-3">
+    <section
+      className={cn("animate-rise @container overflow-hidden rounded-xl border border-line bg-card", fill && "flex h-full min-h-0 flex-col")}
+      data-testid="draft-card"
+    >
+      <header className="flex shrink-0 flex-wrap items-start gap-3 border-b border-line-2 px-3.5 py-3">
         <span className="grid size-9 shrink-0 place-items-center rounded-md bg-amber-soft text-amber">
           <FilePenLine className="size-5" />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="amber">Draf</Badge>
-            <h3 className="font-display text-[16px] leading-tight font-semibold">{FORM_TITLES[draft.form]}</h3>
+            <h3 className="font-display text-[14.5px] leading-tight font-semibold">{FORM_TITLES[draft.form]}</h3>
           </div>
-          <p className="mt-0.5 truncate text-[12.5px] text-ink-2">{draft.subjek}</p>
-          <p className="text-[12px] text-ink-3">
+          <p className="mt-0.5 truncate text-[11.5px] text-ink-2">{draft.subjek}</p>
+          <p className="text-[11px] leading-snug text-ink-3">
             {filled} dari {fields.length} field terisi
             {missingRequired.length > 0 ? <span className="text-red"> · wajib belum: {missingRequired.map((f) => f.label).join(", ")}</span> : null}
             {" · "}diubah {formatDateTime(draft.updatedAt)}
@@ -183,7 +193,7 @@ export const DraftCard = ({ draft: initial }: { readonly draft: FormDraft }) => 
         </div>
       </header>
 
-      <div className="divide-y divide-line-2">
+      <div className={cn("divide-y divide-line-2", fill && "quiet-scroll min-h-0 flex-1 overflow-y-auto")}>
         {groups.map((group) => {
           const inGroup = fields.filter((f) => f.group === group);
           const groupFilled = inGroup.filter((f) => (values[f.key] ?? "").trim()).length;
@@ -197,7 +207,7 @@ export const DraftCard = ({ draft: initial }: { readonly draft: FormDraft }) => 
                   {groupFilled}/{inGroup.length}
                 </span>
               </Collapsible.Trigger>
-              <Collapsible.Panel className="grid gap-3 px-4 pt-1 pb-4 sm:grid-cols-2">
+              <Collapsible.Panel className="grid gap-3 px-3.5 pt-1 pb-4 @[520px]:grid-cols-2">
                 {inGroup.map((field) => (
                   <Field
                     key={field.key}
@@ -217,11 +227,11 @@ export const DraftCard = ({ draft: initial }: { readonly draft: FormDraft }) => 
         })}
       </div>
 
-      <footer className="relative flex flex-wrap items-center gap-3 border-t border-line-2 bg-paper/50 px-4 py-3">
+      <footer className="relative flex shrink-0 flex-wrap items-center gap-2 border-t border-line-2 bg-paper/70 px-3.5 py-3 backdrop-blur-sm">
         {desktop ? (
           <button
             type="button"
-            onClick={() => void fill()}
+            onClick={() => void fillInKhanza()}
             disabled={busy}
             data-testid="fill-in-khanza"
             className="inline-flex h-9 items-center gap-2 rounded-lg bg-teal-2 px-3.5 text-[13.5px] font-medium text-paper hover:bg-teal disabled:opacity-60"

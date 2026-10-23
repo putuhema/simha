@@ -11,6 +11,16 @@ test.describe.configure({ mode: "serial" });
 const ADMIN = { name: "Budi Santika", username: "it-budi", password: "rahasia-uji-123" };
 let page: Page;
 
+/**
+ * The card panel starts closed (new chat, reload, app start). When a thread
+ * already has cards, the small card button reopens it.
+ */
+const openClosedCardPanel = async () => {
+  const button = page.getByRole("button", { name: "Buka panel kartu" });
+  await expect(button).toBeVisible();
+  await button.click();
+};
+
 test.beforeAll(async ({ browser }) => {
   page = await browser.newPage();
 });
@@ -103,6 +113,7 @@ test("Tanya Data shows a chart with its SQL and saves a favorite", async () => {
   await page.getByRole("button", { name: "Percakapan baru" }).first().click();
   await page.getByTestId("favorites").getByRole("button", { name: "Kunjungan per poli", exact: true }).click();
   await expect(page.getByText("★ Jumlah kunjungan per poli")).toBeVisible();
+  await openClosedCardPanel();
   await expect(page.getByTestId("render-block")).toHaveCount(1);
 });
 
@@ -190,8 +201,9 @@ test("asking for a radiology result shows the reading and the images in one card
   // No separate table for the same data.
   await expect(page.getByTestId("tanya-turn").last().getByTestId("render-block")).toHaveCount(0);
 
-  // Kept when the conversation is reopened.
+  // Kept when the conversation is reopened; the panel starts closed and reopens from the card button.
   await page.reload();
+  await openClosedCardPanel();
   await expect(page.getByTestId("radiology-exam")).toContainText("Thorax PA");
 });
 
@@ -285,8 +297,9 @@ test("the AI drafts a resume medis that the user edits, and the draft is kept", 
   await expect(card.locator('[data-field="jalannya_penyakit"]')).toContainText("dari jawaban di chat");
   await expect(card).not.toContainText("wajib belum");
 
-  // Reopening the conversation shows the draft as it is now.
+  // Reopening the conversation shows the draft as it is now; open its card again.
   await page.reload();
+  await openClosedCardPanel();
   await expect(page.getByTestId("draft-card")).toHaveCount(1);
   await expect(card.locator('[data-field="alergi"] input')).toHaveValue("Udang");
   await expect(card.locator('[data-field="kontrol"] input')).toHaveValue("2026-10-28T09:00");

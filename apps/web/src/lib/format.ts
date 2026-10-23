@@ -14,5 +14,15 @@ export const formatRelative = (iso: string, now = Date.now()) => {
   return formatDateTime(iso);
 };
 
+/** Compact "ago" for list rows: "baru", "52 mnt", "3 j", then a short date. */
+export const formatAgo = (iso: string, now = Date.now()) => {
+  const seconds = Math.round((now - new Date(iso).getTime()) / 1000);
+  if (seconds < 60) return "baru";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} mnt`;
+  if (seconds < 86_400) return `${Math.floor(seconds / 3600)} j`;
+  if (seconds < 7 * 86_400) return `${Math.floor(seconds / 86_400)} h`;
+  return new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "short" }).format(new Date(iso));
+};
+
 export const formatDuration = (ms: number | null | undefined) =>
   ms === null || ms === undefined ? "" : ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} dtk`;

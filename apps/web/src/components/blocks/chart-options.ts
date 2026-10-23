@@ -4,11 +4,11 @@
  */
 import type { RenderBlock } from "@simha/shared";
 
-const SERIES_COLORS = ["#0e6b62", "#b45309", "#3f5c8a", "#9a3b5f", "#5b6b2f"];
+const SERIES_COLORS = ["#0f6b61", "#b45309", "#3f5c8a", "#9a3b5f", "#5b6b2f"];
 
-const INK = "#17201e";
-const MUTED = "#7a837f";
-const LINE = "#e8e2d4";
+const INK = "#1a1f1e";
+const MUTED = "#878d8a";
+const LINE = "#efede7";
 const FONT = "IBM Plex Sans, sans-serif";
 
 const label = (value: unknown) => (value === null || value === undefined ? "(kosong)" : String(value));
@@ -22,8 +22,8 @@ export const chartOption = (block: RenderBlock) => {
     animationDuration: 500,
     tooltip: {
       trigger: block.tipe === "pie" ? "item" : "axis",
-      backgroundColor: "#fffdf8",
-      borderColor: "#d9d2c3",
+      backgroundColor: "#ffffff",
+      borderColor: "#e3e0d8",
       textStyle: { color: INK, fontFamily: FONT, fontSize: 12 },
       valueFormatter: (v: unknown) => (typeof v === "number" ? v.toLocaleString("id-ID") : String(v)) + (block.satuan ? ` ${block.satuan}` : ""),
     },
@@ -39,7 +39,7 @@ export const chartOption = (block: RenderBlock) => {
           type: "pie",
           radius: ["38%", "68%"],
           center: ["50%", "45%"],
-          itemStyle: { borderColor: "#fffdf8", borderWidth: 2 },
+          itemStyle: { borderColor: "#ffffff", borderWidth: 2 },
           label: { color: INK, fontSize: 12, formatter: "{b}: {d}%" },
           data: block.baris.map((row) => ({ name: label(row[x]), value: row[y] })),
         },
@@ -52,7 +52,7 @@ export const chartOption = (block: RenderBlock) => {
   const categoryAxis = {
     type: "category",
     data: horizontal ? categories.toReversed() : categories,
-    axisLine: { lineStyle: { color: "#d9d2c3" } },
+    axisLine: { lineStyle: { color: "#e3e0d8" } },
     axisTick: { show: false },
     axisLabel: { color: MUTED, fontSize: 12, width: horizontal ? 180 : 90, overflow: "truncate", hideOverlap: true },
   };

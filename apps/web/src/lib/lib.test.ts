@@ -4,7 +4,8 @@ import { chartOption } from "../components/blocks/chart-options.ts";
 import { rmFromSteps, rmFromText, splitAnswer } from "./answer.ts";
 import { fileNameFor, toCsv } from "./csv.ts";
 import { formMentioned, noRawatIn, noRmIn } from "./desktop.ts";
-import { formatRelative } from "./format.ts";
+import { formatAgo, formatRelative } from "./format.ts";
+import { cardsFromTurns } from "./cards.ts";
 import { applyEvent, emptyRun } from "./run.ts";
 import { parseSseChunk } from "./sse.ts";
 import { draftPreview, stepMark, stepSummary, type StepView } from "./steps.ts";
@@ -177,12 +178,90 @@ describe("chartOption", () => {
   });
 });
 
+
+const documentFixture = {
+  id: "doc1",
+  jenis: "riwayat" as const,
+  judul: "Riwayat pasien",
+  subjek: "RM 000002",
+  ringkas: "1 kunjungan",
+  dibuatOleh: null,
+  dibuatPada: "2026-10-22T00:00:00Z",
+};
+
+const draftFixture = (over: Record<string, unknown>) => ({
+  id: "dr1",
+  form: "resume_ranap" as const,
+  noRawat: "2026/10/21/000002",
+  subjek: "RM 000002 · SITI AMINAH",
+  existing: false,
+  fields: {},
+  sources: {},
+  createdBy: null,
+  updatedAt: "2026-10-22T00:00:00Z",
+  ...over,
+});
+
 describe("formatRelative", () => {
   it("says minutes and hours ago", () => {
     const now = Date.parse("2026-10-22T10:00:00Z");
     expect(formatRelative("2026-10-22T09:59:30Z", now)).toBe("baru saja");
     expect(formatRelative("2026-10-22T09:45:00Z", now)).toBe("15 menit lalu");
     expect(formatRelative("2026-10-22T07:00:00Z", now)).toBe("3 jam lalu");
+  });
+
+  it("keeps the sidebar times short", () => {
+    const now = Date.parse("2026-10-22T10:00:00Z");
+    expect(formatAgo("2026-10-22T09:59:30Z", now)).toBe("baru");
+    expect(formatAgo("2026-10-22T09:45:00Z", now)).toBe("15 mnt");
+    expect(formatAgo("2026-10-22T07:00:00Z", now)).toBe("3 j");
+  });
+});
+
+describe("cardsFromTurns", () => {
+  it("collects every result once and keeps a draft's latest state in its first position", () => {
+    const first = {
+      ...emptyRun("Kunjungan", "t1"),
+      status: "done" as const,
+      blocks: [block({ id: "b1", judul: "Kunjungan per poli" })],
+      documents: [documentFixture],
+      drafts: [draftFixture({})],
+    };
+    const second = {
+      ...emptyRun("Pasien", "t2"),
+      status: "done" as const,
+      blocks: [block({ id: "b2", judul: "Pasien daftar hari ini" })],
+      drafts: [draftFixture({ fields: { jalannya_penyakit: "Membaik" }, updatedAt: "2026-10-22T01:00:00Z" })],
+    };
+    const cards = cardsFromTurns([first, second]);
+    expect(cards.map((card) => [card.kind, card.label])).toEqual([
+      ["render", "Kunjungan per poli"],
+      ["draft", "Resume medis rawat inap"],
+      ["document", "Riwayat pasien"],
+      ["render", "Pasien daftar hari ini"],
+    ]);
+    const latest = cards[1];
+    expect(latest?.kind === "draft" ? latest.draft.fields : null).toEqual({ jalannya_penyakit: "Membaik" });
+  });
+
+  it("labels render cards by type and gives radiology a stable turn key", () => {
+    const gallery = {
+      pemeriksaan: [],
+      pacsCatatan: null,
+      noRkmMedis: "000002",
+      noRawat: null,
+      rentang: null,
+      cocokKunjungan: false,
+      viewerBase: null,
+      studies: [],
+    };
+    const run = { ...emptyRun("Radiologi", "t3"), status: "done" as const, radiology: [gallery, gallery] };
+    const cards = cardsFromTurns([run]);
+    expect(cards.map((card) => [card.kind, card.badge, card.summary])).toEqual([
+      ["radiology", "Radiologi", "RM 000002"],
+      ["radiology", "Radiologi", "RM 000002"],
+    ]);
+    expect(cards[0]?.key).not.toBe(cards[1]?.key);
   });
 });
 
