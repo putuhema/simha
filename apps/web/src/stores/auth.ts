@@ -1,12 +1,12 @@
 /**
- * Who is logged in. The session is an HttpOnly cookie; this store only knows
- * the user and whether the first admin still has to be created.
+ * Who is logged in, using their SIMRS Khanza account. The session is an
+ * HttpOnly cookie; this store only knows the user and the rights snapshot.
  */
 import type { AuthState, User } from "@simha/shared";
 import { create } from "zustand";
 import { api, ApiError, errorMessage, setUnauthorizedHandler } from "../lib/api.ts";
 
-type Status = "loading" | "setup" | "login" | "ready" | "offline";
+type Status = "loading" | "login" | "ready" | "offline";
 
 interface AuthStore {
   readonly status: Status;
@@ -14,7 +14,8 @@ interface AuthStore {
   readonly error: string | null;
   readonly load: () => Promise<void>;
   readonly login: (username: string, password: string) => Promise<void>;
-  readonly setup: (input: { username: string; displayName: string; password: string }) => Promise<void>;
+  /** Re-read this account's Khanza rights after IT changed them. */
+  readonly refreshAccess: () => Promise<void>;
   readonly logout: () => Promise<void>;
 }
 
@@ -25,11 +26,7 @@ export const useAuth = create<AuthStore>((set) => ({
   load: async () => {
     try {
       const state = await api.get<AuthState>("/api/auth/state");
-      set({
-        status: state.user ? "ready" : state.setupNeeded ? "setup" : "login",
-        user: state.user,
-        error: null,
-      });
+      set({ status: state.user ? "ready" : "login", user: state.user, error: null });
     } catch (error) {
       set({ status: "offline", error: errorMessage(error) });
     }
@@ -38,9 +35,9 @@ export const useAuth = create<AuthStore>((set) => ({
     const user = await api.post<User>("/api/auth/login", { username, password });
     set({ status: "ready", user, error: null });
   },
-  setup: async (input) => {
-    const user = await api.post<User>("/api/auth/setup", input);
-    set({ status: "ready", user, error: null });
+  refreshAccess: async () => {
+    const user = await api.post<User>("/api/auth/refresh");
+    set({ user });
   },
   logout: async () => {
     await api.post("/api/auth/logout").catch((error: unknown) => {

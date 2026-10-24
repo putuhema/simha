@@ -1,19 +1,24 @@
 /**
- * Local login for IT staff: users, sessions and the app event log, all in the
- * audit SQLite DB. No external auth service (the app runs on the hospital
- * network).
+ * Login for IT staff, using their SIMRS Khanza account.
  *
- * - Passwords: scrypt hashes (password.ts).
+ * There are no Simha passwords and no local user management: Khanza's
+ * `admin` / `user` tables decide who may log in and which rights they have.
+ * The audit SQLite DB keeps one row per SIMRS username (for sessions and the
+ * audit log) and a snapshot of the granted Khanza rights, taken at login or
+ * refreshed with POST /api/auth/refresh.
+ *
  * - Sessions: a random token in an HttpOnly, SameSite=Strict cookie; only its
  *   SHA-256 hash is stored. Sessions expire after SESSION_HOURS.
  * - Failed logins: after MAX_FAILURES wrong passwords for a username, that
  *   username is locked for LOCK_SECONDS. Every login attempt is logged.
+ * - A Khanza database outage is reported as 503, never as a wrong password.
  */
-import type { CreateUserRequest, Role, UpdateUserRequest, User } from "@simha/shared";
+import { derivePermissions, type Role, type User } from "@simha/shared";
+import { KhanzaQueryError } from "@simha/tools";
 import { Context, Effect, Layer } from "effect";
 import { SqlClient } from "effect/sql";
 import { createHash, randomBytes } from "node:crypto";
-import { hashPassword, verifyPassword } from "./password.ts";
+import { KhanzaAccounts, type KhanzaAccount } from "./KhanzaAccounts.ts";
 
 export const SESSION_COOKIE = "simha_session";
 export const SESSION_HOURS = 12;
@@ -25,7 +30,7 @@ export class CurrentUser extends Context.Service<CurrentUser, User>()("simha/Cur
 
 /** A request the user may not make; `status` is the HTTP status. */
 export class AuthError extends Error {
-  readonly status: 400 | 401 | 403 | 404 | 409 | 429;
+  readonly status: 400 | 401 | 403 | 404 | 409 | 429 | 503;
   constructor(status: AuthError["status"], message: string) {
     super(message);
     this.status = status;
@@ -40,31 +45,47 @@ interface UserRow {
   readonly role: Role;
   readonly active: number;
   readonly created_at: string;
+  readonly source: string;
+  readonly rights_json: string | null;
+  readonly khanza_admin: number;
 }
 
-const toUser = (r: UserRow): User => ({
-  id: r.id,
-  username: r.username,
-  displayName: r.display_name,
-  role: r.role,
-  active: r.active === 1,
-  createdAt: r.created_at,
-});
+/** Old rows (and malformed JSON) grant nothing. */
+const parseRights = (json: string | null): Readonly<Record<string, boolean>> => {
+  if (json === null) return {};
+  try {
+    const parsed: unknown = JSON.parse(json);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
+    return Object.fromEntries(Object.entries(parsed).filter(([, value]) => value === true));
+  } catch {
+    return {};
+  }
+};
+
+const toUser = (r: UserRow): User => {
+  const khanzaAdmin = r.khanza_admin === 1;
+  return {
+    id: r.id,
+    username: r.username,
+    displayName: r.display_name,
+    role: r.role,
+    active: r.active === 1,
+    createdAt: r.created_at,
+    khanzaAdmin,
+    permissions: derivePermissions(parseRights(r.rights_json), khanzaAdmin),
+  };
+};
 
 const now = () => new Date().toISOString();
 const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
 
 const make = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
+  const accounts = yield* KhanzaAccounts;
   const failures = new Map<string, { count: number; lockedUntil: number }>();
 
   const logEvent = (action: string, actor: string | null, detail: string | null = null, ip: string | null = null) =>
     sql`INSERT INTO app_events ${sql.insert({ action, actor, detail, ip, at: now() })}`.pipe(Effect.asVoid, Effect.orDie);
-
-  const userCount = sql<{ n: number }>`SELECT COUNT(*) AS n FROM users`.pipe(
-    Effect.map(([r]) => r?.n ?? 0),
-    Effect.orDie,
-  );
 
   const findByUsername = (username: string) =>
     sql<UserRow>`SELECT * FROM users WHERE username = ${username}`.pipe(
@@ -78,20 +99,44 @@ const make = Effect.gen(function* () {
       Effect.orDie,
     );
 
-  const insertUser = (input: CreateUserRequest) =>
+  /**
+   * Creates or updates the local row for a SIMRS account. The local row is an
+   * identity for sessions and audit rows, not a second source of truth.
+   */
+  const syncAccount = (account: KhanzaAccount) =>
     Effect.gen(function* () {
-      if (yield* findByUsername(input.username)) return yield* Effect.fail(new AuthError(409, "Username sudah dipakai."));
+      const existing = yield* findByUsername(account.username);
+      const role: Role = account.admin ? "admin" : "staff";
+      const rightsJson = JSON.stringify(account.rights);
+      const khanzaAdmin = account.admin ? 1 : 0;
+      if (existing) {
+        yield* sql`UPDATE users SET ${sql.update({
+          display_name: account.displayName,
+          role,
+          active: 1,
+          source: "simrs",
+          password_hash: "",
+          rights_json: rightsJson,
+          khanza_admin: khanzaAdmin,
+          rights_updated_at: now(),
+          updated_at: now(),
+        })} WHERE id = ${existing.id}`.pipe(Effect.orDie);
+        return (yield* getUser(existing.id)) as User;
+      }
       const id = crypto.randomUUID();
-      const passwordHash = yield* Effect.promise(() => hashPassword(input.password));
       yield* sql`INSERT INTO users ${sql.insert({
         id,
-        username: input.username,
-        display_name: input.displayName,
-        password_hash: passwordHash,
-        role: input.role,
+        username: account.username,
+        display_name: account.displayName,
+        password_hash: "",
+        role,
         active: 1,
         created_at: now(),
         updated_at: now(),
+        source: "simrs",
+        rights_json: rightsJson,
+        khanza_admin: khanzaAdmin,
+        rights_updated_at: now(),
       })}`.pipe(Effect.orDie);
       return (yield* getUser(id)) as User;
     });
@@ -110,15 +155,6 @@ const make = Effect.gen(function* () {
       return token;
     });
 
-  /** Creates the first admin. Fails once any user exists. */
-  const setup = (input: { username: string; displayName: string; password: string }, ip: string | null) =>
-    Effect.gen(function* () {
-      if ((yield* userCount) > 0) return yield* Effect.fail(new AuthError(409, "Akun admin pertama sudah dibuat. Silakan login."));
-      const user = yield* insertUser({ ...input, role: "admin" });
-      yield* logEvent("setup", user.username, "Akun admin pertama dibuat.", ip);
-      return { user, token: yield* createSession(user.id) };
-    });
-
   const login = (username: string, password: string, ip: string | null) =>
     Effect.gen(function* () {
       const key = username.toLowerCase();
@@ -128,22 +164,29 @@ const make = Effect.gen(function* () {
         const seconds = Math.ceil((state.lockedUntil - Date.now()) / 1000);
         return yield* Effect.fail(new AuthError(429, `Terlalu banyak percobaan. Coba lagi dalam ${seconds} detik.`));
       }
-      const row = yield* findByUsername(username);
-      // Hash even when the user does not exist, so timing does not reveal valid usernames.
-      const ok = row
-        ? yield* Effect.promise(() => verifyPassword(password, row.password_hash))
-        : yield* Effect.promise(() => hashPassword(password)).pipe(Effect.as(false));
-      if (!row || !ok || row.active !== 1) {
-        const count = (state?.count ?? 0) + 1;
-        failures.set(key, { count, lockedUntil: count >= MAX_FAILURES ? Date.now() + LOCK_SECONDS * 1000 : 0 });
-        yield* logEvent("login_failed", username, row && ok ? "Akun nonaktif." : null, ip);
+
+      const lookup = yield* accounts.login(username, password).pipe(
+        Effect.map((account) => ({ ok: true as const, account })),
+        Effect.catch((error: KhanzaQueryError) => Effect.succeed({ ok: false as const, error })),
+      );
+      if (!lookup.ok) {
+        yield* logEvent("login_failed", username, `Database SIMRS: ${lookup.error.message}`, ip);
         return yield* Effect.fail(
-          new AuthError(401, row && ok ? "Akun ini dinonaktifkan. Hubungi admin." : "Username atau password salah."),
+          new AuthError(503, "Tidak bisa memeriksa akun ke database SIMRS. Coba lagi, atau hubungi admin SIMRS."),
         );
       }
+
+      if (lookup.account === null) {
+        const count = (state?.count ?? 0) + 1;
+        failures.set(key, { count, lockedUntil: count >= MAX_FAILURES ? Date.now() + LOCK_SECONDS * 1000 : 0 });
+        yield* logEvent("login_failed", username, null, ip);
+        return yield* Effect.fail(new AuthError(401, "Username atau password SIMRS salah."));
+      }
+
       failures.delete(key);
-      yield* logEvent("login", row.username, null, ip);
-      return { user: toUser(row), token: yield* createSession(row.id) };
+      const user = yield* syncAccount(lookup.account);
+      yield* logEvent("login", user.username, lookup.account.admin ? "Admin Utama SIMRS" : "SIMRS", ip);
+      return { user, token: yield* createSession(user.id) };
     });
 
   /** The active user of a session token, or undefined. Refreshes last_seen_at. */
@@ -153,10 +196,44 @@ const make = Effect.gen(function* () {
       const [row] = yield* sql<UserRow & { expires_at: string }>`
         SELECT u.*, s.expires_at FROM sessions s JOIN users u ON u.id = s.user_id
         WHERE s.token_hash = ${hash}`;
-      if (!row || row.active !== 1 || row.expires_at < now()) return undefined;
+      if (!row || row.active !== 1 || row.source !== "simrs" || row.expires_at < now()) return undefined;
       yield* sql`UPDATE sessions SET last_seen_at = ${now()} WHERE token_hash = ${hash}`;
       return toUser(row);
     }).pipe(Effect.orDie);
+
+  /**
+   * Re-reads this session's Khanza account and rights. Used after IT changes a
+   * right in Khanza, so the user does not have to log out and in again.
+   */
+  const refresh = (user: User) =>
+    Effect.gen(function* () {
+      const lookup = yield* accounts.rightsOf(user.username).pipe(
+        Effect.map((account) => ({ ok: true as const, account })),
+        Effect.catch((error: KhanzaQueryError) => Effect.succeed({ ok: false as const, error })),
+      );
+      if (!lookup.ok) {
+        return yield* Effect.fail(
+          new AuthError(503, "Tidak bisa membaca hak akses dari database SIMRS. Coba lagi, atau hubungi admin SIMRS."),
+        );
+      }
+      if (lookup.account === null) {
+        yield* sql`DELETE FROM sessions WHERE user_id = ${user.id}`.pipe(Effect.orDie);
+        yield* logEvent("access_revoked", user.username, "Akun tidak ditemukan di SIMRS.");
+        return yield* Effect.fail(new AuthError(401, "Akun ini sudah tidak ada di SIMRS. Silakan login lagi."));
+      }
+      const role: Role = lookup.account.admin ? "admin" : "staff";
+      yield* sql`UPDATE users SET ${sql.update({
+        display_name: lookup.account.displayName,
+        role,
+        active: 1,
+        rights_json: JSON.stringify(lookup.account.rights),
+        khanza_admin: lookup.account.admin ? 1 : 0,
+        rights_updated_at: now(),
+        updated_at: now(),
+      })} WHERE id = ${user.id}`.pipe(Effect.orDie);
+      yield* logEvent("access_refreshed", user.username, lookup.account.admin ? "Admin Utama SIMRS" : "SIMRS");
+      return (yield* getUser(user.id)) as User;
+    });
 
   const logout = (token: string, user: User) =>
     Effect.andThen(
@@ -164,64 +241,16 @@ const make = Effect.gen(function* () {
       logEvent("logout", user.username),
     );
 
-  const listUsers = sql<UserRow>`SELECT * FROM users ORDER BY username`.pipe(
-    Effect.map((rows) => rows.map(toUser)),
-    Effect.orDie,
-  );
-
-  const createUser = (input: CreateUserRequest, actor: User) =>
-    Effect.tap(insertUser(input), (user) => logEvent("user_created", actor.username, `${user.username} (${user.role})`));
-
-  const updateUser = (id: string, input: UpdateUserRequest, actor: User) =>
-    Effect.gen(function* () {
-      const user = yield* getUser(id);
-      if (!user) return yield* Effect.fail(new AuthError(404, "User tidak ditemukan."));
-      if (user.id === actor.id && (input.active === false || input.role === "staff")) {
-        return yield* Effect.fail(new AuthError(400, "Anda tidak bisa menonaktifkan atau menurunkan akun Anda sendiri."));
-      }
-      const passwordHash = input.password ? yield* Effect.promise(() => hashPassword(input.password ?? "")) : undefined;
-      yield* sql`UPDATE users SET ${sql.update({
-        updated_at: now(),
-        ...(input.displayName !== undefined ? { display_name: input.displayName } : {}),
-        ...(input.role !== undefined ? { role: input.role } : {}),
-        ...(input.active !== undefined ? { active: input.active ? 1 : 0 } : {}),
-        ...(passwordHash !== undefined ? { password_hash: passwordHash } : {}),
-      })} WHERE id = ${id}`.pipe(Effect.orDie);
-      // A disabled account or a reset password ends the user's sessions.
-      if (input.active === false || passwordHash !== undefined) {
-        yield* sql`DELETE FROM sessions WHERE user_id = ${id}`.pipe(Effect.orDie);
-      }
-      const changes = Object.keys(input).map((k) => (k === "password" ? "password direset" : k));
-      yield* logEvent("user_updated", actor.username, `${user.username}: ${changes.join(", ")}`);
-      return (yield* getUser(id)) as User;
-    });
-
-  const changePassword = (user: User, currentPassword: string, newPassword: string) =>
-    Effect.gen(function* () {
-      const row = yield* findByUsername(user.username);
-      if (!row || !(yield* Effect.promise(() => verifyPassword(currentPassword, row.password_hash)))) {
-        return yield* Effect.fail(new AuthError(400, "Password lama salah."));
-      }
-      const passwordHash = yield* Effect.promise(() => hashPassword(newPassword));
-      yield* sql`UPDATE users SET password_hash = ${passwordHash}, updated_at = ${now()} WHERE id = ${user.id}`.pipe(Effect.orDie);
-      yield* logEvent("password_changed", user.username);
-    });
-
   return {
-    setupNeeded: Effect.map(userCount, (n) => n === 0),
-    setup,
     login,
+    refresh,
     logout,
     userForToken,
-    listUsers,
-    createUser,
-    updateUser,
-    changePassword,
     logEvent,
   };
 });
 
 export class Auth extends Context.Service<Auth, Effect.Success<typeof make>>()("simha/Auth") {}
 
-/** Needs the audit DB's SqlClient. */
+/** Needs the audit DB's SqlClient and the Khanza account lookup. */
 export const AuthLive = Layer.effect(Auth, make);

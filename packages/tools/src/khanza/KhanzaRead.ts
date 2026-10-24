@@ -63,6 +63,13 @@ export interface KhanzaReadOptions {
   readonly timeout: Duration.Duration;
 }
 
+/**
+ * SIMRS login compares `AES_ENCRYPT(?)` values, so those parameters contain a
+ * password. The audit log keeps the statement but not the values.
+ */
+const auditParams = (text: string, params: ReadonlyArray<unknown>): ReadonlyArray<unknown> =>
+  /AES_ENCRYPT/i.test(text) ? ["[disamarkan]"] : params;
+
 const makeKhanzaRead = Effect.fn("makeKhanzaRead")(function* (options: KhanzaReadOptions) {
   const audit = yield* AuditLog;
   const sql: SqlClient.SqlClient = yield* connectKhanza(options.connection, 5);
@@ -90,7 +97,7 @@ const makeKhanzaRead = Effect.fn("makeKhanzaRead")(function* (options: KhanzaRea
           toolCallId,
           pool: "read",
           sql: text,
-          params,
+          params: auditParams(text, params),
           rowCount,
           durationMs: performance.now() - started,
           error,

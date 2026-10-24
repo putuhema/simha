@@ -10,6 +10,7 @@ import { HttpRouter } from "effect/http";
 import { createServer } from "node:http";
 import { AgentLive } from "./agent/Agent.ts";
 import { AuthLive } from "./auth/Auth.ts";
+import { KhanzaAccountsLive } from "./auth/KhanzaAccounts.ts";
 import { FixExecutorLive } from "./fixes/FixExecutor.ts";
 import { SystemPromptLive } from "./agent/prompt.ts";
 import { HttpSettingsLive, ServerConfig } from "./config.ts";
@@ -22,6 +23,9 @@ import { ViewsLive } from "./views.ts";
  * Everything the routes need: audit DB, Khanza read pool, AI provider, agent, PACS,
  * login, and the fix executor (the only user of the Khanza write pool).
  */
+const KhanzaAuthLive = KhanzaAccountsLive.pipe(Layer.provideMerge(KhanzaReadLive));
+const AuthWithKhanzaLive = AuthLive.pipe(Layer.provideMerge(KhanzaAuthLive));
+
 export const AppLive = Layer.mergeAll(AgentLive, FixExecutorLive, ViewsLive).pipe(
   Layer.provideMerge(
     Layer.mergeAll(
@@ -31,9 +35,8 @@ export const AppLive = Layer.mergeAll(AgentLive, FixExecutorLive, ViewsLive).pip
       ResultStoreLive,
       SchemaDocsLive,
       AppDocsLive,
-      AuthLive,
+      AuthWithKhanzaLive,
       HttpSettingsLive,
-      KhanzaReadLive,
       KhanzaWriteLive,
       LlmSettingsLive,
       PacsLive,

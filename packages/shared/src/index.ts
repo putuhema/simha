@@ -3,3 +3,4 @@
  */
 export * from "./api.ts";
 export * from "./forms.ts";
+export * from "./permissions.ts";

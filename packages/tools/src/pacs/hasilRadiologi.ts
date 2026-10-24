@@ -15,9 +15,10 @@ import type { PacsStudy, RadiologyExam } from "@simha/shared";
 import { RadiologyGallery } from "@simha/shared";
 import { Effect, Schema } from "effect";
 import { ToolError } from "../errors.ts";
+import { CurrentPermissions } from "../khanza/current-tool-call.ts";
 import { KhanzaRead } from "../khanza/KhanzaRead.ts";
 import { NoRawat, NoRkmMedis } from "../read/common.ts";
-import { defineTool } from "../tool.ts";
+import { defineTool, requirePermission } from "../tool.ts";
 import { Pacs } from "./Pacs.ts";
 
 const NAME = "hasilRadiologi";
@@ -101,6 +102,7 @@ const visitOf = (noRawat: string) =>
 export const hasilRadiologi = defineTool({
   name: NAME,
   kind: "render",
+  requires: (permissions) => permissions.radiology,
   description:
     "Radiology of a visit or patient in ONE card: the exams and the radiologist's reading (hasil baca / expertise) " +
     "from Khanza, together with the images (foto rontgen/thorax, CT, MRI) from the hospital's PACS, with a viewer. " +
@@ -133,6 +135,12 @@ export const hasilRadiologi = defineTool({
       "cukup satu kalimat pendek. Kamu tidak bisa melihat gambarnya.",
   }),
   handler: Effect.fn(NAME)(function* (params) {
+    const permissions = yield* CurrentPermissions;
+    yield* requirePermission(
+      NAME,
+      permissions.radiology,
+      "Akun SIMRS Anda tidak punya hak `periksa_radiologi`, jadi hasil radiologi tidak bisa dibuka.",
+    );
     const pacs = yield* Pacs;
     const noRawat = params.noRawat?.trim() || null;
     const visit = noRawat ? yield* visitOf(noRawat) : null;

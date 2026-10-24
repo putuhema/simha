@@ -146,6 +146,34 @@ describe.skipIf(testDb === null)("fixes", () => {
     }
   });
 
+  it("only a SIMRS account with the table's Khanza right may approve it", async () => {
+    const noRawat = await makeStay(["TST-R1", "TST-R2"]);
+    const app = makeTestApp([]);
+    try {
+      const created = await app.call("POST", "/fixes", {
+        title: "Tutup kamar lama",
+        reason: "Dua kamar aktif",
+        sql: closeRoomSql,
+        params: ["Pindah Kamar", "2099-01-01", "09:00:00", noRawat, "TST-R1"],
+      });
+      expect(created.status).toBe(201);
+      const fix = (await created.json()) as Fix;
+
+      // The fixture account has only tindakan_ralan, not kamar_inap.
+      await app.sessionFor("it-terbatas", "staff", ["tindakan_ralan"]);
+      const denied = await app.callAs("it-terbatas", "POST", `/fixes/${fix.id}/approve`);
+      expect(denied.status).toBe(403);
+      expect(((await denied.json()) as { error: string }).error).toMatch(/tidak punya hak/);
+      expect((await kamarInap(noRawat)).map((row) => row.stts_pulang)).toEqual(["-", "-"]);
+
+      const approved = await app.callAs("it-sari", "POST", `/fixes/${fix.id}/approve`);
+      expect(approved.status).toBe(200);
+      expect(((await approved.json()) as Fix).status).toBe("applied");
+    } finally {
+      await app.dispose();
+    }
+  });
+
   it("a row-count mismatch at approval aborts and changes nothing", async () => {
     const noRawat = await makeStay(["TST-C1"]);
     const app = makeTestApp([]);

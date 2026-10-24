@@ -17,6 +17,7 @@ import { ErrorText } from "../ui/Field.tsx";
 import { Empty, Spinner } from "../ui/Spinner.tsx";
 import { api, errorMessage } from "../../lib/api.ts";
 import { useApi } from "../../lib/useApi.ts";
+import { useAuth } from "../../stores/auth.ts";
 
 interface Visit {
   readonly no_rawat: string;
@@ -50,7 +51,16 @@ const Row = ({ label, children }: { readonly label: string; readonly children: R
 );
 
 /** Riwayat / CPPT / Resume buttons: the server makes the document from Khanza data, no AI involved. */
-const DocumentButtons = ({ rm, noRawat }: { readonly rm: string; readonly noRawat: string | undefined }) => {
+const DocumentButtons = ({
+  rm,
+  noRawat,
+  statusLanjut,
+}: {
+  readonly rm: string;
+  readonly noRawat: string | undefined;
+  readonly statusLanjut: string | undefined;
+}) => {
+  const permissions = useAuth((s) => s.user?.permissions);
   const [busy, setBusy] = useState<DocumentKind | null>(null);
   const [document, setDocument] = useState<DocumentInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -65,11 +75,15 @@ const DocumentButtons = ({ rm, noRawat }: { readonly rm: string; readonly noRawa
       setBusy(null);
     }
   };
+  const canCppt = noRawat !== undefined && (statusLanjut === "Ranap" ? permissions?.cpptRanap : permissions?.cpptRalan);
+  const canResume = noRawat !== undefined && permissions?.resume;
+  const canRadiology = permissions?.radiology === true;
   const kinds: ReadonlyArray<readonly [DocumentKind, string]> = [
     ["riwayat", "Riwayat"],
-    ["cppt", "CPPT / SOAP"],
-    ["resume", "Resume"],
+    ...(canCppt ? ([["cppt", "CPPT / SOAP"]] as const) : []),
+    ...(canResume ? ([["resume", "Resume"]] as const) : []),
   ];
+  const hidden = noRawat !== undefined && (!canCppt || !canResume || !canRadiology);
   return (
     <div className="mt-3 border-t border-line-2 pt-3">
       <p className="eyebrow mb-2">Dokumen</p>
@@ -79,8 +93,13 @@ const DocumentButtons = ({ rm, noRawat }: { readonly rm: string; readonly noRawa
             {busy === jenis ? <Spinner className="size-3" /> : <FileText />} {label}
           </Button>
         ))}
-        <RadiologyButton rm={rm} />
+        {canRadiology ? <RadiologyButton rm={rm} /> : null}
       </div>
+      {hidden ? (
+        <p className="mt-2 text-[11.5px] text-ink-3">
+          Sebagian tombol tidak muncul karena hak akun SIMRS Anda. Lihat <strong>Pengaturan → Akun</strong>.
+        </p>
+      ) : null}
       {error ? <div className="mt-2"><ErrorText>{error}</ErrorText></div> : null}
       <Dialog open={document !== null} onOpenChange={(open) => !open && setDocument(null)} wide title={document?.judul ?? ""} description={document?.subjek}>
         {document ? <DocumentCard document={document} height={620} /> : null}
@@ -138,7 +157,7 @@ export const PatientPanel = ({ rm, summary }: { readonly rm: string | undefined;
                 )}
               </Row>
             </dl>
-            <DocumentButtons rm={card.data.pasien.no_rkm_medis} noRawat={visit?.no_rawat} />
+            <DocumentButtons rm={card.data.pasien.no_rkm_medis} noRawat={visit?.no_rawat} statusLanjut={visit?.status_lanjut} />
             <OpenInKhanza noRawat={visit?.no_rawat ?? null} noRm={card.data.pasien.no_rkm_medis} className="mt-3" />
           </div>
         ) : null}

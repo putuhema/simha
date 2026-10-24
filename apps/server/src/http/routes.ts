@@ -1,17 +1,13 @@
 /**
  * HTTP API under /api, plus the web UI at every other path. Request bodies are
  * checked against the Schemas in @simha/shared. Every route except health,
- * login and first-run setup needs a logged-in user (session cookie); the user
+ * login and auth state needs a logged-in SIMRS user (session cookie); the user
  * is who approves fixes and asks questions in the audit log.
  *
  *   GET    /api/health                   server, Khanza, AI model and PACS status (public)
- *   GET    /api/auth/state               logged-in user, or whether setup is needed (public)
- *   POST   /api/auth/setup               create the first admin (only while there are no users)
+ *   GET    /api/auth/state               logged-in user (public)
  *   POST   /api/auth/login | logout
- *   POST   /api/auth/password            change own password
- *   GET    /api/users                    list users (admin)
- *   POST   /api/users                    create a user (admin)
- *   PATCH  /api/users/:id                rename, change role, disable, reset password (admin)
+ *   POST   /api/auth/refresh             re-read this account's rights from SIMRS
  *   GET    /api/stats                    registrations today, inpatients, pending fixes
  *   POST   /api/ask                      a Tanya Data question or an investigation (SSE)
  *   GET    /api/conversations            recent Tanya Data threads (?mine=1)
@@ -45,27 +41,28 @@
  *   PUT    /api/settings/llm             change them (admin)
  *   POST   /api/settings/llm/test        try settings without saving (admin)
  *   GET    /api/audit                    audit log (?kind=runs|tools|queries|fixes|events&q=&from=&to=&limit=&offset=)
+ *
+ * Routes that open patient data tied to a Khanza menu check the same right as
+ * that menu (CPPT, resume, radiology, digital files, approving a fix); the
+ * other routes are available to every SIMRS login. See @simha/shared/permissions.
  */
 import { LlmClient } from "@simha/llm";
 import {
   AskRequest,
   AuditKind,
-  ChangePasswordRequest,
+  canApproveFix,
   CreateDocumentRequest,
   CreateFavoriteRequest,
   CreateFixRequest,
   CreateKnowledgeRequest,
-  CreateUserRequest,
   FixStatus,
   KnowledgeFeedbackRequest,
   LoginRequest,
   RejectFixRequest,
-  SetupRequest,
   UpdateConversationRequest,
   UpdateDraftRequest,
   UpdateKnowledgeRequest,
   UpdateLlmSettingsRequest,
-  UpdateUserRequest,
   formProblems,
   type User,
 } from "@simha/shared";
@@ -92,7 +89,7 @@ import { Agent } from "../agent/Agent.ts";
 import { Auth, AuthError, CurrentUser, SESSION_COOKIE, SESSION_HOURS } from "../auth/Auth.ts";
 import { HttpSettings } from "../config.ts";
 import { favoriteFromBlock, runFavorite } from "../favorites.ts";
-import { FixExecutor, type FixActionError } from "../fixes/FixExecutor.ts";
+import { FixActionError, FixExecutor } from "../fixes/FixExecutor.ts";
 import { LlmSettingsService } from "../llm/LlmSettings.ts";
 import { Store } from "../store.ts";
 import { Views } from "../views.ts";
@@ -134,12 +131,17 @@ const searchParams = Effect.map(HttpServerRequest.HttpServerRequest, (r) => new 
 const clientIp = Effect.map(HttpServerRequest.HttpServerRequest, (r) => Option.getOrNull(r.remoteAddress ?? Option.none()));
 
 /**
- * Runs `handler` for a logged-in (and, with `admin`, admin) user, with the
- * user available as CurrentUser. Otherwise 401 / 403.
+ * Runs `handler` for a logged-in user, with the user available as CurrentUser.
+ * `admin` requires a Khanza Admin Utama; `allow` is the SIMRS-rights gate for
+ * a route and returns 403 (with `forbidden`) when it fails.
  */
 const authed = <E, R>(
   handler: Effect.Effect<HttpServerResponse.HttpServerResponse, E, R>,
-  options: { readonly admin?: boolean } = {},
+  options: {
+    readonly admin?: boolean;
+    readonly allow?: (user: User) => boolean;
+    readonly forbidden?: string;
+  } = {},
 ) =>
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
@@ -147,6 +149,9 @@ const authed = <E, R>(
     const user = token ? yield* (yield* Auth).userForToken(token) : undefined;
     if (!user) return errorResponse(401, "Silakan login dulu.");
     if (options.admin && user.role !== "admin") return errorResponse(403, "Hanya admin yang boleh melakukan ini.");
+    if (options.allow && !options.allow(user)) {
+      return errorResponse(403, options.forbidden ?? "Akun SIMRS Anda tidak punya hak untuk ini.");
+    }
     return yield* handler.pipe(Effect.provideService(CurrentUser, user));
   });
 
@@ -163,10 +168,10 @@ const sessionResponse = (user: User, token: string) =>
   });
 
 /** Approve / reject / rollback outcome: the fix, or the reason it was refused. */
-const fixAction = <R>(effect: Effect.Effect<unknown, FixActionError | string, R>) =>
+const fixAction = <R>(effect: Effect.Effect<unknown, FixActionError | AuthError | string, R>) =>
   effect.pipe(
     Effect.map((fix) => json(fix)),
-    Effect.catch((e: FixActionError | string) =>
+    Effect.catch((e: FixActionError | AuthError | string) =>
       Effect.succeed(typeof e === "string" ? errorResponse(400, e) : errorResponse(e.status, e.message)),
     ),
   );
@@ -193,20 +198,8 @@ const AuthRoutes = Layer.mergeAll(
       const request = yield* HttpServerRequest.HttpServerRequest;
       const token = request.cookies[SESSION_COOKIE];
       const user = token ? yield* auth.userForToken(token) : undefined;
-      return json({ setupNeeded: yield* auth.setupNeeded, user: user ?? null });
+      return json({ user: user ?? null });
     }),
-  ),
-
-  route(
-    "POST",
-    "/api/auth/setup",
-    handled(
-      Effect.gen(function* () {
-        const input = yield* body(SetupRequest);
-        const { user, token } = yield* (yield* Auth).setup(input, yield* clientIp);
-        return yield* sessionResponse(user, token);
-      }),
-    ),
   ),
 
   route(
@@ -223,6 +216,18 @@ const AuthRoutes = Layer.mergeAll(
 
   route(
     "POST",
+    "/api/auth/refresh",
+    authed(
+      handled(
+        Effect.gen(function* () {
+          return json(yield* (yield* Auth).refresh(yield* CurrentUser));
+        }),
+      ),
+    ),
+  ),
+
+  route(
+    "POST",
     "/api/auth/logout",
     authed(
       Effect.gen(function* () {
@@ -230,52 +235,6 @@ const AuthRoutes = Layer.mergeAll(
         yield* (yield* Auth).logout(request.cookies[SESSION_COOKIE] ?? "", yield* CurrentUser);
         return HttpServerResponse.expireCookieUnsafe(HttpServerResponse.empty({ status: 204 }), SESSION_COOKIE, { path: "/" });
       }),
-    ),
-  ),
-
-  route(
-    "POST",
-    "/api/auth/password",
-    authed(
-      handled(
-        Effect.gen(function* () {
-          const input = yield* body(ChangePasswordRequest);
-          yield* (yield* Auth).changePassword(yield* CurrentUser, input.currentPassword, input.newPassword);
-          return HttpServerResponse.empty({ status: 204 });
-        }),
-      ),
-    ),
-  ),
-
-  route("GET", "/api/users", authed(Effect.gen(function* () {
-      return json(yield* (yield* Auth).listUsers);
-    }), { admin: true })),
-
-  route(
-    "POST",
-    "/api/users",
-    authed(
-      handled(
-        Effect.gen(function* () {
-          const input = yield* body(CreateUserRequest);
-          return json(yield* (yield* Auth).createUser(input, yield* CurrentUser), 201);
-        }),
-      ),
-      { admin: true },
-    ),
-  ),
-
-  route(
-    "PATCH",
-    "/api/users/:id",
-    authed(
-      handled(
-        Effect.gen(function* () {
-          const input = yield* body(UpdateUserRequest);
-          return json(yield* (yield* Auth).updateUser(yield* id, input, yield* CurrentUser));
-        }),
-      ),
-      { admin: true },
     ),
   ),
 );
@@ -299,6 +258,7 @@ const ChatRoutes = Layer.mergeAll(
               mode: input.mode ?? "tanya",
               conversationId: input.conversationId,
               askedBy: user.username,
+              permissions: user.permissions,
             }),
           );
         }),
@@ -396,7 +356,11 @@ const ChatRoutes = Layer.mergeAll(
       Effect.gen(function* () {
         const user = yield* CurrentUser;
         const rm = yield* pathParam("rm");
-        return yield* runTool(kartuPasien, { noRkmMedis: rm }, { sessionId: `ui:${user.username}` }).pipe(
+        return yield* runTool(kartuPasien, { noRkmMedis: rm }, {
+          sessionId: `ui:${user.username}`,
+          actor: user.username,
+          permissions: user.permissions,
+        }).pipe(
           Effect.map((card) => (card.pasien ? json(card) : errorResponse(404, `Pasien dengan RM ${rm} tidak ditemukan.`))),
           Effect.catch((e) => Effect.succeed(errorResponse(e._tag === "ToolInputError" ? 400 : 502, e.message))),
         );
@@ -473,7 +437,16 @@ const FixRoutes = Layer.mergeAll(
     "POST",
     "/api/fixes/:id/approve",
     authed(fixAction(Effect.gen(function* () {
-      return yield* (yield* FixExecutor).approve(yield* id, (yield* CurrentUser).username);
+      const fixId = yield* id;
+      const user = yield* CurrentUser;
+      const fix = yield* (yield* FixStore).get(fixId);
+      if (!fix) return yield* Effect.fail(new FixActionError({ status: 404, message: "Perbaikan tidak ditemukan." }));
+      if (!canApproveFix(user.permissions, fix.table)) {
+        return yield* Effect.fail(
+          new AuthError(403, `Akun SIMRS Anda tidak punya hak untuk menyetujui perubahan pada tabel ${fix.table}.`),
+        );
+      }
+      return yield* (yield* FixExecutor).approve(fixId, user.username);
     }))),
   ),
 
@@ -481,8 +454,17 @@ const FixRoutes = Layer.mergeAll(
     "POST",
     "/api/fixes/:id/reject",
     authed(fixAction(Effect.gen(function* () {
+      const fixId = yield* id;
       const input = yield* optionalBody(RejectFixRequest, {});
-      return yield* (yield* FixExecutor).reject(yield* id, (yield* CurrentUser).username, input.reason);
+      const user = yield* CurrentUser;
+      const fix = yield* (yield* FixStore).get(fixId);
+      if (!fix) return yield* Effect.fail(new FixActionError({ status: 404, message: "Perbaikan tidak ditemukan." }));
+      if (!canApproveFix(user.permissions, fix.table)) {
+        return yield* Effect.fail(
+          new AuthError(403, `Akun SIMRS Anda tidak punya hak untuk menolak perubahan pada tabel ${fix.table}.`),
+        );
+      }
+      return yield* (yield* FixExecutor).reject(fixId, user.username, input.reason);
     }))),
   ),
 
@@ -490,7 +472,16 @@ const FixRoutes = Layer.mergeAll(
     "POST",
     "/api/fixes/:id/rollback",
     authed(fixAction(Effect.gen(function* () {
-      return yield* (yield* FixExecutor).rollback(yield* id, (yield* CurrentUser).username);
+      const fixId = yield* id;
+      const user = yield* CurrentUser;
+      const fix = yield* (yield* FixStore).get(fixId);
+      if (!fix) return yield* Effect.fail(new FixActionError({ status: 404, message: "Perbaikan tidak ditemukan." }));
+      if (!canApproveFix(user.permissions, fix.table)) {
+        return yield* Effect.fail(
+          new AuthError(403, `Akun SIMRS Anda tidak punya hak untuk membatalkan perubahan pada tabel ${fix.table}.`),
+        );
+      }
+      return yield* (yield* FixExecutor).rollback(fixId, user.username);
     }))),
   ),
 );
@@ -514,11 +505,24 @@ const DocumentRoutes = Layer.mergeAll(
         Effect.gen(function* () {
           const input = yield* body(CreateDocumentRequest);
           const user = yield* CurrentUser;
-          return yield* runTool(dokumenPasien, input, { sessionId: `ui:${user.username}`, actor: user.username }).pipe(
+          return yield* runTool(dokumenPasien, input, {
+            sessionId: `ui:${user.username}`,
+            actor: user.username,
+            permissions: user.permissions,
+          }).pipe(
             Effect.map((out) => json(out.document, 201)),
             Effect.catch((e) =>
               Effect.succeed(
-                errorResponse(e._tag === "ToolInputError" ? 400 : e._tag === "ToolError" ? 404 : 502, e.message),
+                errorResponse(
+                  e._tag === "ToolPermissionError"
+                    ? 403
+                    : e._tag === "ToolInputError"
+                      ? 400
+                      : e._tag === "ToolError"
+                        ? 404
+                        : 502,
+                  e.message,
+                ),
               ),
             ),
           );
@@ -534,9 +538,20 @@ const DocumentRoutes = Layer.mergeAll(
       Effect.gen(function* () {
         const stored = yield* (yield* ResultStore).getDocument(yield* id);
         if (!stored) return errorResponse(404, "Dokumen tidak ditemukan.");
+        const user = yield* CurrentUser;
+        const denied =
+          (stored.info.jenis === "cppt" && !(user.permissions.cpptRalan || user.permissions.cpptRanap)) ||
+          (stored.info.jenis === "resume" && !user.permissions.resume);
+        if (denied) {
+          return errorResponse(
+            403,
+            stored.info.jenis === "resume"
+              ? "Akun SIMRS Anda tidak punya hak `data_resume_pasien` untuk membuka resume medis ini."
+              : "Akun SIMRS Anda tidak punya hak CPPT untuk membuka dokumen ini.",
+          );
+        }
         const download = (yield* searchParams).get("download") === "1";
         if (download) {
-          const user = yield* CurrentUser;
           yield* (yield* Auth).logEvent("document_downloaded", user.username, `${stored.info.judul}: ${stored.info.subjek}`);
         }
         const fileName = `${stored.info.jenis}-${stored.info.subjek.replaceAll(/[^A-Za-z0-9]+/g, "-").replaceAll(/^-|-$/g, "")}.html`;
@@ -578,6 +593,10 @@ const PacsRoutes = Layer.mergeAll(
           Effect.catch((e: PacsError) => Effect.succeed(errorResponse(502, e.message))),
         );
       }),
+      {
+        allow: (user) => user.permissions.radiology,
+        forbidden: "Akun SIMRS Anda tidak punya hak `periksa_radiologi` untuk melihat hasil radiologi.",
+      },
     ),
   ),
 
@@ -612,6 +631,10 @@ const PacsRoutes = Layer.mergeAll(
           Effect.catch((e: PacsError) => Effect.succeed(errorResponse(502, e.message))),
         );
       }),
+      {
+        allow: (user) => user.permissions.radiology,
+        forbidden: "Akun SIMRS Anda tidak punya hak `periksa_radiologi` untuk membuka gambar radiologi.",
+      },
     ),
   ),
 );
@@ -673,6 +696,10 @@ const BerkasRoutes = route(
         }),
       );
     }),
+    {
+      allow: (user) => user.permissions.berkas,
+      forbidden: "Akun SIMRS Anda tidak punya hak `berkas_digital_perawatan` untuk membuka berkas digital.",
+    },
   ),
 );
 
@@ -686,6 +713,10 @@ const DraftRoutes = Layer.mergeAll(
         const draft = yield* (yield* ResultStore).getDraft(yield* id);
         return draft ? json(draft) : errorResponse(404, "Draf tidak ditemukan.");
       }),
+      {
+        allow: (user) => user.permissions.resume,
+        forbidden: "Akun SIMRS Anda tidak punya hak `data_resume_pasien` untuk membuka draf resume.",
+      },
     ),
   ),
   route(
@@ -707,6 +738,10 @@ const DraftRoutes = Layer.mergeAll(
           return draft ? json(draft) : errorResponse(404, "Draf tidak ditemukan.");
         }),
       ),
+      {
+        allow: (user) => user.permissions.resume,
+        forbidden: "Akun SIMRS Anda tidak punya hak `data_resume_pasien` untuk mengubah draf resume.",
+      },
     ),
   ),
 );

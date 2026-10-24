@@ -2,6 +2,7 @@
  * HTTP API contracts shared by the server and the web UI.
  */
 import { Schema } from "effect";
+import { Permissions } from "./permissions.ts";
 
 const NonEmpty = Schema.String.check(Schema.isNonEmpty());
 
@@ -513,56 +514,36 @@ export type CreateFixRequest = typeof CreateFixRequest.Type;
 export const Role = Schema.Literals(["admin", "staff"]);
 export type Role = typeof Role.Type;
 
+/**
+ * A logged-in SIMRS user. The account itself lives in Khanza; Simha keeps only
+ * a local row for sessions and the audit log. `permissions` is a snapshot of
+ * the Khanza rights read at login (or at POST /api/auth/refresh).
+ */
 export const User = Schema.Struct({
   id: Schema.String,
   username: Schema.String,
   displayName: Schema.String,
-  /** admin: manage users and AI settings. staff: everything else. */
+  /** admin: a Khanza Admin Utama (all rights, AI settings). staff: every other SIMRS user. */
   role: Role,
   active: Schema.Boolean,
   createdAt: Schema.String,
+  /** True when the username matches a row in Khanza's `admin` table. */
+  khanzaAdmin: Schema.Boolean,
+  permissions: Permissions,
 });
 export type User = typeof User.Type;
 
-/** GET /api/auth/state: who is logged in, and whether the first admin must still be created. */
-export const AuthState = Schema.Struct({ setupNeeded: Schema.Boolean, user: Schema.NullOr(User) });
+/** GET /api/auth/state: who is logged in, or null. */
+export const AuthState = Schema.Struct({ user: Schema.NullOr(User) });
 export type AuthState = typeof AuthState.Type;
 
-const Username = Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9._-]{3,32}$/)).annotate({
-  description: "3-32 letters, digits, dot, dash or underscore",
-});
-const Password = Schema.String.check(Schema.isMinLength(8), Schema.isMaxLength(200));
-const DisplayName = NonEmpty.check(Schema.isMaxLength(100));
-
+/** POST /api/auth/login: the same username and password as the Khanza desktop app. */
 export const LoginRequest = Schema.Struct({
   username: NonEmpty.check(Schema.isMaxLength(64)),
   password: NonEmpty.check(Schema.isMaxLength(200)),
 });
 export type LoginRequest = typeof LoginRequest.Type;
 
-/** POST /api/auth/setup: the first admin account. Only allowed while there are no users. */
-export const SetupRequest = Schema.Struct({ username: Username, displayName: DisplayName, password: Password });
-export type SetupRequest = typeof SetupRequest.Type;
-
-export const CreateUserRequest = Schema.Struct({
-  username: Username,
-  displayName: DisplayName,
-  password: Password,
-  role: Role,
-});
-export type CreateUserRequest = typeof CreateUserRequest.Type;
-
-export const UpdateUserRequest = Schema.Struct({
-  displayName: Schema.optionalKey(DisplayName),
-  role: Schema.optionalKey(Role),
-  active: Schema.optionalKey(Schema.Boolean),
-  /** Set a new password (admin reset). */
-  password: Schema.optionalKey(Password),
-});
-export type UpdateUserRequest = typeof UpdateUserRequest.Type;
-
-export const ChangePasswordRequest = Schema.Struct({ currentPassword: NonEmpty, newPassword: Password });
-export type ChangePasswordRequest = typeof ChangePasswordRequest.Type;
 
 // --- Dashboard ------------------------------------------------------------------------
 

@@ -1,14 +1,15 @@
 /**
  * The main flows through the real UI, in order (one shared server):
- * first-run setup, a complaint from investigation to approved fix and
- * rollback, Tanya Data with a chart and a favorite, settings and audit log, a
- * narrow window, and logout.
+ * SIMRS login, a complaint from investigation to approved fix and rollback,
+ * Tanya Data with a chart and a favorite, settings and audit log, a narrow
+ * window, a limited-rights account, and logout.
  */
 import { expect, test, type Page } from "@playwright/test";
 
 test.describe.configure({ mode: "serial" });
 
 const ADMIN = { name: "Budi Santika", username: "it-budi", password: "rahasia-uji-123" };
+const LIMITED = { username: "it-terbatas", password: "rahasia-uji-123" };
 let page: Page;
 
 /**
@@ -29,14 +30,12 @@ test.afterAll(async () => {
   await page.close();
 });
 
-test("first run asks for an admin account and logs in", async () => {
+test("logs in with a SIMRS Khanza account", async () => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Buat akun admin" })).toBeVisible();
-  await page.getByLabel("Nama lengkap").fill(ADMIN.name);
-  await page.getByRole("textbox", { name: /^Username/ }).fill(ADMIN.username);
-  await page.getByRole("textbox", { name: /^Password/ }).fill(ADMIN.password);
-  await page.getByLabel("Ulangi password").fill(ADMIN.password);
-  await page.getByRole("button", { name: "Buat akun dan masuk" }).click();
+  await expect(page.getByRole("heading", { name: "Masuk" })).toBeVisible();
+  await page.getByLabel("Username SIMRS").fill(ADMIN.username);
+  await page.getByLabel("Password SIMRS").fill(ADMIN.password);
+  await page.getByRole("button", { name: "Masuk" }).click();
 
   await expect(page).toHaveURL(/\/tanya$/);
   await expect(page.getByRole("heading", { name: "Mau cek data apa hari ini?" })).toBeVisible();
@@ -48,6 +47,7 @@ test("first run asks for an admin account and logs in", async () => {
   await expect(sidebar.getByRole("link", { name: "Pengetahuan AI" })).toHaveCount(0);
   await expect(sidebar.getByRole("link", { name: "Pengaturan" })).toHaveCount(0);
   await expect(page.getByTestId("user-menu")).toContainText(ADMIN.name);
+  await expect(page.getByTestId("user-menu")).toContainText("Admin SIMRS");
 });
 
 test("the sidebar collapses to an icon rail without moving the toggle", async () => {
@@ -369,6 +369,30 @@ test("the AI drafts a resume medis that the user edits, and the draft is kept", 
   await expect(page.getByTestId("draft-card")).toHaveCount(1);
   await expect(card.locator('[data-field="alergi"] input')).toHaveValue("Udang");
   await expect(card.locator('[data-field="kontrol"] input')).toHaveValue("2026-10-28T09:00");
+});
+
+test("a SIMRS account only sees the document actions its rights allow", async () => {
+  await page.getByTestId("user-menu").first().click();
+  await page.getByRole("menuitem", { name: "Keluar" }).click();
+  await expect(page.getByRole("heading", { name: "Masuk" })).toBeVisible();
+
+  await page.getByLabel("Username SIMRS").fill(LIMITED.username);
+  await page.getByLabel("Password SIMRS").fill(LIMITED.password);
+  await page.getByRole("button", { name: "Masuk" }).click();
+  await expect(page).toHaveURL(/\/tanya/);
+  await page.getByRole("button", { name: "Percakapan baru" }).first().click();
+
+  await page.getByLabel("Pertanyaan").fill("Riwayat pasien RM 000002");
+  await page.getByLabel("Pertanyaan").press("Enter");
+  const turn = page.getByTestId("tanya-turn").last();
+  await turn.getByRole("button", { name: "Kartu pasien" }).click();
+  const patient = page.getByRole("dialog").last().getByTestId("patient-card");
+  await expect(patient.getByRole("button", { name: "Riwayat" })).toBeVisible();
+  await expect(patient.getByRole("button", { name: "CPPT / SOAP" })).toHaveCount(0);
+  await expect(patient.getByRole("button", { name: "Resume" })).toHaveCount(0);
+  await expect(patient.getByRole("button", { name: "Radiologi" })).toHaveCount(0);
+  await expect(patient.getByText(/Sebagian tombol tidak muncul/)).toBeVisible();
+  await page.keyboard.press("Escape");
 });
 
 test("logout returns to the login page", async () => {

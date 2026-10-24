@@ -326,6 +326,21 @@ const investigateMode = Effect.gen(function* () {
   yield* sql`UPDATE conversations SET kind = 'ask' WHERE kind = 'ticket'`;
 });
 
+const simrsLogin = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  // Simha no longer owns passwords: every account comes from SIMRS Khanza.
+  // The local users table stays as the identity for sessions and audit rows
+  // (agent_runs.asked_by, fixes.created_by, ...), with a snapshot of the
+  // granted Khanza rights. Old local accounts and their sessions are disabled.
+  yield* sql`ALTER TABLE users ADD COLUMN source TEXT NOT NULL DEFAULT 'local'`;
+  yield* sql`ALTER TABLE users ADD COLUMN rights_json TEXT NOT NULL DEFAULT '{}'`;
+  yield* sql`ALTER TABLE users ADD COLUMN khanza_admin INTEGER NOT NULL DEFAULT 0`;
+  yield* sql`ALTER TABLE users ADD COLUMN rights_updated_at TEXT`;
+  // Local passwords are dead: remove the old hashes as well as the accounts.
+  yield* sql`UPDATE users SET active = 0, password_hash = '' WHERE source = 'local'`;
+  yield* sql`DELETE FROM sessions`;
+});
+
 export const auditMigrations = {
   "0001_init": init,
   "0002_agent": agent,
@@ -338,4 +353,5 @@ export const auditMigrations = {
   "0009_cache_usage": cacheUsage,
   "0010_thread_actions": threadActions,
   "0011_investigate_mode": investigateMode,
+  "0012_simrs_login": simrsLogin,
 };

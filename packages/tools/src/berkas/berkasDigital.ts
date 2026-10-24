@@ -13,9 +13,10 @@ import { BerkasDigital, type BerkasDigitalFile } from "@simha/shared";
 import { Effect, Result, Schema } from "effect";
 import { identityOf, visitOf } from "../documents/data.ts";
 import { ToolError } from "../errors.ts";
+import { CurrentPermissions } from "../khanza/current-tool-call.ts";
 import { KhanzaRead } from "../khanza/KhanzaRead.ts";
 import { NoRawat, NoRkmMedis } from "../read/common.ts";
-import { defineTool } from "../tool.ts";
+import { defineTool, requirePermission } from "../tool.ts";
 import { Berkas } from "./Berkas.ts";
 import { berkasKindOf } from "./Berkas.ts";
 
@@ -33,6 +34,7 @@ const baseName = (lokasi: string) => lokasi.replaceAll("\\", "/").split("/").fil
 export const berkasDigital = defineTool({
   name: NAME,
   kind: "render",
+  requires: (permissions) => permissions.berkas,
   description:
     "Digital files (berkas digital) of a visit or patient from Khanza: scanned lab results, radiology PDFs, photos, " +
     "consent forms and other uploads, shown as one card with image thumbnails and PDF links. Use this for 'berkas " +
@@ -47,6 +49,12 @@ export const berkasDigital = defineTool({
   }),
   output: Schema.Struct({ berkas: BerkasDigital }),
   handler: Effect.fn(NAME)(function* (params) {
+    const permissions = yield* CurrentPermissions;
+    yield* requirePermission(
+      NAME,
+      permissions.berkas,
+      "Akun SIMRS Anda tidak punya hak `berkas_digital_perawatan`, jadi berkas digital tidak bisa dibuka.",
+    );
     const read = yield* KhanzaRead;
     const files = yield* Berkas;
     const noRawat = params.noRawat?.trim() || null;

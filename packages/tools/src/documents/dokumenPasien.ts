@@ -10,10 +10,10 @@
 import { DocumentInfo, DocumentKind } from "@simha/shared";
 import { Effect, Schema } from "effect";
 import { ToolError } from "../errors.ts";
-import { CurrentActor, CurrentSession, CurrentToolCall } from "../khanza/current-tool-call.ts";
+import { CurrentActor, CurrentPermissions, CurrentSession, CurrentToolCall } from "../khanza/current-tool-call.ts";
 import { ResultStore } from "../info/ResultStore.ts";
 import { NoRawat, NoRkmMedis } from "../read/common.ts";
-import { defineTool } from "../tool.ts";
+import { defineTool, requirePermission } from "../tool.ts";
 import { cpptOf, detailsOf, hospital, identityOf, labOf, radiologyOf, resumeOf, visitOf, visitsOf } from "./data.ts";
 import { cpptHtml, resumeHtml, riwayatHtml } from "./html.ts";
 
@@ -64,6 +64,22 @@ export const dokumenPasien = defineTool({
       const noRawat = params.noRawat?.trim();
       if (!noRawat) return yield* new ToolError({ tool: NAME, message: `Dokumen ${params.jenis} butuh noRawat.` });
       const { visit, noRkmMedis } = yield* visitOf(NAME, noRawat);
+      const permissions = yield* CurrentPermissions;
+      if (params.jenis === "cppt") {
+        const inpatient = visit.jenis === "Rawat inap";
+        yield* requirePermission(
+          NAME,
+          inpatient ? permissions.cpptRanap : permissions.cpptRalan,
+          `Akun SIMRS Anda tidak punya hak \`${inpatient ? "tindakan_ranap" : "tindakan_ralan"}\`, ` +
+            `jadi CPPT rawat ${inpatient ? "inap" : "jalan"} tidak bisa dibuka.`,
+        );
+      } else {
+        yield* requirePermission(
+          NAME,
+          permissions.resume,
+          "Akun SIMRS Anda tidak punya hak `data_resume_pasien`, jadi resume medis tidak bisa dibuka.",
+        );
+      }
       const identity = yield* identityOf(NAME, noRkmMedis);
       const [details] = yield* detailsOf([visit]);
       const entries = yield* cpptOf(noRawat);

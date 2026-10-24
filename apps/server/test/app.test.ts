@@ -21,22 +21,52 @@ import { describe, expect, it } from "vitest";
 import { makeTestApp, readEvents, testDb } from "./harness.ts";
 
 describe.skipIf(testDb === null)("login", () => {
-  it("needs a first admin, then refuses a second setup", async () => {
+  it("logs in with a SIMRS account and exposes the rights of that account", async () => {
     const app = makeTestApp([]);
     try {
       const state = (await (await app.raw("GET", "/api/auth/state")).json()) as AuthState;
-      expect(state).toEqual({ setupNeeded: true, user: null });
+      expect(state).toEqual({ user: null });
 
-      const setup = await app.raw("POST", "/api/auth/setup", { username: "kepala-it", displayName: "Kepala IT", password: "panjang-sekali" });
-      expect(setup.status).toBe(200);
-      const cookie = setup.headers.get("set-cookie") ?? "";
+      const login = await app.raw("POST", "/api/auth/login", { username: "it-budi", password: app.password });
+      expect(login.status).toBe(200);
+      const cookie = login.headers.get("set-cookie") ?? "";
       expect(cookie).toMatch(/simha_session=/);
       expect(cookie).toMatch(/HttpOnly/i);
       expect(cookie).toMatch(/SameSite=Strict/i);
-      expect((await setup.json()) as User).toMatchObject({ username: "kepala-it", role: "admin" });
+      const admin = (await login.json()) as User;
+      expect(admin).toMatchObject({
+        username: "it-budi",
+        displayName: "Budi Santika",
+        role: "admin",
+        khanzaAdmin: true,
+      });
+      expect(admin.permissions).toMatchObject({
+        cpptRalan: true,
+        cpptRanap: true,
+        resume: true,
+        radiology: true,
+        berkas: true,
+      });
+      expect(admin.permissions.fixTables).toEqual(
+        expect.arrayContaining(["kamar_inap", "reg_periksa", "rawat_jl_pr", "rawat_inap_pr"]),
+      );
 
-      const again = await app.raw("POST", "/api/auth/setup", { username: "lain", displayName: "Lain", password: "panjang-sekali" });
-      expect(again.status).toBe(409);
+      const limited = await app.raw("POST", "/api/auth/login", { username: "it-terbatas", password: app.password });
+      expect(limited.status).toBe(200);
+      expect((await limited.json()) as User).toMatchObject({
+        username: "it-terbatas",
+        displayName: "Ns. Terbatas Fiktif",
+        role: "staff",
+        khanzaAdmin: false,
+        permissions: {
+          cpptRalan: true,
+          cpptRanap: false,
+          resume: false,
+          radiology: false,
+          berkas: false,
+          fixTables: ["rawat_jl_pr"],
+        },
+      });
     } finally {
       await app.dispose();
     }
@@ -58,10 +88,9 @@ describe.skipIf(testDb === null)("login", () => {
       }
       expect((await app.raw("GET", "/api/health")).status).toBe(200);
 
-      expect((await app.callAs("ns-staff", "GET", "/users")).status).toBe(403);
       expect((await app.callAs("ns-staff", "PUT", "/settings/llm", { provider: "fake", model: "x", maskPii: true })).status).toBe(403);
       expect((await app.callAs("ns-staff", "GET", "/conversations")).status).toBe(200);
-      expect((await app.call("GET", "/users")).status).toBe(200);
+      expect((await app.call("PUT", "/settings/llm", { provider: "fake", model: "x", maskPii: true })).status).toBe(200);
     } finally {
       await app.dispose();
     }
@@ -74,7 +103,7 @@ describe.skipIf(testDb === null)("login", () => {
       for (let i = 0; i < 5; i++) {
         const wrong = await app.raw("POST", "/api/auth/login", { username: "it-budi", password: "salah-salah" });
         expect(wrong.status).toBe(401);
-        expect(((await wrong.json()) as { error: string }).error).toBe("Username atau password salah.");
+        expect(((await wrong.json()) as { error: string }).error).toBe("Username atau password SIMRS salah.");
       }
       const locked = await app.raw("POST", "/api/auth/login", { username: "IT-BUDI", password: app.password });
       expect(locked.status).toBe(429);
@@ -83,26 +112,48 @@ describe.skipIf(testDb === null)("login", () => {
 
       const events = (await (await app.call("GET", "/audit?kind=events&q=login_failed")).json()) as AuditPage;
       expect(events.total).toBe(6);
+
+      // The password is never written to the local audit DB.
+      const queries = await app.audit<{ params_json: string }>(
+        "SELECT params_json FROM queries WHERE sql LIKE '%AES_ENCRYPT%'",
+      );
+      expect(queries.length).toBeGreaterThan(0);
+      expect(queries.every((row) => !row.params_json.includes("salah-salah") && !row.params_json.includes(app.password))).toBe(true);
     } finally {
       await app.dispose();
     }
   });
 
-  it("disabling a user or resetting a password ends their sessions; logout ends one", async () => {
+  it("re-reads rights on refresh and ends the session when the SIMRS account is removed", async () => {
     const app = makeTestApp([]);
     try {
+      const cookie = await app.sessionFor("ns-ayu");
       expect((await app.callAs("ns-ayu", "GET", "/conversations")).status).toBe(200);
-      const users = (await (await app.call("GET", "/users")).json()) as Array<User>;
-      const ayu = users.find((u) => u.username === "ns-ayu");
-      if (!ayu) throw new Error("no user");
 
-      const self = users.find((u) => u.username === "it-budi");
-      expect((await app.call("PATCH", `/users/${self?.id}`, { active: false })).status).toBe(400);
+      await app.setRights("ns-ayu", ["periksa_radiologi"]);
+      const refreshed = await app.raw("POST", "/api/auth/refresh", undefined, cookie);
+      expect(refreshed.status).toBe(200);
+      const user = (await refreshed.json()) as User;
+      expect(user.permissions).toMatchObject({
+        cpptRalan: false,
+        cpptRanap: false,
+        resume: false,
+        radiology: true,
+        berkas: false,
+        fixTables: [],
+      });
 
-      expect((await app.call("PATCH", `/users/${ayu.id}`, { active: false })).status).toBe(200);
-      expect((await app.callAs("ns-ayu", "GET", "/conversations")).status).toBe(401);
-      const login = await app.raw("POST", "/api/auth/login", { username: "ns-ayu", password: app.password });
-      expect(((await login.json()) as { error: string }).error).toMatch(/dinonaktifkan/);
+      // Riwayat has no Khanza right; CPPT rawat inap does.
+      expect(
+        (await app.callAs("ns-ayu", "POST", "/documents", { jenis: "riwayat", noRkmMedis: "000002" })).status,
+      ).toBe(201);
+      expect(
+        (await app.callAs("ns-ayu", "POST", "/documents", { jenis: "cppt", noRawat: "2026/10/21/000002" })).status,
+      ).toBe(403);
+
+      await app.removeAccount("ns-ayu");
+      expect((await app.raw("POST", "/api/auth/refresh", undefined, cookie)).status).toBe(401);
+      expect((await app.raw("GET", "/api/conversations", undefined, cookie)).status).toBe(401);
 
       const logout = await app.call("POST", "/auth/logout");
       expect(logout.status).toBe(204);

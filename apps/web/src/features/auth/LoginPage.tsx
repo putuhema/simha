@@ -28,16 +28,20 @@ export const LoginPage = () => {
   return (
     <AuthLayout title="Masuk" subtitle="Gunakan akun petugas IT Anda.">
       <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
-        <Field label="Username">
+        <Field label="Username SIMRS" hint="Sama dengan username di aplikasi Khanza (biasanya NIP).">
           <Input autoFocus autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
         </Field>
-        <Field label="Password">
+        <Field label="Password SIMRS">
           <Input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </Field>
         <ErrorText>{error ?? sessionError}</ErrorText>
         <Button type="submit" variant="primary" disabled={busy}>
           {busy ? <Spinner /> : null} Masuk
         </Button>
+        <p className="text-[12px] leading-relaxed text-ink-3">
+          Password tidak disimpan di Simha. Perubahan password dan hak akses dilakukan di Khanza
+          (menu <span className="font-mono">T/Set User</span> atau <span className="font-mono">T/Set Admin</span>).
+        </p>
       </form>
     </AuthLayout>
   );

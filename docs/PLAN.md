@@ -1,16 +1,16 @@
 # Plan
 
-Status: **M6.6 (AI learning) done, waiting for your test.** Next: M7 (MCP over stdio/HTTP) and M5.2 (routine checks and the agent test set).
+Status: **M6.7 (SIMRS login and rights) done, waiting for your test.** Next: M7 (MCP over stdio/HTTP) and M5.2 (routine checks and the agent test set).
 
 ## Packages and main modules
 
 | Package | Main modules |
 |---|---|
-| `packages/shared` | `api.ts` (API request/response and stream event Schemas, agent modes, render blocks, fixes), `forms.ts` (resume form draft) |
-| `packages/tools` | `audit/` (SQLite audit log + migrations, shared by server and MCP), `khanza/` (read and write pools, grants check, query timeout), `registry.ts` (`Tool` = name, description, params Schema, kind, handler), `read/` (cariPasien, kunjunganAktif, riwayatKamar, statusKamar, daftarTindakan, statusBilling, dataSep, suratKontrol), `diagnose/` (diagnosaPindahKamar, diagnosaTindakan), `propose/usulkanPerbaikan.ts`, `info/` (lihatSkema, jalankanQueryBaca, tampilkan), `app/` (cariAplikasiKhanza + generated map), `knowledge/` (examples/notes, search, catatPengetahuan), `guards/` (select guard, write guard, column deny-list, PII masking), `services/` (KhanzaRead, KhanzaWrite, AuditLog, FixStore as Effect services) |
+| `packages/shared` | `api.ts` (API request/response and stream event Schemas, agent modes, render blocks, fixes), `permissions.ts` (Khanza right → Simha capability, fix table rights), `forms.ts` (resume form draft) |
+| `packages/tools` | `audit/` (SQLite audit log + migrations, shared by server and MCP), `khanza/` (read and write pools, grants check, query timeout), `registry.ts` (`Tool` = name, description, params Schema, kind, handler), `read/` (cariPasien, kunjunganAktif, riwayatKamar, statusKamar, daftarTindakan, statusBilling, dataSep, suratKontrol), `diagnose/` (diagnosaPindahKamar, diagnosaTindakan), `propose/usulkanPerbaikan.ts`, `info/` (lihatSkema, jalankanQueryBaca, tampilkan), `app/` (cariAplikasiKhanza, detailAplikasi + generated map), `knowledge/` (examples/notes, search, catatPengetahuan), `guards/` (select guard, write guard, column deny-list, PII masking), `services/` (KhanzaRead, KhanzaWrite, AuditLog, FixStore as Effect services) |
 | `packages/llm` | `LlmClient.ts` (service: `chat(messages, tools) -> Stream<LlmEvent>`), `adapters/anthropic.ts`, `adapters/openai-compat.ts`, `adapters/fake.ts`, `layer.ts` (picks adapter from `LLM_PROVIDER`) |
 | `packages/mcp` | `server.ts` (registers the tool registry with `@modelcontextprotocol/sdk`), `stdio.ts`, `http.ts` |
-| `apps/server` | `config.ts`, `agent/` (loop, `system-prompt.md`), `fixes/` (approve, execute, rollback), `auth/` (local login), `http/` (routes, SSE), `main.ts` |
+| `apps/server` | `config.ts`, `agent/` (loop, `system-prompt.md`, per-user tool filtering), `fixes/` (approve, execute, rollback), `auth/` (SIMRS login + rights refresh), `http/` (routes, SSE), `main.ts` |
 | `apps/web` | routes `tanya`, `pengetahuan`, `pengaturan`; Tanya Data and investigate modes; `components/` (render blocks: table, chart, stat; patient card, fix card), stores |
 | `apps/desktop` | Electron main (starts or connects to the server), preload, packaging for Windows |
 
@@ -27,8 +27,9 @@ Each one ends with tests passing and a stop for you to test.
 - **M5.2. Routine data checks and agent test set.** Scheduled checks for known data problems that open an investigation; fixed scenarios with known answers to score each AI provider/model.
 - **M6. Desktop. ✅ Done.** Electron app wrapping the UI (remote server or a local server it starts), setup page, "Buka di Khanza", Windows installer.
 - **M6.2. Resume drafts. ✅ Done.** The AI drafts the resume medis rawat inap from Khanza data, asks for the rest, and "Isi di Khanza" fills Khanza's own form (see M6.2 notes).
-- **M6.5. App map: menu, flows, rights. ✅ Done.** `pnpm extract-khanza-app` reads `frmUtama.java` and writes `docs/khanza-app/` (explicit: 20 groups [A]–[T], every button, form, access right and table). Hand-written flows cover registrasi, rawat inap, IGD, lab, radiologi, farmasi, kasir, BPJS, master data and reports. The agent uses `cariAplikasiKhanza`; `synonyms.json` maps staff words ("pindah kamar", "SEP") to real menu paths.
+- **M6.5. App map: menu, flows, rights. ✅ Done.** `pnpm extract-khanza-app` reads `frmUtama.java` and writes `docs/khanza-app/` (explicit: 20 groups [A]–[T], every button, form, access right and table). Hand-written flows cover registrasi, rawat inap, IGD, lab, radiologi, farmasi, kasir, BPJS, master data and reports. The agent uses `cariAplikasiKhanza` to find a hit and `detailAplikasi` for its full record; `synonyms.json` maps staff words ("pindah kamar", "SEP") to real menu paths.
 - **M6.6. AI learning (knowledge). ✅ Done.** Successful answers become unverified examples; 👍 verifies them, 👎 disables them and saves a correction note. `catatPengetahuan` lets the AI save durable hospital facts; the agent retrieves at most five matching examples/notes and injects them into the current user turn. **Pengetahuan AI** page for review, and authenticated knowledge/feedback endpoints. Patient/visit numbers are refused.
+- **M6.7. SIMRS login and rights. ✅ Done.** Simha no longer has local passwords or user management: `POST /api/auth/login` runs Khanza's own `AES_ENCRYPT` comparison against `admin`/`user`, syncs a local identity row, and shows the rights in **Pengaturan → Akun**. **Muat ulang hak** re-reads them. CPPT, resume, radiology, digital files and fix approvals follow the same Khanza right as the menu that owns them — server-side 403, hidden/disabled UI, and the AI only receives tools it may use. See M6.7 notes.
 - **M6.1. Khanza bridge. ✅ Done.** `HarnessBridge.java` in the hospital's Khanza build (applied with `integrations/khanza-bridge/apply.mjs`): "Buka di Khanza" opens resume, CPPT/SOAP or riwayat for the visit in the running Khanza (see M6.1 notes).
 - **M7. MCP.** Same tools over stdio and streamable HTTP, README section for Claude Desktop / Claude Code.
 
@@ -91,7 +92,7 @@ Each one ends with tests passing and a stop for you to test.
 
 ## M5 notes
 
-- **Login.** Users, sessions and an event log are in the audit DB (migration `0005_auth`). The first visit creates the first admin; admins add more users. Every API route except health, login and first-run setup needs a session. The user is now who approves fixes and asks questions (`agent_runs.asked_by`), so the `actor` / `createdBy` request fields are gone.
+- **Login.** Users, sessions and an event log are in the audit DB (migration `0005_auth`). The first visit creates the first admin; admins add more users. Every API route except health, login and first-run setup needs a session. The user is now who approves fixes and asks questions (`agent_runs.asked_by`), so the `actor` / `createdBy` request fields are gone. *(Local accounts were replaced by SIMRS login in M6.7; the sessions table and audit fields stay.)*
 - **API under `/api`.** The server serves the built UI at every other path, with security headers (CSP `default-src 'self'`, no framing). Fonts are bundled, so nothing loads from the internet.
 - **AI settings page.** It changes the provider without a restart. `LlmClient` is now a proxy over the current adapter. A broken AI configuration no longer stops the server; questions fail with the reason until an admin fixes it.
 - **History.** Chat and investigation history are rebuilt from the audit DB (`agent_runs`, `tool_calls`, `render_blocks`, `fixes`), so a reload shows the same steps, charts and fixes as the live stream.
@@ -146,6 +147,9 @@ Each one ends with tests passing and a stop for you to test.
 - **Coverage:** 1,094 menu buttons, 1,090 resolve to a form; the 3 INACBG buttons open the PHP panel and `btnfee_rujukan_ranap` is a TODO stub. 1,079 forms, 1,072 rights; 1,052 rights gate exactly one button. Every form also carries the tables it writes/reads (static SQL hints), which is how "form apa yang mengisi kamar_inap" is answered.
 - **Tool:** `cariAplikasiKhanza` searches the map offline (no DB, no Khanza pool) and returns menu path, form, rights, tables and flow steps. A table question gets `tabel[]` (forms that write/read it) and `bagian: "tabel"` finds forms by table; `form[].tulis`/`baca` are capped so a 200-table registration form does not flood the model. `AppDocs` loads at startup, like `SchemaDocs`.
 - **Prompt:** the system prompt tells the agent to call it for "di menu mana", flow, form and access-right questions, and never to invent a menu. `docs/khanza_notes.md` carries a short pointer so the rule survives prompt caching.
+- **Drill-down (`detailAplikasi`):** search returns the door, not the room. A flow answer used to be rebuilt from step titles (the 8-step cap never bit, the prose was never sent), so the four `Pindah` modes, the rights and the warnings were guessed. `detailAplikasi` returns one full record: a flow's intro and every step's `Does` / `Who` / `Hak akses` / `Tabel`; a form's buttons, right-click entries, rights and tables; a menu or a right with what it opens. The two giant dialogs (216 and 277 popups, 177 written tables) made the first version a ~100 KB tool result, so action/table lists stop at 30/40 with a `+N` marker and `cari` filters them by the task's word ("resep pulang" → 1 entry). In memory, no DB. `app/paths.ts` now words the paths for both tools.
+- **Honest staleness:** `cariAplikasiKhanza` returns `peta { termuat, commit, dibuat, jumlah }` and never says "menu tidak ada" when index.json failed to load; `detailAplikasi` fails with that message instead of answering. `appMapStatus` is the single check.
+- **Freshness gate:** `pnpm check:app-map` compares `index.json` (commit + its own group/button/form counts) with the Khanza git HEAD; it skips when the source is absent. The map test also fails when `docs.source.commit` differs from `~/work/simrsmt` (or `KHANZA_SRC_DIR`), and every flow step must carry a `Does`. `pnpm verify` runs typecheck, lint, tests and the check.
 
 ## M6.6 notes: AI learning
 
@@ -184,6 +188,15 @@ Each one ends with tests passing and a stop for you to test.
 - **Card**: grouped like Khanza's form, source badges, required fields, length counters; saved on blur. One card per draft in the conversation (latest state; later AI updates replace it in place). Kept in transcripts.
 - **Khanza** (`HarnessBridge`, command `fill`): opens RMDataResumePasienRanap like `open`, selects the saved row first when there is one (so Ganti works), then sets the 39 fields by name (text, choice only when listed, date picker); never saves. Values travel base64 in one line. Tested with the real Khanza code on local data: new visit (Simpan) and existing resume (Ganti).
 - **Next forms**: resume ralan, CPPT entries.
+
+## M6.7 notes: SIMRS login and rights
+
+- **One login.** `apps/server/src/auth/KhanzaAccounts.ts` runs Khanza's own query, through the read pool: `admin.usere/passworde = AES_ENCRYPT(?, 'nur'/'windi')`, else `user.id_user/password` with the same keys. A row in `admin` is Admin Utama (all rights); a row in `user` gives the boolean `enum('true','false')` columns. The password is a query parameter and is never stored; `KhanzaRead` redacts every `AES_ENCRYPT` parameter in the audit log.
+- **Local identity.** The audit DB keeps a `users` row per SIMRS username for sessions and audit foreign keys. Migration `0012_simrs_login` adds `source`, `rights_json`, `khanza_admin` and `rights_updated_at`, disables old local accounts and deletes their sessions. Local password hashing and `/api/users` are gone.
+- **Rights map** (`packages/shared/src/permissions.ts`): `tindakan_ralan` → CPPT ralan + fixes on `rawat_jl_pr`; `tindakan_ranap` → CPPT ranap + fixes on `rawat_inap_pr`; `data_resume_pasien` → resume + drafts; `periksa_radiologi` → radiology card and PACS; `berkas_digital_perawatan` → digital files; `kamar_inap` → fixes on `kamar_inap`/`kamar`; `registrasi` → fixes on `reg_periksa`; `bpjs_surat_kontrol`/`skdp_bpjs` → fixes on `bridging_surat_kontrol_bpjs`. Features with no Khanza menu (riwayat, Tanya Data, patient search) stay open to every SIMRS login, like the bridge.
+- **Enforcement.** HTTP routes check the snapshot (`403`), `FixExecutor` paths check the table right, and the agent filters its tool list with `toolAllowed` (`hasilRadiologi`, `berkasDigital`); `dokumenPasien` checks the visit's ralan/ranap right inside the handler. The UI hides document buttons, radiology/digital-file cards and fix actions it cannot use; **Pengaturan → Akun** shows why and can `POST /api/auth/refresh`.
+- **Refresh semantics.** Like Khanza, rights are read at login. `POST /api/auth/refresh` re-reads them by username (no password); a deleted Khanza account deletes its Simha sessions and returns 401.
+- **Tests.** The test DB loads a compact `user`/`admin` fixture (`packages/tools/test/fixtures/khanza-auth.sql`) and the harness creates SIMRS accounts on demand. Tests cover login, wrong password/lock, admin vs staff, redacted audit params, a rights refresh (CPPT becomes 403, riwayat stays 200), account removal, and an e2e limited-rights account that sees only Riwayat.
 
 ## Decisions and questions
 

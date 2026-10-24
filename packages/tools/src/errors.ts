@@ -25,3 +25,12 @@ export class ToolError extends Schema.TaggedError<ToolError>()("ToolError", {
   tool: Schema.String,
   message: Schema.String,
 }) {}
+
+/**
+ * The SIMRS account behind the request may not use this tool (a Khanza right
+ * is missing). The message names the right so the user can ask IT to grant it.
+ */
+export class ToolPermissionError extends Schema.TaggedError<ToolPermissionError>()("ToolPermissionError", {
+  tool: Schema.String,
+  message: Schema.String,
+}) {}

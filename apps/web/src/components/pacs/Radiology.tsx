@@ -17,6 +17,7 @@ import { Button } from "../ui/Button.tsx";
 import { Dialog } from "../ui/Dialog.tsx";
 import { ErrorText } from "../ui/Field.tsx";
 import { Empty, Spinner } from "../ui/Spinner.tsx";
+import { useAuth } from "../../stores/auth.ts";
 
 const image = (instance: string, kind: "thumb" | "preview" | "file") => `/api/pacs/instances/${instance}/${kind}`;
 
@@ -315,7 +316,24 @@ const day = (iso: string, add: number) => {
  * exam with its reading and the PACS images of that exam, in one card.
  */
 export const RadiologyCard = ({ gallery, flat = false }: { readonly gallery: RadiologyGallery; readonly flat?: boolean | undefined }) => {
+  const allowed = useAuth((s) => s.user?.permissions.radiology === true);
   const [viewing, setViewing] = useState<{ readonly study: PacsStudy; readonly index: number } | null>(null);
+  if (!allowed) {
+    return (
+      <figure className={cn("animate-rise @container overflow-hidden", !flat && "rounded-xl border border-line bg-card")} data-testid="radiology-card">
+        <figcaption className="flex items-center gap-2.5 border-b border-line-2 px-3.5 py-3">
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-paper-2 text-ink-3">
+            <ScanLine className="size-4" />
+          </span>
+          <h3 className="font-display text-[14.5px] leading-tight font-semibold">Hasil radiologi</h3>
+        </figcaption>
+        <p className="px-3.5 py-3.5 text-[12.5px] text-ink-2">
+          Akun SIMRS Anda tidak punya hak <span className="font-mono">periksa_radiologi</span>, jadi hasil radiologi ini
+          tidak ditampilkan.
+        </p>
+      </figure>
+    );
+  }
   const { byExam, rest } = matchStudies(gallery.pemeriksaan, gallery.studies);
   const open = (study: PacsStudy) => (index: number) => setViewing({ study, index });
   const empty = gallery.pemeriksaan.length === 0 && gallery.studies.length === 0;

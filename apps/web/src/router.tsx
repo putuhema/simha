@@ -9,7 +9,6 @@ import { AppShell } from "./components/layout/AppShell.tsx";
 import { Button } from "./components/ui/Button.tsx";
 import { Spinner } from "./components/ui/Spinner.tsx";
 import { LoginPage } from "./features/auth/LoginPage.tsx";
-import { SetupPage } from "./features/auth/SetupPage.tsx";
 import type { SettingsTab } from "./features/pengaturan/PengaturanPage.tsx";
 import { useAuth } from "./stores/auth.ts";
 
@@ -39,7 +38,6 @@ const Root = () => {
       </div>
     );
   }
-  if (status === "setup") return <SetupPage />;
   if (status === "login") return <LoginPage />;
   return <Outlet />;
 };
@@ -88,7 +86,7 @@ const pengetahuanRoute = createRoute({
   },
 });
 
-const TABS: ReadonlyArray<SettingsTab> = ["ai", "audit", "pengguna", "akun", "desktop", "pengetahuan"];
+const TABS: ReadonlyArray<SettingsTab> = ["ai", "audit", "akun", "desktop", "pengetahuan"];
 const pengaturanRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/pengaturan",

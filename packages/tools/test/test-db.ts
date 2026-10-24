@@ -143,6 +143,7 @@ const prepareDatabase = async (target: AdminTarget): Promise<TestDbInfo> => {
       "SET SESSION sql_mode = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'",
     );
     await conn.query(readFileSync(NodePath.join(fixtures, "khanza-schema.sql"), "utf8"));
+    await conn.query(readFileSync(NodePath.join(fixtures, "khanza-auth.sql"), "utf8"));
     await conn.query(readFileSync(NodePath.join(fixtures, "seed.sql"), "utf8"));
 
     const readUser = "harness_test_read";

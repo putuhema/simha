@@ -1,5 +1,6 @@
+import { FIX_TABLES } from "@simha/shared";
 import { describe, expect, it } from "vitest";
-import { checkFix, FixRejected, inlineParams, selectByKeys } from "./guard.ts";
+import { checkFix, FixRejected, FIX_ALLOW_LIST, inlineParams, selectByKeys } from "./guard.ts";
 
 const PK: Record<string, ReadonlyArray<string>> = {
   kamar_inap: ["no_rawat", "tgl_masuk", "jam_masuk"],
@@ -92,5 +93,13 @@ describe("selectByKeys", () => {
     expect(selectByKeys("kamar", [{ kd_kamar: "A" }, { kd_kamar: "B" }])).toBe(
       "SELECT * FROM `kamar` WHERE (`kd_kamar` <=> 'A') OR (`kd_kamar` <=> 'B')",
     );
+  });
+});
+
+describe("SIMRS fix rights", () => {
+  it("has a Khanza right for every table a fix may change", () => {
+    // Adding a table to the write allow-list without a right would let every
+    // logged-in SIMRS user approve it; keep the two lists in sync.
+    expect(FIX_TABLES.toSorted()).toEqual(Object.keys(FIX_ALLOW_LIST).toSorted());
   });
 });

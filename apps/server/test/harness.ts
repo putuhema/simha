@@ -10,8 +10,10 @@ import { connectionAs, testDb } from "@simha/tools/testing";
 import { Duration, Effect, Layer, ManagedRuntime, Redacted } from "effect";
 import { SqlClient } from "effect/sql";
 import { HttpRouter } from "effect/http";
+import mysql from "mysql2/promise";
 import { AgentLive } from "../src/agent/Agent.ts";
 import { AuthLive } from "../src/auth/Auth.ts";
+import { KhanzaAccountsLive } from "../src/auth/KhanzaAccounts.ts";
 import { HttpSettings } from "../src/config.ts";
 import { FixExecutorLive } from "../src/fixes/FixExecutor.ts";
 import { systemPromptLayer } from "../src/agent/prompt.ts";
@@ -38,17 +40,100 @@ const TEST_DOCS = {
   notes: "# Notes\n\n- `kd_poli` for poli gigi is `GIG`.\n- TODO: more\n",
 };
 
-/** The first user (admin), who makes every request unless a test says otherwise. */
-/** The session cookie from a login or setup response. */
+/** The default SIMRS account (an Admin Utama), used unless a test says otherwise. */
+const DEFAULT_USER = "it-budi";
+const PASSWORD = "rahasia-uji-123";
+
+/** The Khanza rights the test auth fixture has columns for. */
+const TEST_RIGHTS = [
+  "pasien",
+  "registrasi",
+  "tindakan_ralan",
+  "tindakan_ranap",
+  "kamar_inap",
+  "periksa_radiologi",
+  "berkas_digital_perawatan",
+  "data_resume_pasien",
+  "bpjs_surat_kontrol",
+  "skdp_bpjs",
+] as const;
+export type TestRight = (typeof TEST_RIGHTS)[number];
+const ALL_TEST_RIGHTS: ReadonlyArray<TestRight> = TEST_RIGHTS;
+
+/**
+ * Creates (or updates) the matching Khanza `admin`/`user` row in the throwaway
+ * test DB, so server tests can log in exactly like a real SIMRS user.
+ */
+const ensureKhanzaAccount = async (
+  username: string,
+  admin: boolean,
+  rights: ReadonlyArray<TestRight>,
+): Promise<void> => {
+  const db = testDb;
+  if (db === null) throw new Error("no test DB");
+  const connection = await mysql.createConnection({
+    host: db.host,
+    port: db.port,
+    user: db.adminUser,
+    password: db.adminPass,
+    database: db.database,
+  });
+  try {
+    if (admin) {
+      // One atomic statement: test files run in parallel and a delete/insert
+      // gap would let a concurrent login miss the admin row and become staff.
+      await connection.execute(
+        `INSERT INTO admin (usere, passworde) VALUES (AES_ENCRYPT(?, 'nur'), AES_ENCRYPT(?, 'windi'))
+         ON DUPLICATE KEY UPDATE passworde = VALUES(passworde)`,
+        [username, PASSWORD],
+      );
+    } else {
+      await connection.execute("DELETE FROM admin WHERE usere = AES_ENCRYPT(?, 'nur')", [username]);
+    }
+    const columns = TEST_RIGHTS.map((right) => `\`${right}\``).join(", ");
+    const placeholders = TEST_RIGHTS.map(() => "?").join(", ");
+    const updates = TEST_RIGHTS.map((right) => `\`${right}\` = VALUES(\`${right}\`)`).join(", ");
+    await connection.execute(
+      `INSERT INTO user (id_user, password, ${columns})
+       VALUES (AES_ENCRYPT(?, 'nur'), AES_ENCRYPT(?, 'windi'), ${placeholders})
+       ON DUPLICATE KEY UPDATE password = VALUES(password), ${updates}`,
+      [username, PASSWORD, ...TEST_RIGHTS.map((right) => (rights.includes(right) ? "true" : "false"))],
+    );
+  } finally {
+    await connection.end();
+  }
+};
+
+/** Removes the Khanza account, as Khanza does when a user is deleted. */
+const removeKhanzaAccount = async (username: string): Promise<void> => {
+  const db = testDb;
+  if (db === null) throw new Error("no test DB");
+  const connection = await mysql.createConnection({
+    host: db.host,
+    port: db.port,
+    user: db.adminUser,
+    password: db.adminPass,
+    database: db.database,
+  });
+  try {
+    await connection.execute("DELETE FROM admin WHERE usere = AES_ENCRYPT(?, 'nur')", [username]);
+    await connection.execute("DELETE FROM user WHERE id_user = AES_ENCRYPT(?, 'nur')", [username]);
+  } finally {
+    await connection.end();
+  }
+};
+
+/** Changes a staff account's rights; the current session keeps its snapshot until refresh. */
+const setKhanzaRights = (username: string, rights: ReadonlyArray<TestRight>) =>
+  ensureKhanzaAccount(username, false, rights);
+
+/** The session cookie from a login response. */
 const cookieOf = (response: Response) => {
   const header = response.headers.get("set-cookie") ?? "";
   const value = /simha_session=([^;]+)/.exec(header)?.[1];
   if (!value) throw new Error(`no session cookie (${response.status})`);
   return `simha_session=${value}`;
 };
-
-const DEFAULT_USER = "it-budi";
-const PASSWORD = "rahasia-uji-123";
 
 export interface TestAppOptions {
   /** Directory served as the web UI. */
@@ -72,6 +157,8 @@ export const makeTestApp = (
     env: { provider: "fake", model: "fake-model", baseUrl: undefined, apiKey: undefined, maskPii: fake.info.maskPii },
     initialClient: fake,
   });
+  const read = khanzaReadLayer({ connection: connectionAs(db, db.readUser, db.readPass), timeout: Duration.seconds(5) });
+  const auth = AuthLive.pipe(Layer.provideMerge(KhanzaAccountsLive.pipe(Layer.provideMerge(read))));
   const app = Layer.mergeAll(AgentLive, FixExecutorLive, ViewsLive).pipe(
     Layer.provideMerge(
       Layer.mergeAll(
@@ -82,9 +169,8 @@ export const makeTestApp = (
         schemaDocsLayer(docs),
         appDocsLayer(JSON.stringify({ source: { commit: "test" }, groups: [], forms: {}, rights: {} })),
         khanzaWriteLayer(connectionAs(db, db.writeUser, db.writePass)),
-        khanzaReadLayer({ connection: connectionAs(db, db.readUser, db.readPass), timeout: Duration.seconds(5) }),
+        auth,
         llm,
-        AuthLive,
         Layer.succeed(HttpSettings, { webDir: options.webDir ?? "/nonexistent", secureCookie: false }),
         systemPromptLayer("Test system prompt."),
         options.pacs ?? pacsLayer({ url: "", user: "", pass: Redacted.make("") }),
@@ -124,21 +210,19 @@ export const makeTestApp = (
       }),
     );
 
-  /** Session cookie per username; users are created on first use (the first one is the admin). */
+  /** Session cookie per username; SIMRS accounts are created on first use. */
   const sessions = new Map<string, string>();
-  const sessionFor = async (username: string, role: "admin" | "staff" = "staff"): Promise<string> => {
+  const sessionFor = async (
+    username: string,
+    role: "admin" | "staff" = "staff",
+    rights: ReadonlyArray<TestRight> = ALL_TEST_RIGHTS,
+  ): Promise<string> => {
     const known = sessions.get(username);
     if (known) return known;
-    if (sessions.size === 0 && username !== DEFAULT_USER) await sessionFor(DEFAULT_USER);
-    if (sessions.size === 0) {
-      const setup = await raw("POST", "/api/auth/setup", { username, displayName: username, password: PASSWORD });
-      sessions.set(username, cookieOf(setup));
-      return sessions.get(username) as string;
-    }
-    const admin = sessions.get(DEFAULT_USER) as string;
-    const created = await raw("POST", "/api/users", { username, displayName: username, password: PASSWORD, role }, admin);
-    if (created.status !== 201) throw new Error(`could not create ${username}: ${await created.text()}`);
+    const admin = role === "admin" || username === DEFAULT_USER;
+    await ensureKhanzaAccount(username, admin, rights);
     const login = await raw("POST", "/api/auth/login", { username, password: PASSWORD });
+    if (login.status !== 200) throw new Error(`could not log in ${username}: ${await login.text()}`);
     sessions.set(username, cookieOf(login));
     return sessions.get(username) as string;
   };
@@ -148,8 +232,25 @@ export const makeTestApp = (
     raw(method, path.startsWith("/api") ? path : `/api${path}`, body, await sessionFor(username));
   /** A request as the default user (admin). Paths without /api get it added. */
   const call = (method: string, path: string, body?: unknown) => callAs(DEFAULT_USER, method, path, body);
+  /** Deletes the SIMRS account; the next login cannot succeed. */
+  const removeAccount = async (username: string) => {
+    await removeKhanzaAccount(username);
+    sessions.delete(username);
+  };
 
-  return { fake, call, callAs, raw, sessionFor, password: PASSWORD, audit, runtime, dispose };
+  return {
+    fake,
+    call,
+    callAs,
+    raw,
+    sessionFor,
+    setRights: setKhanzaRights,
+    removeAccount,
+    password: PASSWORD,
+    audit,
+    runtime,
+    dispose,
+  };
 };
 
 /** Reads a whole SSE response into events. */

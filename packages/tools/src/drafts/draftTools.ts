@@ -24,6 +24,7 @@ const INSTRUCTIONS =
 export const buatDraftResume = defineTool({
   name: "buatDraftResume",
   kind: "render",
+  requires: (permissions) => permissions.resume,
   description:
     "Start a draft of Khanza's 'Resume Pasien Ranap' (resume medis rawat inap) for one inpatient visit, when the user " +
     "wants to make or complete a resume. The server fills what Khanza data shows (diagnoses, procedures, first CPPT, " +
@@ -56,6 +57,7 @@ export const buatDraftResume = defineTool({
 export const isiDraft = defineTool({
   name: "isiDraft",
   kind: "render",
+  requires: (permissions) => permissions.resume,
   description:
     "Put the user's answers into a form draft made with buatDraftResume. isian: field key -> text, using the keys " +
     "from buatDraftResume (e.g. jalannya_penyakit, edukasi, kontrol 'YYYY-MM-DD HH:MM', keadaan one of its choices). " +

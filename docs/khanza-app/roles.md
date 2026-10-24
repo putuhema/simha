@@ -69,6 +69,13 @@ Daftar lengkap hak → menu ada di [index.json](index.json) (`rights`), dan hak 
 
 ## Catatan untuk Simha
 
+Simha sekarang login dengan akun Khanza: username/password dicek dengan `AES_ENCRYPT(...,'nur')` /
+`AES_ENCRYPT(...,'windi')` yang sama, lalu hak dibaca dari baris `user` (atau semua hak bila cocok
+dengan `admin`). Pemetaan hak → fitur Simha ada di `packages/shared/src/permissions.ts` dan
+[README](../../README.md#5-build-the-ui-and-start-the-server); perubahan hak di Khanza dibaca ulang
+lewat **Pengaturan → Akun → Muat ulang hak** (atau logout/login), sama seperti `akses` dibaca sekali
+saat login.
+
 Agent tidak boleh mengubah hak sendiri. Kalau perbaikan data menyentuh menu/hak, jawab dengan menu
 yang harus dibuka IT (mis. **T/Set User**) dan jelaskan kolom yang perlu di-set — jangan menulis
 `UPDATE user` dengan password terenkripsi.

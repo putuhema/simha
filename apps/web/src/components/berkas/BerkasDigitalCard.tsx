@@ -11,6 +11,7 @@ import { cn } from "../../lib/cn.ts";
 import { formatBytes } from "../../lib/format.ts";
 import { Badge } from "../ui/Badge.tsx";
 import { Dialog } from "../ui/Dialog.tsx";
+import { useAuth } from "../../stores/auth.ts";
 
 const urlFor = (file: BerkasDigitalFile, extra = "") =>
   `/api/berkas?noRawat=${encodeURIComponent(file.noRawat)}&kode=${encodeURIComponent(file.kode)}${extra}`;
@@ -96,7 +97,27 @@ const OtherTile = ({ file, showVisit }: { readonly file: BerkasDigitalFile; read
 );
 
 export const BerkasDigitalCard = ({ berkas, flat = false }: { readonly berkas: BerkasDigital; readonly flat?: boolean | undefined }) => {
+  const allowed = useAuth((s) => s.user?.permissions.berkas === true);
   const [viewing, setViewing] = useState<BerkasDigitalFile | null>(null);
+  if (!allowed) {
+    return (
+      <figure className={cn("animate-rise @container overflow-hidden", !flat && "rounded-xl border border-line bg-card")} data-testid="berkas-card">
+        <figcaption className="flex flex-wrap items-start gap-2.5 border-b border-line-2 px-3.5 py-3">
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-paper-2 text-ink-3">
+            <FolderOpen className="size-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <Badge tone="neutral">Berkas</Badge>
+            <h3 className="font-display text-[14.5px] leading-tight font-semibold">Berkas digital</h3>
+          </div>
+        </figcaption>
+        <p className="px-3.5 py-3.5 text-[12.5px] text-ink-2">
+          Akun SIMRS Anda tidak punya hak <span className="font-mono">berkas_digital_perawatan</span>, jadi berkas ini
+          tidak ditampilkan.
+        </p>
+      </figure>
+    );
+  }
   const showVisit = berkas.noRawat === null;
   return (
     <figure className={cn("animate-rise @container overflow-hidden", !flat && "rounded-xl border border-line bg-card")} data-testid="berkas-card">

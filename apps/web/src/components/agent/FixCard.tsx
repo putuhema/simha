@@ -4,7 +4,7 @@
  * Rollback. Every action asks for confirmation and shows who did what.
  */
 import { Collapsible } from "@base-ui/react/collapsible";
-import type { Fix, FixDetail } from "@simha/shared";
+import { fixTableRights, type Fix, type FixDetail } from "@simha/shared";
 import { Check, ChevronRight, Pencil, RotateCcw, X } from "lucide-react";
 import { useState } from "react";
 import { DataTable } from "../blocks/DataTable.tsx";
@@ -17,6 +17,7 @@ import { Spinner } from "../ui/Spinner.tsx";
 import { api, errorMessage } from "../../lib/api.ts";
 import { formatDateTime } from "../../lib/format.ts";
 import { useApi } from "../../lib/useApi.ts";
+import { useAuth } from "../../stores/auth.ts";
 
 const STATUS: Readonly<Record<Fix["status"], { readonly label: string; readonly tone: "amber" | "teal" | "ok" | "red" | "neutral" }>> = {
   pending: { label: "Menunggu persetujuan", tone: "amber" },
@@ -56,6 +57,7 @@ type Pending = "approve" | "reject" | "rollback" | "edit" | null;
 
 export const FixCard = ({ fixId, onChanged }: { readonly fixId: string; readonly onChanged: () => void }) => {
   const detail = useApi<FixDetail>(`/api/fixes/${fixId}`);
+  const fixTables = useAuth((s) => s.user?.permissions.fixTables);
   const [dialog, setDialog] = useState<Pending>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +68,8 @@ export const FixCard = ({ fixId, onChanged }: { readonly fixId: string; readonly
     return detail.error ? <ErrorText>{detail.error}</ErrorText> : <Spinner className="text-ink-3" />;
   }
   const status = STATUS[fix.status];
+  const canAct = fixTables?.includes(fix.table) ?? false;
+  const requiredRights = fixTableRights(fix.table).join(" / ");
 
   const act = async (path: string, body?: unknown) => {
     setBusy(true);
@@ -105,7 +109,7 @@ export const FixCard = ({ fixId, onChanged }: { readonly fixId: string; readonly
         {fix.error ? <ErrorText>{fix.error}</ErrorText> : null}
         {error && dialog === null ? <ErrorText>{error}</ErrorText> : null}
 
-        {fix.status === "pending" ? (
+        {fix.status === "pending" && canAct ? (
           <div className="flex flex-wrap gap-2 pt-1">
             <Button variant="approve" onClick={() => setDialog("approve")}>
               <Check /> Setujui
@@ -118,12 +122,24 @@ export const FixCard = ({ fixId, onChanged }: { readonly fixId: string; readonly
             </Button>
           </div>
         ) : null}
+        {fix.status === "pending" && !canAct ? (
+          <p className="rounded-md bg-paper-2/60 px-3 py-2 text-[12.5px] text-ink-2">
+            Akun SIMRS Anda tidak punya hak <span className="font-mono">{requiredRights || "terkait"}</span> untuk
+            menyetujui perubahan pada tabel <span className="font-mono">{fix.table}</span>.
+          </p>
+        ) : null}
         {fix.status === "applied" ? (
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <p className="text-[13px] text-ok">Perubahan sudah dijalankan dan bisa dibatalkan.</p>
-            <Button variant="danger" size="sm" onClick={() => setDialog("rollback")}>
-              <RotateCcw /> Rollback
-            </Button>
+            {canAct ? (
+              <Button variant="danger" size="sm" onClick={() => setDialog("rollback")}>
+                <RotateCcw /> Rollback
+              </Button>
+            ) : (
+              <p className="text-[12px] text-ink-3">
+                Rollback butuh hak <span className="font-mono">{requiredRights || "terkait"}</span>.
+              </p>
+            )}
           </div>
         ) : null}
       </div>

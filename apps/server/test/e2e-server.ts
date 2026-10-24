@@ -30,6 +30,7 @@ import * as NodePath from "node:path";
 import { AgentLive } from "../src/agent/Agent.ts";
 import { systemPromptLayer } from "../src/agent/prompt.ts";
 import { AuthLive } from "../src/auth/Auth.ts";
+import { KhanzaAccountsLive } from "../src/auth/KhanzaAccounts.ts";
 import { HttpSettings } from "../src/config.ts";
 import { FixExecutorLive } from "../src/fixes/FixExecutor.ts";
 import { Routes } from "../src/http/routes.ts";
@@ -221,6 +222,8 @@ const main = Effect.gen(function* () {
   const port = Number(process.env["E2E_PORT"] ?? 8799);
   const webDir = NodePath.resolve(import.meta.dirname, "..", "..", "web", "dist");
 
+  const read = khanzaReadLayer({ connection: connection(info.readUser, info.readPass), timeout: Duration.seconds(5) });
+  const auth = AuthLive.pipe(Layer.provideMerge(KhanzaAccountsLive.pipe(Layer.provideMerge(read))));
   const app = Layer.mergeAll(AgentLive, FixExecutorLive, ViewsLive).pipe(
     Layer.provideMerge(
       Layer.mergeAll(
@@ -230,14 +233,13 @@ const main = Effect.gen(function* () {
         ResultStoreLive,
         SchemaDocsLive,
         AppDocsLive,
-        AuthLive,
+        auth,
         llmSettingsLayer({
           env: { provider: "fake", model: "skrip-uji", baseUrl: undefined, apiKey: undefined, maskPii: true },
           initialClient: fake,
         }),
         Layer.succeed(HttpSettings, { webDir, secureCookie: false }),
         khanzaWriteLayer(connection(info.writeUser, info.writePass)),
-        khanzaReadLayer({ connection: connection(info.readUser, info.readPass), timeout: Duration.seconds(5) }),
         systemPromptLayer("E2E test system prompt."),
         pacsLayer(FAKE_ORTHANC, makeFakeOrthanc().fetch),
         Layer.succeed(Berkas, makeBerkas({ dir: BERKAS_DIR })),

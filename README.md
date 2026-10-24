@@ -5,12 +5,14 @@
 - **Investigasi keluhan:** switch the chat to **Investigasi** and paste a nurse's complaint. The agent reads the real patient data through safe, read-only tools, explains each check, gives a diagnosis and proposes a fix as SQL. The fix only runs after a person clicks **Approve**, and it can be rolled back.
 - **Tanya Data mode:** ask questions about hospital data in plain Indonesian ("10 obat paling banyak dipakai minggu ini"). The agent writes a guarded `SELECT` and shows the answer as a table, chart or number.
 
-> Status: **M6.6 done**: web UI (Tanya Data with an investigate mode, Pengetahuan AI, Pengaturan), desktop app with Khanza bridge, resume drafts, app map and AI learning (examples, notes, feedback). See [docs/PLAN.md](docs/PLAN.md). Name, tagline and identifiers: [docs/BRAND.md](docs/BRAND.md).
+> Status: **M6.7 done**: SIMRS Khanza login and rights (one account, same permissions), web UI (Tanya Data with an investigate mode, Pengetahuan AI, Pengaturan), desktop app with Khanza bridge, resume drafts, app map and AI learning (examples, notes, feedback). See [docs/PLAN.md](docs/PLAN.md). Name, tagline and identifiers: [docs/BRAND.md](docs/BRAND.md).
 
 ## Safety model (short version)
 
 | Rule | How |
 |---|---|
+| One SIMRS login | Simha has no passwords of its own: it checks the Khanza account with Khanza's own encrypted comparison. A Khanza Admin Utama is a Simha admin. |
+| Same rights as SIMRS | CPPT, resume, radiology, digital files and fix approvals use the same Khanza right as the menu that owns them; hidden in the UI and rejected by the API (403). |
 | Read-only by default | Agent tools use a MySQL user with `SELECT` only. Simha checks `SHOW GRANTS` at startup and refuses to run if that user can change data. |
 | Writes need approval | The AI can only *propose* a fix. After Approve, the server runs it with a separate write user, in a transaction, and rolls back if the affected row count differs from the preview. |
 | Every fix can be undone | The affected rows are saved (before-image) before the change runs. |
@@ -55,6 +57,7 @@ GRANT SELECT, UPDATE                 ON sik.bridging_surat_kontrol_bpjs TO 'harn
 
 Notes:
 
+- The read user is also the login checker: it runs Khanza's own `AES_ENCRYPT` comparison on the `user` and `admin` tables. `GRANT SELECT ON sik.*` covers both; if you trim that grant, keep `SELECT` on `user` and `admin`. The password is sent as a query parameter and redacted from the audit log.
 - The write user needs `SELECT` on each table so the server can capture the before-image and check the row count.
 - Rollback runs the opposite statement, so a table needs the opposite privilege too: undoing a DELETE re-inserts the rows (hence `INSERT` on `rawat_jl_pr` / `rawat_inap_pr`), undoing an INSERT deletes them. A fix itself can still only DELETE from those tables; the server's allow-list (`packages/tools/src/fixes/guard.ts`) decides which statements a fix may use.
 - These grants are a second safety wall behind that allow-list. Trim both to what you actually need.
@@ -96,7 +99,8 @@ kasir tidak muncul".
 
 ```bash
 pnpm extract-khanza-app          # reads ~/work/simrsmt, writes docs/khanza-app/
-pnpm extract-khanza-app --check  # fails when the map is stale
+pnpm extract-khanza-app --check  # fails when the map is stale (re-parses the source)
+pnpm check:app-map               # fast: index.json vs the Khanza git HEAD (skips without the source)
 ```
 
 It writes `docs/khanza-app/index.json` (the graph the `cariAplikasiKhanza` tool reads) plus
@@ -106,6 +110,14 @@ right-click actions, and the tables each form writes/reads. `flows/`, `roles.md`
 generated). The output is tied to one Khanza commit, shown in `index.json`. Re-run it after a Khanza
 update; the report prints how many buttons resolved to a form and exits non-zero when that drops below
 90%.
+
+The agent reads the map with two tools: `cariAplikasiKhanza` finds the menu, form, flow, right or table
+(one line per hit, lists capped), and `detailAplikasi` opens one hit — a flow's intro and every step with
+what it does, who does it, its rights and tables; or a form's buttons, right-click actions, rights and
+tables. A few dialogs are huge (`DlgKamarInap` has 216 right-click actions, `DlgReg` 277), so those lists
+stop at 30/40 entries with a `+N` marker, and `cari` narrows them to the word from the task. `pnpm verify`
+runs typecheck, lint, the tests and `check:app-map`, so a map from an older Khanza commit fails the build
+instead of answering with a menu that moved.
 
 See [docs/khanza-app/README.md](docs/khanza-app/README.md).
 
@@ -124,6 +136,8 @@ pnpm tool suratKontrol '{"noSep":"0001R0010126V000123"}'
 pnpm tool lihatSkema '{"kataKunci":"obat"}'
 pnpm tool cariAplikasiKhanza '{"kataKunci":"pindah kamar"}'
 pnpm tool cariAplikasiKhanza '{"kataKunci":"form apa yang mengisi kamar_inap","bagian":"tabel"}'
+pnpm tool detailAplikasi '{"jenis":"alur","id":"rawat-inap"}'
+pnpm tool detailAplikasi '{"jenis":"form","id":"DlgKamarInap"}'
 pnpm tool jalankanQueryBaca '{"sql":"SELECT COUNT(*) AS jumlah FROM reg_periksa WHERE tgl_registrasi = CURDATE()","alasan":"coba"}'
 ```
 
@@ -136,7 +150,25 @@ pnpm build       # web UI -> apps/web/dist (once, and after updates)
 pnpm start       # http://127.0.0.1:8787
 ```
 
-Open http://127.0.0.1:8787. The first visit asks for the **first admin account**. After that everyone logs in with their own account, which admins create under **Pengaturan → Pengguna**.
+Open http://127.0.0.1:8787. Log in with a **SIMRS Khanza account**: the same username and password as the Khanza desktop app. Simha never stores the password. A Khanza **Admin Utama** (a row in Khanza's `admin` table) becomes a Simha admin; everyone else keeps the rights of their `user` row.
+
+**Login and rights.** Simha runs Khanza's own comparison — `AES_ENCRYPT(?, 'nur')` for the username and `AES_ENCRYPT(?, 'windi')` for the password — through the SELECT-only read user. The rights are read once at login (like Khanza reads `akses` once); after IT changes them, use **Pengaturan → Akun → Muat ulang hak**, or log out and in again. A feature that has a Khanza menu is gated by the same right:
+
+| Simha | Khanza right |
+|---|---|
+| CPPT / SOAP rawat jalan | `tindakan_ralan` |
+| CPPT / SOAP rawat inap | `tindakan_ranap` |
+| Resume medis | `data_resume_pasien` |
+| Radiology readings and PACS images | `periksa_radiologi` |
+| Berkas digital | `berkas_digital_perawatan` |
+| Approve/reject/rollback a fix on `kamar_inap`, `kamar` | `kamar_inap` |
+| … on `reg_periksa` | `registrasi` |
+| … on `rawat_jl_pr` | `tindakan_ralan` |
+| … on `rawat_inap_pr` | `tindakan_ranap` |
+| … on `bridging_surat_kontrol_bpjs` | `bpjs_surat_kontrol` or `skdp_bpjs` |
+| AI settings and knowledge review | Admin Utama |
+
+Riwayat pasien, Tanya Data and patient search have no Khanza menu of their own, so every SIMRS login can use them — the same rule the Khanza bridge uses for **Riwayat Perawatan**. Buttons and cards the account may not use are hidden or replaced with an explanation, and the API returns 403 if one is called directly.
 
 - **Investigasi keluhan.** In the composer, switch the mode from **Tanya data** to **Investigasi** and paste the nurse's complaint. It is the same chat as Tanya Data, so follow-up questions keep the context. The answer shows:
   - "Yang dicek AI" (✓ fine, ! problem found, ✕ failed; click a step for its details);
@@ -157,17 +189,17 @@ Open http://127.0.0.1:8787. The first visit asks for the **first admin account**
 - **Pengaturan.** The tabs are:
   - **AI:** provider, model, base URL, API key, "samarkan data" and **Tes koneksi**. Saving switches the AI without a restart and overrides `.env`; admins only.
   - **Audit log:** questions, tool calls, queries, fix approvals, logins, filterable.
-  - **Pengguna:** admins only.
-  - **Akun:** change your own password.
+  - **Akun:** your SIMRS account, the rights Simha read from Khanza, which buttons/cards they unlock, and **Muat ulang hak**.
   - **Pengetahuan AI:** what the AI learned — examples saved automatically, AI/staff notes and 👎 corrections. 👍 verifies an example; admins can verify, edit, deactivate or delete items.
 
 To serve the hospital network, set `SERVER_HOST=0.0.0.0`. Behind HTTPS (e.g. a reverse proxy), also set `COOKIE_SECURE=true`.
 
 Security notes:
 
-- **Passwords:** scrypt hashes in the audit DB.
+- **Passwords:** Simha has no passwords of its own. It compares against Khanza's encrypted `user` / `admin` values and never stores the plaintext. The audit log redacts the parameters of every `AES_ENCRYPT` query.
 - **Sessions:** an HttpOnly, SameSite=Strict cookie (12 hours); only a hash of the token is stored.
-- **Wrong passwords:** after 5 wrong tries a username is locked for a minute.
+- **Wrong passwords:** after 5 wrong tries a username is locked for a minute (the counter is in the Simha process, not Khanza).
+- **Rights:** a snapshot of the Khanza rights is stored with the session's local user row. `POST /api/auth/refresh` re-reads it; removing the Khanza account ends the session on the next refresh.
 - **API key:** an API key saved on the settings page is stored in `data/audit.sqlite`. Keep that file readable only by the account that runs the server.
 
 ### 6. Fixes: approve and roll back
@@ -244,7 +276,7 @@ Khanza runs on its own (it keeps running when Simha quits). Everything it prints
 
 ### HTTP API
 
-The UI uses the same API. Everything except `/api/health`, `/api/auth/state`, `/api/auth/login` and `/api/auth/setup` needs a login cookie:
+The UI uses the same API. Everything except `/api/health`, `/api/auth/state` and `/api/auth/login` needs a login cookie:
 
 ```bash
 curl -c jar -X POST localhost:8787/api/auth/login -H 'content-type: application/json' \
@@ -267,11 +299,9 @@ Send the `conversationId` with the next `/api/ask` for a follow-up. Add `"mode":
 | Endpoint | |
 |---|---|
 | `GET /api/health` | Khanza server, read-only status, AI provider and model (public) |
-| `GET /api/auth/state` | logged-in user, or `setupNeeded` (public) |
-| `POST /api/auth/setup` | `{ username, displayName, password }`: first admin, only while there are no users |
-| `POST /api/auth/login`, `POST /api/auth/logout` | |
-| `POST /api/auth/password` | `{ currentPassword, newPassword }` |
-| `GET /api/users`, `POST /api/users`, `PATCH /api/users/:id` | manage users (admin) |
+| `GET /api/auth/state` | logged-in user and its Simha permissions, or null (public) |
+| `POST /api/auth/login`, `POST /api/auth/logout` | SIMRS username and password; logout |
+| `POST /api/auth/refresh` | re-read this account's rights from Khanza (`403`/`401` as appropriate) |
 | `GET /api/stats` | registrations today, inpatients, fixes waiting |
 | `POST /api/ask` | `{ question, conversationId?, mode?: "tanya" \| "investigasi" }` (SSE) |
 | `GET /api/conversations`, `GET /api/conversations/:id` | chat threads (`?mine=1`), active first and pinned on top; each run carries its mode |

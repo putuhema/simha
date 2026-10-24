@@ -7,9 +7,8 @@ import { Account } from "./Account.tsx";
 import { AuditLog } from "./AuditLog.tsx";
 import { DesktopSettings } from "./DesktopSettings.tsx";
 import { LlmSettingsForm } from "./LlmSettingsForm.tsx";
-import { Users } from "./Users.tsx";
 
-export type SettingsTab = "ai" | "audit" | "pengguna" | "akun" | "desktop" | "pengetahuan";
+export type SettingsTab = "ai" | "audit" | "akun" | "desktop" | "pengetahuan";
 
 const tabClass =
   "relative px-3 py-2 text-[13.5px] whitespace-nowrap text-ink-2 outline-none hover:text-ink data-[active]:font-medium data-[active]:text-ink focus-visible:ring-2 focus-visible:ring-teal";
@@ -30,11 +29,6 @@ export const PengaturanPage = () => {
             <Tabs.Tab value="audit" className={tabClass}>
               Audit log
             </Tabs.Tab>
-            {isAdmin ? (
-              <Tabs.Tab value="pengguna" className={tabClass}>
-                Pengguna
-              </Tabs.Tab>
-            ) : null}
             <Tabs.Tab value="akun" className={tabClass}>
               Akun
             </Tabs.Tab>
@@ -54,11 +48,6 @@ export const PengaturanPage = () => {
           <Tabs.Panel value="audit">
             <AuditLog />
           </Tabs.Panel>
-          {isAdmin ? (
-            <Tabs.Panel value="pengguna">
-              <Users />
-            </Tabs.Panel>
-          ) : null}
           <Tabs.Panel value="akun">
             <Account />
           </Tabs.Panel>

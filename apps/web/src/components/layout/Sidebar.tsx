@@ -104,7 +104,7 @@ const UserMenu = ({ compact, health, onNavigate }: { readonly compact: boolean; 
           <>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[12.5px] font-medium text-ink">{user.displayName}</span>
-              <span className="block truncate text-[11px] text-ink-3">{user.role === "admin" ? "Admin" : "Staf IT"}</span>
+              <span className="block truncate text-[11px] text-ink-3">{user.khanzaAdmin ? "Admin SIMRS" : "Pengguna SIMRS"}</span>
             </span>
             <ChevronsUpDown className="size-3.5 shrink-0 text-ink-3" />
           </>
@@ -118,7 +118,7 @@ const UserMenu = ({ compact, health, onNavigate }: { readonly compact: boolean; 
               <div className="min-w-0">
                 <p className="truncate font-medium">{user.displayName}</p>
                 <p className="truncate font-mono text-[11px] text-ink-3">
-                  {user.username} · {user.role === "admin" ? "admin" : "staf IT"}
+                  {user.username} · {user.khanzaAdmin ? "Admin Utama SIMRS" : "pengguna SIMRS"}
                 </p>
               </div>
             </div>
@@ -136,7 +136,7 @@ const UserMenu = ({ compact, health, onNavigate }: { readonly compact: boolean; 
               <FileClock className="size-4 text-ink-2" /> Audit log
             </Menu.Item>
             <Menu.Item className={menuItem} onClick={() => go("akun")}>
-              <KeyRound className="size-4 text-ink-2" /> Akun & password
+              <KeyRound className="size-4 text-ink-2" /> Akun & hak akses
             </Menu.Item>
             {desktop ? (
               <Menu.Item className={menuItem} onClick={() => go("desktop")}>

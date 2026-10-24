@@ -13,7 +13,7 @@ export { AuditLog, AuditLogLive, AuditLogMemory, auditLogLayerFile } from "./aud
 export type { AuditLogService, QueryRecord, ToolCallEnd, ToolCallStart } from "./audit/AuditLog.ts";
 export * from "./config.ts";
 export * from "./errors.ts";
-export { CurrentActor, CurrentSession, CurrentToolCall } from "./khanza/current-tool-call.ts";
+export { CurrentActor, CurrentPermissions, CurrentSession, CurrentToolCall } from "./khanza/current-tool-call.ts";
 export { KhanzaRead, KhanzaReadLive, khanzaReadLayer } from "./khanza/KhanzaRead.ts";
 export type { KhanzaReadOptions, KhanzaReadService } from "./khanza/KhanzaRead.ts";
 export { catatPengetahuan } from "./knowledge/catatPengetahuan.ts";
@@ -51,5 +51,5 @@ export { usulkanPerbaikan } from "./propose/usulkanPerbaikan.ts";
 export * from "./read/index.ts";
 export { defaultRegistry, makeRegistry, parametersJsonSchema } from "./registry.ts";
 export type { AnyTool, ToolDescription, ToolRegistry, ToolServices } from "./registry.ts";
-export { defineTool, runTool } from "./tool.ts";
-export type { RunToolOptions, Tool, ToolKind } from "./tool.ts";
+export { defineTool, requirePermission, runTool, toolAllowed } from "./tool.ts";
+export type { RunToolOptions, Tool, ToolFailure, ToolKind } from "./tool.ts";

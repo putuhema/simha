@@ -10,19 +10,21 @@
  * fake test adapter.
  */
 import { LlmClient, type ChatMessage, type LlmEvent, type ToolCall } from "@simha/llm";
-import type { AgentEvent, AgentMode, BerkasDigital, DocumentInfo, FormDraft, RadiologyGallery, RenderBlock } from "@simha/shared";
+import type { AgentEvent, AgentMode, BerkasDigital, DocumentInfo, FormDraft, Permissions, RadiologyGallery, RenderBlock } from "@simha/shared";
 import {
   AuditLog,
   defaultRegistry,
   FixStore,
   KhanzaRead,
   KnowledgeStore,
+  makeRegistry,
   maskPii,
   maskText,
   Pacs,
   personalReason,
   ResultStore,
   runTool,
+  toolAllowed,
   AppDocs,
   Berkas,
   SchemaDocs,
@@ -40,6 +42,10 @@ export const MAX_STEPS = 8;
 /** After this, the model gets one last turn without tools to answer with what it has. */
 const TIME_BUDGET_MS = 45_000;
 
+/** The tools this SIMRS account may use, in the order the provider receives them. */
+const registryFor = (permissions: Permissions): ToolRegistry =>
+  makeRegistry(defaultRegistry.tools.filter((tool) => toolAllowed(tool, permissions)));
+
 type AgentInput = {
   readonly question: string;
   /** tanya (Tanya Data) or investigasi (a nurse's complaint). */
@@ -47,6 +53,8 @@ type AgentInput = {
   readonly conversationId?: string | undefined;
   /** Username of the IT staff member asking (audit log). */
   readonly askedBy: string | null;
+  /** Snapshot of the SIMRS account's rights; decides which tools the model may see. */
+  readonly permissions: Permissions;
 };
 
 /** Appended to an investigation question, so the answer has the sections the UI expects. */
@@ -111,7 +119,6 @@ const make = Effect.gen(function* () {
   const pacs = yield* Pacs;
   const berkas = yield* Berkas;
   const system = yield* SystemPrompt;
-  const registry: ToolRegistry = defaultRegistry;
 
   /** Newest reg_periksa date, cached for a few minutes; null when it cannot be read. */
   const LATEST_DATA_TTL_MS = 5 * 60_000;
@@ -128,7 +135,13 @@ const make = Effect.gen(function* () {
     return value;
   }).pipe(Effect.catch(() => Effect.succeed(null)));
 
-  const runOneTool = (call: ToolCall, runId: string, askedBy: string | null) =>
+  const runOneTool = (
+    registry: ToolRegistry,
+    permissions: Permissions,
+    call: ToolCall,
+    runId: string,
+    askedBy: string | null,
+  ) =>
     Effect.gen(function* () {
       const tool = registry.get(call.name);
       const started = performance.now();
@@ -136,7 +149,7 @@ const make = Effect.gen(function* () {
         const known = registry.tools.map((t) => t.name).join(", ");
         return { ok: false as const, error: `Tool "${call.name}" tidak ada. Tool yang tersedia: ${known}.`, durationMs: 0 };
       }
-      const exit = yield* runTool(tool, call.args, { sessionId: runId, actor: askedBy }).pipe(
+      const exit = yield* runTool(tool, call.args, { sessionId: runId, actor: askedBy, permissions }).pipe(
         Effect.provideService(KhanzaRead, read),
         Effect.provideService(AuditLog, audit),
         Effect.provideService(FixStore, fixes),
@@ -169,6 +182,7 @@ const make = Effect.gen(function* () {
     Stream.callback<AgentEvent>((queue) =>
       Effect.gen(function* () {
         const emit = (event: AgentEvent) => Queue.offer(queue, event);
+        const registry = registryFor(input.permissions);
         const conversationId = yield* store.conversationFor(input.conversationId ? { id: input.conversationId } : {});
         const runId = crypto.randomUUID();
         const { info } = llm;
@@ -318,7 +332,7 @@ const make = Effect.gen(function* () {
             for (const [n, call] of calls.entries()) {
               const draftId = drafts.toSorted((a, b) => a.index - b.index)[n]?.draftId;
               yield* emit({ _tag: "tool_started", callId: call.id, name: call.name, args: call.args, ...(draftId ? { draftId } : {}) });
-              const outcome = yield* runOneTool(call, runId, input.askedBy);
+              const outcome = yield* runOneTool(registry, input.permissions, call, runId, input.askedBy);
               yield* emit(
                 outcome.ok
                   ? { _tag: "tool_finished", callId: call.id, name: call.name, ok: true, result: outcome.result, durationMs: outcome.durationMs }
