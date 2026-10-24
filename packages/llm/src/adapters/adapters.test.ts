@@ -6,6 +6,7 @@ import type { ChatMessage } from "../types.ts";
 import { toAnthropicMessages, toAnthropicTools, toAnthropicUsage } from "./anthropic.ts";
 import {
   cachedTokensOf,
+  chatCompletionParams,
   normalizeBaseUrl,
   promptCacheKey,
   reasoningOf,
@@ -190,5 +191,15 @@ describe("prompt cache usage", () => {
     expect(promptCacheKey(openai, request)).toBe("conversation-1");
     expect(promptCacheKey(claude, request)).toBeUndefined();
     expect(promptCacheKey(openai, { system: "", messages: [], tools: [] })).toBeUndefined();
+  });
+
+  it("asks streaming servers to include token counts", () => {
+    const request = { system: "sys", messages: history, tools: [] };
+    expect(chatCompletionParams(claude, request, true)).toMatchObject({
+      stream: true,
+      stream_options: { include_usage: true },
+    });
+    // The fallback for servers that reject the field still streams.
+    expect(chatCompletionParams(claude, request, false)).not.toHaveProperty("stream_options");
   });
 });

@@ -25,7 +25,13 @@ export const fakeTurn = (text: string, toolCalls: ReadonlyArray<Omit<ToolCall, "
   return [
     ...(text === "" ? [] : [{ type: "text_delta" as const, text }]),
     ...calls.map((call) => ({ type: "tool_call" as const, call })),
-    { type: "done", stopReason: calls.length > 0 ? "tool_use" : "end_turn" },
+    {
+      type: "done",
+      stopReason: calls.length > 0 ? "tool_use" : "end_turn",
+      // Like a real provider that reports usage: the UI and audit log have
+      // token counts to show, and the tests exercise the same path.
+      usage: { inputTokens: 1_200, outputTokens: 180, cachedInputTokens: 900 },
+    },
   ];
 };
 

@@ -260,4 +260,48 @@ describe.skipIf(testDb === null)("audit log", () => {
       await app.dispose();
     }
   });
+
+  it("stores the tokens the provider reports, summed over every model turn", async () => {
+    const app = makeTestApp([
+      [
+        { type: "tool_call", call: { id: "call_token", name: "statusKamar", args: { namaBangsal: "Mawar" } } },
+        {
+          type: "done",
+          stopReason: "tool_use",
+          usage: { inputTokens: 1_000, outputTokens: 100, cachedInputTokens: 600, cacheWriteTokens: 50 },
+        },
+      ],
+      [
+        { type: "text_delta", text: "Selesai." },
+        {
+          type: "done",
+          stopReason: "end_turn",
+          usage: { inputTokens: 1_500, outputTokens: 200, cachedInputTokens: 1_200 },
+        },
+      ],
+    ]);
+    try {
+      const events = await readEvents(await app.call("POST", "/ask", { question: "Berapa kamar kosong?" }));
+      const started = events[0];
+      if (started?._tag !== "run_started") throw new Error("expected run_started");
+
+      const [run] = await app.audit<{
+        input_tokens: number;
+        output_tokens: number;
+        cached_input_tokens: number;
+        cache_write_tokens: number;
+      }>(
+        `SELECT input_tokens, output_tokens, cached_input_tokens, cache_write_tokens
+         FROM agent_runs WHERE id = '${started.runId}'`,
+      );
+      expect(run).toEqual({
+        input_tokens: 2_500,
+        output_tokens: 300,
+        cached_input_tokens: 1_800,
+        cache_write_tokens: 50,
+      });
+    } finally {
+      await app.dispose();
+    }
+  });
 });

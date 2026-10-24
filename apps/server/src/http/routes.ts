@@ -41,6 +41,9 @@
  *   PUT    /api/settings/llm             change them (admin)
  *   POST   /api/settings/llm/test        try settings without saving (admin)
  *   GET    /api/audit                    audit log (?kind=runs|tools|queries|fixes|events&q=&from=&to=&limit=&offset=)
+ *   GET    /api/usage                    AI usage & cost for a date range (admin)
+ *   GET    /api/usage/export             the same period as CSV, one row per run (admin)
+ *   PUT    /api/usage/prices             set model prices / USD→IDR rate (admin)
  *
  * Routes that open patient data tied to a Khanza menu check the same right as
  * that menu (CPPT, resume, radiology, digital files, approving a fix); the
@@ -63,6 +66,7 @@ import {
   UpdateDraftRequest,
   UpdateKnowledgeRequest,
   UpdateLlmSettingsRequest,
+  PriceBook,
   formProblems,
   type User,
 } from "@simha/shared";
@@ -92,6 +96,7 @@ import { favoriteFromBlock, runFavorite } from "../favorites.ts";
 import { FixActionError, FixExecutor } from "../fixes/FixExecutor.ts";
 import { LlmSettingsService } from "../llm/LlmSettings.ts";
 import { Store } from "../store.ts";
+import { Usage } from "../usage.ts";
 import { Views } from "../views.ts";
 import { sseResponse } from "./sse.ts";
 import { serveWebApp } from "./static.ts";
@@ -129,6 +134,31 @@ const id = pathParam("id");
 const searchParams = Effect.map(HttpServerRequest.HttpServerRequest, (r) => new URL(r.url, "http://local").searchParams);
 
 const clientIp = Effect.map(HttpServerRequest.HttpServerRequest, (r) => Option.getOrNull(r.remoteAddress ?? Option.none()));
+
+/** YYYY-MM-DD in the server's time zone (agent_runs dates are grouped in local time too). */
+const localDate = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
+/** A YYYY-MM-DD query value, or undefined when it is missing or not a real date. */
+const dateParam = (query: URLSearchParams, name: string) => {
+  const value = query.get(name) ?? "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T00:00:00Z`)) ? value : undefined;
+};
+
+/**
+ * The usage page's date range: inclusive calendar days, 30 by default. Both
+ * ends are validated because a hand-edited URL must not ask for decades of days.
+ */
+const usageRange = (query: URLSearchParams): Effect.Effect<{ readonly from: string; readonly to: string }, string> =>
+  Effect.gen(function* () {
+    const today = new Date();
+    const to = dateParam(query, "to") ?? localDate(today);
+    const from = dateParam(query, "from") ?? localDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29));
+    const days = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
+    if (days < 1) return yield* Effect.fail("Tanggal mulai harus sama dengan atau sebelum tanggal akhir.");
+    if (days > 366) return yield* Effect.fail("Rentang pemakaian maksimal 366 hari.");
+    return { from, to };
+  });
 
 /**
  * Runs `handler` for a logged-in user, with the user available as CurrentUser.
@@ -1073,6 +1103,58 @@ const DataRoutes = Layer.mergeAll(
           );
         }),
       ),
+    ),
+  ),
+
+  route(
+    "GET",
+    "/api/usage",
+    authed(
+      handled(
+        Effect.gen(function* () {
+          const range = yield* usageRange(yield* searchParams);
+          return json(yield* (yield* Usage).report(range));
+        }),
+      ),
+      { admin: true },
+    ),
+  ),
+
+  route(
+    "GET",
+    "/api/usage/export",
+    authed(
+      handled(
+        Effect.gen(function* () {
+          const range = yield* usageRange(yield* searchParams);
+          const csv = yield* (yield* Usage).csv(range);
+          return HttpServerResponse.text(csv, {
+            headers: {
+              "content-type": "text/csv; charset=utf-8",
+              "content-disposition": `attachment; filename="pemakaian-ai-${range.from}-sd-${range.to}.csv"`,
+              "x-content-type-options": "nosniff",
+            },
+          });
+        }),
+      ),
+      { admin: true },
+    ),
+  ),
+
+  route(
+    "PUT",
+    "/api/usage/prices",
+    authed(
+      handled(
+        Effect.gen(function* () {
+          const input = yield* body(PriceBook);
+          const user = yield* CurrentUser;
+          const book = yield* (yield* Usage).setPrices(input, user);
+          yield* (yield* Auth).logEvent("usage_prices_changed", user.username, `${book.models.length} model, kurs ${book.usdIdr}`);
+          return json(book);
+        }),
+      ),
+      { admin: true },
     ),
   ),
 );

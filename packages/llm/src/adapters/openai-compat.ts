@@ -7,6 +7,7 @@
 import OpenAI, { APIError } from "openai";
 import type {
   ChatCompletionChunk,
+  ChatCompletionCreateParamsStreaming,
   ChatCompletionMessageParam,
   ChatCompletionTool,
 } from "openai/resources/chat/completions/completions";
@@ -141,6 +142,29 @@ export const cachedTokensOf = (usage: unknown): number => {
 export const promptCacheKey = (info: LlmInfo, request: ChatRequest): string | undefined =>
   info.provider === "openai" ? request.cacheKey : undefined;
 
+/**
+ * One streaming turn. `stream_options.include_usage` is what makes OpenAI-style
+ * servers send the token counts in a final chunk with no choices; without it
+ * the stream carries no `usage` at all and the run's token columns stay empty.
+ * A few older compatible servers reject the field, so `includeUsage` is a
+ * fallback switch rather than something every caller sets.
+ */
+export const chatCompletionParams = (
+  info: LlmInfo,
+  request: ChatRequest,
+  includeUsage: boolean,
+): ChatCompletionCreateParamsStreaming => {
+  const cacheKey = promptCacheKey(info, request);
+  return {
+    model: info.model,
+    stream: true,
+    messages: toOpenAiMessages(request.system, request.messages),
+    ...(request.tools.length > 0 ? { tools: toOpenAiTools(request.tools) } : {}),
+    ...(cacheKey === undefined ? {} : { prompt_cache_key: cacheKey }),
+    ...(includeUsage ? { stream_options: { include_usage: true } } : {}),
+  };
+};
+
 export const toStopReason = (finishReason: string | null | undefined, hasToolCalls: boolean): StopReason => {
   // Some servers report "stop" even when they returned tool calls.
   if (finishReason === "length") return "max_tokens";
@@ -168,18 +192,19 @@ export const makeOpenAiCompatClient = (options: OpenAiCompatOptions): LlmClientS
 
   async function* run(request: ChatRequest): AsyncGenerator<LlmEvent> {
     const controller = new AbortController();
-    const cacheKey = promptCacheKey(info, request);
+    const create = (body: ChatCompletionCreateParamsStreaming) =>
+      client.chat.completions.create(body, { signal: controller.signal });
     try {
-      const stream = await client.chat.completions.create(
-        {
-          model: info.model,
-          stream: true,
-          messages: toOpenAiMessages(request.system, request.messages),
-          ...(request.tools.length > 0 ? { tools: toOpenAiTools(request.tools) } : {}),
-          ...(cacheKey === undefined ? {} : { prompt_cache_key: cacheKey }),
-        },
-        { signal: controller.signal },
-      );
+      let stream: Awaited<ReturnType<typeof create>>;
+      try {
+        stream = await create(chatCompletionParams(info, request, true));
+      } catch (error) {
+        // An older OpenAI-compatible server may not know `stream_options`.
+        // Losing the token counts is bad, but failing the question is worse.
+        // Some reject the field without naming it, hence any client error.
+        if (!(error instanceof APIError) || (error.status !== 400 && error.status !== 422)) throw error;
+        stream = await create(chatCompletionParams(info, request, false));
+      }
       const calls = new ToolCallAccumulator();
       let text = "";
       let finishReason: string | null = null;

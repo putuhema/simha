@@ -37,6 +37,7 @@ import { Routes } from "../src/http/routes.ts";
 import { llmSettingsLayer } from "../src/llm/LlmSettings.ts";
 import { FAKE_ORTHANC, makeFakeOrthanc } from "./fake-orthanc.ts";
 import { StoreLive } from "../src/store.ts";
+import { UsageLive } from "../src/usage.ts";
 import { ViewsLive } from "../src/views.ts";
 
 /** The fixture files pointed at by berkas_digital_perawatan in the test seed. */
@@ -246,7 +247,7 @@ const main = Effect.gen(function* () {
 
   const read = khanzaReadLayer({ connection: connection(info.readUser, info.readPass), timeout: Duration.seconds(5) });
   const auth = AuthLive.pipe(Layer.provideMerge(KhanzaAccountsLive.pipe(Layer.provideMerge(read))));
-  const app = Layer.mergeAll(AgentLive, FixExecutorLive, ViewsLive).pipe(
+  const app = Layer.mergeAll(AgentLive, FixExecutorLive, ViewsLive, UsageLive).pipe(
     Layer.provideMerge(
       Layer.mergeAll(
         StoreLive,

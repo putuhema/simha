@@ -17,6 +17,7 @@ import { HttpSettingsLive, ServerConfig } from "./config.ts";
 import { Routes } from "./http/routes.ts";
 import { LlmSettingsLive } from "./llm/LlmSettings.ts";
 import { StoreLive } from "./store.ts";
+import { UsageLive } from "./usage.ts";
 import { ViewsLive } from "./views.ts";
 
 /**
@@ -26,7 +27,7 @@ import { ViewsLive } from "./views.ts";
 const KhanzaAuthLive = KhanzaAccountsLive.pipe(Layer.provideMerge(KhanzaReadLive));
 const AuthWithKhanzaLive = AuthLive.pipe(Layer.provideMerge(KhanzaAuthLive));
 
-export const AppLive = Layer.mergeAll(AgentLive, FixExecutorLive, ViewsLive).pipe(
+export const AppLive = Layer.mergeAll(AgentLive, FixExecutorLive, ViewsLive, UsageLive).pipe(
   Layer.provideMerge(
     Layer.mergeAll(
       StoreLive,

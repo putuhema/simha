@@ -86,7 +86,7 @@ const pengetahuanRoute = createRoute({
   },
 });
 
-const TABS: ReadonlyArray<SettingsTab> = ["ai", "audit", "akun", "desktop", "pengetahuan"];
+const TABS: ReadonlyArray<SettingsTab> = ["ai", "pemakaian", "audit", "akun", "desktop", "pengetahuan"];
 const pengaturanRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/pengaturan",

@@ -1,6 +1,6 @@
 # Plan
 
-Status: **M6.8 (identity and access questions) done, waiting for your test.** Next: M7 (MCP over stdio/HTTP) and M5.2 (routine checks and the agent test set).
+Status: **M6.9 (AI usage & cost) done, waiting for your test.** Next: M7 (MCP over stdio/HTTP) and M5.2 (routine checks and the agent test set).
 
 ## Packages and main modules
 
@@ -31,6 +31,7 @@ Each one ends with tests passing and a stop for you to test.
 - **M6.6. AI learning (knowledge). ✅ Done.** Successful answers become unverified examples; 👍 verifies them, 👎 disables them and saves a correction note. `catatPengetahuan` lets the AI save durable hospital facts; the agent retrieves at most five matching examples/notes and injects them into the current user turn. **Pengetahuan AI** page for review, and authenticated knowledge/feedback endpoints. Patient/visit numbers are refused.
 - **M6.7. SIMRS login and rights. ✅ Done.** Simha no longer has local passwords or user management: `POST /api/auth/login` runs Khanza's own `AES_ENCRYPT` comparison against `admin`/`user`, syncs a local identity row, and shows the rights in **Pengaturan → Akun**. **Muat ulang hak** re-reads them. CPPT, resume, radiology, digital files and fix approvals follow the same Khanza right as the menu that owns them — server-side 403, hidden/disabled UI, and the AI only receives tools it may use. See M6.7 notes.
 - **M6.8. Identity and access questions. ✅ Done.** Every agent turn carries the logged-in account (username, display name, employee/doctor/petugas name, granted rights). `aksesSaya` answers "siapa saya", "nama dokter/perawat saya", "apa hak saya", and "bisa buka menu/form X / punya hak Y" against the generated desktop app map, naming the exact Khanza right when denied. **Pengaturan → Akun** shows the same names, mapped features, workflow tables and the full granted-rights list. See M6.8 notes.
+- **M6.9. AI usage & cost. ✅ Done.** `apps/server/src/usage.ts` aggregates `agent_runs` for **Pengaturan → Pemakaian AI** (admin): runs/tokens/cost per day, cache hit rate, failures by provider, slowest questions, per-user usage and a per-run CSV export. Prices are editable per model (USD per 1M input/output/cached/cache-write, optional USD→IDR) and stored in the audit DB; a built-in table covers common models. The OpenAI-compatible adapter now sets `stream_options.include_usage`, which was why the audit log's token columns were empty. See M6.9 notes.
 - **M6.1. Khanza bridge. ✅ Done.** `HarnessBridge.java` in the hospital's Khanza build (applied with `integrations/khanza-bridge/apply.mjs`): "Buka di Khanza" opens resume, CPPT/SOAP or riwayat for the visit in the running Khanza (see M6.1 notes).
 - **M7. MCP.** Same tools over stdio and streamable HTTP, README section for Claude Desktop / Claude Code.
 
@@ -207,6 +208,16 @@ Each one ends with tests passing and a stop for you to test.
 - **`aksesSaya` tool.** Built per run with the current `User` (`packages/tools/src/access/aksesSaya.ts`), so it works with the same snapshot as the permission gates. It always returns the account, the mapped feature rights and the fix tables. With `tanya`, it searches `docs/khanza-app` (menus, forms, rights) and returns `diizinkan` plus the required Khanza rights; a form also lists extra rights its buttons check. It never queries Khanza or changes data. The app map covers the Java desktop app, not the PHP webapps — the tool says so.
 - **UI.** **Pengaturan → Akun** shows the employee/doctor/petugas names and a collapsible list of every granted Khanza right. Admin Utama shows "semua menu dan hak".
 - **Tests.** `identity.test.ts` checks `D001` → dr. Andi Fiktif, `P001` → Ns. Rina Fiktif, the identity block in the model turn, and a menu allowed for admin / denied for the limited account. The e2e test asks "Siapa saya?" and "Bisa buka menu kasir?" through the real UI.
+
+## M6.9 notes: AI usage & cost
+
+- **Missing tokens (root cause).** OpenAI-compatible streaming requests did not set `stream_options.include_usage`, so OpenAI, DeepSeek and gateways returned chunks with no `usage`. Every run therefore stored `NULL` for input/output/cached/cache-write tokens. The adapter now sends it and retries once without the field when a server answers 400/422 (older or stricter servers). Anthropic already reported usage.
+- **Aggregation.** `apps/server/src/usage.ts` groups `agent_runs` by local calendar day, provider, model and `asked_by`; the report is built from those groups so totals, days, models and users always add up. Durations come from `finished_at - started_at`; running rows are excluded from the slow list. Days without runs are included with zeros. The audit DB stays the only source; nothing is added to Khanza.
+- **Cost.** `packages/shared/src/usage.ts` holds the built-in list prices (USD per 1M tokens) and `costUsdOf`: uncached input at the input price, cache reads at the cached price, cache writes at the write price, output at the output price. Cached and written tokens are subtracted from `input_tokens` (both adapters count them inside it). Unknown models stay unpriced and are reported as such instead of showing a fake zero.
+- **Price book.** `PUT /api/usage/prices` upserts provider+model rows in the `settings` table (`usage_prices`), plus an optional USD→IDR rate; other saved rows stay. The dialog on the page only sends models in the current report, so switching provider later does not erase the previous model's price. An all-empty row on an unpriced model is skipped (still unpriced, not free).
+- **CSV.** `GET /api/usage/export` returns one row per run for the period (started/finished, user, mode, provider, model, status, steps, all four token fields, estimated USD, duration, question, error) with the shared CSV escaping: quoted commas, doubled quotes, formula prefixes and a UTF-8 BOM.
+- **Access.** All three routes are admin-only (`403` for staff), dates must be a valid range of at most 366 days (`400`), and price changes are written to `app_events` as `usage_prices_changed`.
+- **Tests.** `apps/server/test/usage.test.ts` seeds runs with known tokens and statuses: totals, cache hit rate, per-day/per-model/per-user cost, slowest order, failure grouping, date validation, admin gate and CSV escaping. `agent.test.ts` checks that usage from two model turns is summed into the run row. The e2e smoke test opens the tab, checks the charts and exports the CSV.
 
 ## Decisions and questions
 

@@ -5,7 +5,7 @@
 - **Investigasi keluhan:** switch the chat to **Investigasi** and paste a nurse's complaint. The agent reads the real patient data through safe, read-only tools, explains each check, gives a diagnosis and proposes a fix as SQL. The fix only runs after a person clicks **Approve**, and it can be rolled back.
 - **Tanya Data mode:** ask questions about hospital data in plain Indonesian ("10 obat paling banyak dipakai minggu ini"). The agent writes a guarded `SELECT` and shows the answer as a table, chart or number.
 
-> Status: **M6.8 done**: SIMRS Khanza login and rights (one account, same permissions), identity/access questions, web UI (Tanya Data with an investigate mode, Pengetahuan AI, Pengaturan), desktop app with Khanza bridge, resume drafts, app map and AI learning (examples, notes, feedback). See [docs/PLAN.md](docs/PLAN.md). Name, tagline and identifiers: [docs/BRAND.md](docs/BRAND.md).
+> Status: **M6.9 done**: SIMRS Khanza login and rights (one account, same permissions), identity/access questions, AI usage & cost, web UI (Tanya Data with an investigate mode, Pengetahuan AI, Pengaturan), desktop app with Khanza bridge, resume drafts, app map and AI learning (examples, notes, feedback). See [docs/PLAN.md](docs/PLAN.md). Name, tagline and identifiers: [docs/BRAND.md](docs/BRAND.md).
 
 ## Safety model (short version)
 
@@ -190,6 +190,7 @@ Riwayat pasien, Tanya Data and patient search have no Khanza menu of their own, 
 - **Tanya Data.** Ask in plain Indonesian. Answers show tables (sortable, CSV export), charts and numbers, each with an assumption line and "Query yang dipakai". The **card panel** on the right is closed by default (a new chat, starting the app, or opening a stored thread), so the chat stays uncluttered. While a live answer runs, the panel opens by itself as soon as it produces a result. Every result — table, chart, numbers, document, form draft, radiology or digital file — goes there: the chat keeps a one-line door to it, a strip of tabs switches between cards, the panel can be dragged wider, and the expand icon fills the window with the card (the same icon or Esc goes back to the panel). Earlier cards reopen with the small card button at the top right (or ⇧⌘K). On a narrow window the cards stay inline in the chat. **Simpan ke favorit** saves the question and SQL; favorites re-run without the AI.
 - **Pengaturan.** The tabs are:
   - **AI:** provider, model, base URL, API key, "samarkan data" and **Tes koneksi**. Saving switches the AI without a restart and overrides `.env`; admins only.
+  - **Pemakaian AI:** admins only. Runs, tokens, cache hit rate, estimated cost, failures by provider, the slowest questions and per-user usage for 7/30/90 days or any range, with **CSV** (one row per question) and **Harga model**. Price the models once (USD per 1M tokens for input, output, cached input and cache write, plus an optional USD→IDR rate) and the estimate matches the provider's invoice. Every run's provider, model, steps, tokens and duration come from the audit log; questions made before token recording are marked as such.
   - **Audit log:** questions, tool calls, queries, fix approvals, logins, filterable.
   - **Akun:** your SIMRS account, the rights Simha read from Khanza, which buttons/cards they unlock, and **Muat ulang hak**.
   - **Pengetahuan AI:** what the AI learned — examples saved automatically, AI/staff notes and 👎 corrections. 👍 verifies an example; admins can verify, edit, deactivate or delete items.
@@ -322,6 +323,9 @@ Send the `conversationId` with the next `/api/ask` for a follow-up. Add `"mode":
 | `POST /api/knowledge/feedback` | `{ blockId \| runId, rating: "up" \| "down", comment? }` |
 | `GET /api/settings/llm`, `PUT /api/settings/llm`, `POST /api/settings/llm/test` | AI provider (changes: admin) |
 | `GET /api/audit` | `?kind=runs\|tools\|queries\|fixes\|events&q=&from=&to=&limit=&offset=` |
+| `GET /api/usage` | `?from=&to=`: token, cache, cost, failure, slowest and per-user aggregates (admin) |
+| `GET /api/usage/export` | the same period as CSV, one row per question (admin) |
+| `PUT /api/usage/prices` | `{ usdIdr, models: [{ provider, model, input, output, cachedInput, cacheWrite }] }` (admin) |
 
 Request and event Schemas are in `packages/shared/src/api.ts`.
 
@@ -412,8 +416,11 @@ follow-up replays exactly what the model saw.
 - **Cache accounting.** Each run records `cached_input_tokens` (read from the provider's cache) and
   `cache_write_tokens` (written to it). The sources are Anthropic's `cache_read_input_tokens` /
   `cache_creation_input_tokens`, OpenAI's `prompt_tokens_details.cached_tokens` and DeepSeek's
-  `prompt_cache_hit_tokens`. Both columns are visible in **Audit log → Pertanyaan**, so a cache that
-  stops working is easy to spot.
+  `prompt_cache_hit_tokens`. OpenAI-compatible streaming requests also set
+  `stream_options.include_usage`; without it those servers send no token counts at all, which leaves the
+  audit log's token columns empty. A server that rejects the field is retried once without it. The token
+  columns are visible in **Audit log → Pertanyaan**, and the totals, cache hit rate and cost estimate are
+  on **Pengaturan → Pemakaian AI**.
 - **History budget.** A follow-up resends the conversation, and past tool results (a query can return 50
   rows) are the biggest part of it. Once the replayed history passes about 24,000 estimated tokens
   (`apps/server/src/agent/history.ts`) the oldest tool results are first replaced by a one-line `[ringkas]`

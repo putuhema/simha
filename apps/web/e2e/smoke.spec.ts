@@ -359,6 +359,25 @@ test("settings test the AI connection and show the audit log", async () => {
   await expect(page.getByRole("cell", { name: "rolled_back" }).first()).toBeVisible();
 });
 
+test("the AI usage page shows totals, prices and a CSV export", async () => {
+  await page.getByTestId("user-menu").first().click();
+  await page.getByRole("menuitem", { name: /Pemakaian AI/ }).click();
+  await expect(page).toHaveURL(/tab=pemakaian/);
+  await expect(page.getByRole("heading", { name: "Pertanyaan per hari" })).toBeVisible();
+  await expect(page.getByText("Estimasi biaya")).toBeVisible();
+  // The earlier questions in this suite reported token usage to the audit log.
+  await expect(page.getByText("Cache prompt")).toBeVisible();
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: /CSV/ }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^pemakaian-ai-\d{4}-\d{2}-\d{2}-sd-\d{4}-\d{2}-\d{2}\.csv$/);
+
+  await page.getByRole("button", { name: "Harga model" }).click();
+  await expect(page.getByRole("dialog")).toContainText("USD per 1 juta token");
+  await page.getByRole("button", { name: "Batal" }).click();
+});
+
 test("works in a narrow window without sideways scrolling", async () => {
   await page.setViewportSize({ width: 400, height: 800 });
   await page.getByRole("button", { name: "Buka menu" }).click();

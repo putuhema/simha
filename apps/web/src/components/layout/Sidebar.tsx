@@ -10,6 +10,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Archive,
   ArchiveRestore,
+  ChartColumn,
   ChevronRight,
   ChevronsUpDown,
   FileClock,
@@ -85,7 +86,7 @@ const UserMenu = ({ compact, health, onNavigate }: { readonly compact: boolean; 
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   if (!user) return null;
-  const go = (tab: "ai" | "audit" | "akun" | "desktop") => {
+  const go = (tab: "ai" | "pemakaian" | "audit" | "akun" | "desktop") => {
     onNavigate();
     void navigate({ to: "/pengaturan", search: { tab } });
   };
@@ -135,6 +136,11 @@ const UserMenu = ({ compact, health, onNavigate }: { readonly compact: boolean; 
             <Menu.Item className={menuItem} onClick={() => go("audit")}>
               <FileClock className="size-4 text-ink-2" /> Audit log
             </Menu.Item>
+            {user.role === "admin" ? (
+              <Menu.Item className={menuItem} onClick={() => go("pemakaian")}>
+                <ChartColumn className="size-4 text-ink-2" /> Pemakaian AI
+              </Menu.Item>
+            ) : null}
             <Menu.Item className={menuItem} onClick={() => go("akun")}>
               <KeyRound className="size-4 text-ink-2" /> Akun & hak akses
             </Menu.Item>

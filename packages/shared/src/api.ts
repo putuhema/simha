@@ -683,3 +683,136 @@ export const AuditPage = Schema.Struct({
 });
 export type AuditPage = typeof AuditPage.Type;
 
+// --- AI usage & cost -------------------------------------------------------------------------
+
+/** USD per 1 million tokens for one provider/model. */
+export const ModelPrice = Schema.Struct({
+  provider: Schema.String,
+  model: Schema.String,
+  /** Uncached input tokens. */
+  input: Schema.Number,
+  output: Schema.Number,
+  /** Input tokens read from the prompt cache (cheaper, or free). */
+  cachedInput: Schema.Number,
+  /** Input tokens written into the prompt cache (Anthropic charges extra). */
+  cacheWrite: Schema.Number,
+});
+export type ModelPrice = typeof ModelPrice.Type;
+
+/**
+ * Prices saved in the app, plus the USD→IDR rate. `usdIdr: 0` means USD only.
+ * PUT /api/usage/prices (admin) upserts these; saved rows for other models stay.
+ */
+export const PriceBook = Schema.Struct({ usdIdr: Schema.Number, models: Schema.Array(ModelPrice) });
+export type PriceBook = typeof PriceBook.Type;
+
+export const UsageTotals = Schema.Struct({
+  runs: Schema.Number,
+  /** Finished without an error. Interrupted runs are not counted as ok. */
+  ok: Schema.Number,
+  /** error + interrupted. */
+  failed: Schema.Number,
+  steps: Schema.Number,
+  inputTokens: Schema.Number,
+  cachedInputTokens: Schema.Number,
+  cacheWriteTokens: Schema.Number,
+  outputTokens: Schema.Number,
+  /** cached_input_tokens / input_tokens (0–1); null when no input tokens were recorded. */
+  cacheHitRate: Schema.NullOr(Schema.Number),
+  /** Summed duration of finished runs, in milliseconds. */
+  durationMs: Schema.Number,
+  /** At list prices from the saved book or the built-in table. */
+  costUsd: Schema.Number,
+  /** Runs whose model has no price (their cost is not in costUsd). */
+  unpricedRuns: Schema.Number,
+  /** Runs without token data: made before usage recording, or by a provider that did not report it. */
+  noTokenRuns: Schema.Number,
+  /** Distinct SIMRS users who asked; null accounts are not counted. */
+  users: Schema.Number,
+});
+export type UsageTotals = typeof UsageTotals.Type;
+
+/** One calendar day (server local time); days without runs are included with zeros. */
+export const UsageDay = Schema.Struct({
+  day: Schema.String,
+  runs: Schema.Number,
+  failed: Schema.Number,
+  inputTokens: Schema.Number,
+  cachedInputTokens: Schema.Number,
+  cacheWriteTokens: Schema.Number,
+  outputTokens: Schema.Number,
+  costUsd: Schema.Number,
+});
+export type UsageDay = typeof UsageDay.Type;
+
+export const UsageModel = Schema.Struct({
+  provider: Schema.String,
+  model: Schema.String,
+  runs: Schema.Number,
+  failed: Schema.Number,
+  steps: Schema.Number,
+  inputTokens: Schema.Number,
+  cachedInputTokens: Schema.Number,
+  cacheWriteTokens: Schema.Number,
+  outputTokens: Schema.Number,
+  cacheHitRate: Schema.NullOr(Schema.Number),
+  costUsd: Schema.Number,
+  unpricedRuns: Schema.Number,
+  noTokenRuns: Schema.Number,
+});
+export type UsageModel = typeof UsageModel.Type;
+
+export const UsageUser = Schema.Struct({
+  user: Schema.NullOr(Schema.String),
+  runs: Schema.Number,
+  failed: Schema.Number,
+  inputTokens: Schema.Number,
+  outputTokens: Schema.Number,
+  costUsd: Schema.Number,
+  unpricedRuns: Schema.Number,
+});
+export type UsageUser = typeof UsageUser.Type;
+
+/** One of the slowest questions of the period, for "why is it slow?". */
+export const UsageQuestion = Schema.Struct({
+  id: Schema.String,
+  question: Schema.String,
+  askedBy: Schema.NullOr(Schema.String),
+  provider: Schema.String,
+  model: Schema.String,
+  status: Schema.String,
+  steps: Schema.Number,
+  inputTokens: Schema.NullOr(Schema.Number),
+  outputTokens: Schema.NullOr(Schema.Number),
+  costUsd: Schema.NullOr(Schema.Number),
+  durationMs: Schema.Number,
+  startedAt: Schema.String,
+});
+export type UsageQuestion = typeof UsageQuestion.Type;
+
+/** Why runs failed, per provider and model, with the most recent error. */
+export const UsageFailure = Schema.Struct({
+  provider: Schema.String,
+  model: Schema.String,
+  errors: Schema.Number,
+  interrupted: Schema.Number,
+  lastError: Schema.NullOr(Schema.String),
+  lastAt: Schema.NullOr(Schema.String),
+});
+export type UsageFailure = typeof UsageFailure.Type;
+
+/** GET /api/usage?from=&to= (admin). Dates are inclusive calendar days; the default range is 30 days. */
+export const UsageReport = Schema.Struct({
+  from: Schema.String,
+  to: Schema.String,
+  totals: UsageTotals,
+  days: Schema.Array(UsageDay),
+  models: Schema.Array(UsageModel),
+  users: Schema.Array(UsageUser),
+  slowest: Schema.Array(UsageQuestion),
+  failures: Schema.Array(UsageFailure),
+  /** The prices applied to this report (built-ins plus the saved book). */
+  prices: PriceBook,
+});
+export type UsageReport = typeof UsageReport.Type;
+
