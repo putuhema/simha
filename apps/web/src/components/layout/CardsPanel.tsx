@@ -4,8 +4,8 @@
  * draft or radiology card stays here, one at a time, with a strip of tabs.
  * With no cards yet it is the "start" panel, like a quiet desk.
  */
-import { ChartColumn, FilePenLine, FileText, FolderOpen, Maximize2, PanelRightClose, ScanLine, Table2 } from "lucide-react";
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { ChartColumn, FilePenLine, FileText, FolderOpen, Maximize2, Minimize2, PanelRightClose, ScanLine, Table2 } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { AnswerCard } from "../../lib/cards.ts";
 import { cn } from "../../lib/cn.ts";
 import { useCardsPanel } from "../../stores/cards.ts";
@@ -14,7 +14,6 @@ import { DocumentCard } from "../blocks/DocumentCard.tsx";
 import { DraftCard } from "../blocks/DraftCard.tsx";
 import { RenderBlockView } from "../blocks/RenderBlockView.tsx";
 import { RadiologyCard } from "../pacs/Radiology.tsx";
-import { Dialog } from "../ui/Dialog.tsx";
 import { TipButton } from "../ui/Tip.tsx";
 
 const WIDTH_KEY = "simha.cards-width";
@@ -56,21 +55,22 @@ export const CardBody = ({
   card,
   onSaved,
   fill,
-  documentHeight,
   flat,
+  expanded,
 }: {
   readonly card: AnswerCard;
   readonly onSaved?: (() => void) | undefined;
   readonly fill?: boolean | undefined;
-  readonly documentHeight?: number | undefined;
   /** No card chrome: the panel's own background shows through (used in the cards panel). */
   readonly flat?: boolean | undefined;
+  /** The whole window: stop trimming the card for the narrow panel. */
+  readonly expanded?: boolean | undefined;
 }) => {
   switch (card.kind) {
     case "render":
-      return <RenderBlockView block={card.block} compact onSaved={onSaved} flat={flat} />;
+      return <RenderBlockView block={card.block} compact={!expanded} onSaved={onSaved} flat={flat} />;
     case "document":
-      return <DocumentCard document={card.document} fill={fill} height={documentHeight ?? 520} flat={flat} />;
+      return <DocumentCard document={card.document} fill={fill} flat={flat} />;
     case "draft":
       return <DraftCard draft={card.draft} fill={fill} flat={flat} />;
     case "radiology":
@@ -86,6 +86,10 @@ export const CardsPanel = ({ cards, onSaved }: { readonly cards: ReadonlyArray<A
   const [width, setWidth] = useState(() => clampWidth(savedWidth()));
   const selected = cards.find((card) => card.key === selectedId) ?? cards.at(-1) ?? null;
   const autoSized = useRef<string | null>(null);
+  const surface = useRef<HTMLElement>(null);
+  const expandButton = useRef<HTMLButtonElement>(null);
+  const fromRect = useRef<DOMRect | null>(null);
+  const wasExpanded = useRef(false);
 
   // Give a document or a draft room to be read the first time it opens.
   useEffect(() => {
@@ -112,6 +116,52 @@ export const CardsPanel = ({ cards, onSaved }: { readonly cards: ReadonlyArray<A
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  // Full screen is a state of this panel, not a modal: the window becomes the
+  // panel. The card stays mounted, so a draft keeps what was typed in it.
+  const expand = () => {
+    fromRect.current = surface.current?.getBoundingClientRect() ?? null;
+    setExpanded(true);
+  };
+
+  // Grow out of the panel's old rectangle so the window does not just blink
+  // into place. Leaving is immediate: a return should feel instant.
+  useLayoutEffect(() => {
+    const el = surface.current;
+    if (!expanded || !el) return;
+    el.focus({ preventScroll: true });
+    const rect = fromRect.current;
+    fromRect.current = null;
+    if (!rect || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const room = { right: Math.max(0, window.innerWidth - rect.right), bottom: Math.max(0, window.innerHeight - rect.bottom) };
+    const animation = el.animate(
+      [
+        { clipPath: `inset(${rect.top}px ${room.right}px ${room.bottom}px ${rect.left}px)` },
+        { clipPath: "inset(0px)" },
+      ],
+      { duration: 220, easing: "cubic-bezier(0.23, 1, 0.32, 1)" },
+    );
+    return () => animation.cancel();
+  }, [expanded]);
+
+  // The button that opened the window gets focus back when it closes.
+  useEffect(() => {
+    if (wasExpanded.current && !expanded) expandButton.current?.focus({ preventScroll: true });
+    wasExpanded.current = expanded;
+  }, [expanded]);
+
+  // Esc goes back to the panel, unless a dialog or menu inside the card owns it.
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]') !== null) return;
+      event.preventDefault();
+      setExpanded(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [expanded]);
+
   const startResize = (event: ReactPointerEvent<HTMLDivElement>) => {
     event.preventDefault();
     const startX = event.clientX;
@@ -133,90 +183,109 @@ export const CardsPanel = ({ cards, onSaved }: { readonly cards: ReadonlyArray<A
   if (cards.length === 0) return null;
 
   return (
-    <aside
-      aria-label="Panel kartu"
-      style={{ width }}
-      className="relative flex h-full shrink-0 animate-panel-in flex-col border-l border-line-2 bg-card"
-    >
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Atur lebar panel kartu"
-        aria-valuenow={width}
-        aria-valuemin={MIN_WIDTH}
-        aria-valuemax={panelRoom()}
-        title="Tarik untuk mengubah lebar panel"
-        tabIndex={0}
-        onPointerDown={startResize}
-        onKeyDown={(event) => {
-          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-          event.preventDefault();
-          setWidth((current) => clampWidth(current + (event.key === "ArrowLeft" ? 24 : -24)));
-        }}
-        className="group absolute inset-y-0 left-0 z-10 w-1.5 cursor-col-resize rounded-full"
+    <>
+      {/* Full screen takes the panel out of the row; this keeps the chat where it is. */}
+      {expanded ? <div aria-hidden style={{ width }} className="h-full shrink-0" /> : null}
+      <aside
+        ref={surface}
+        aria-label="Panel kartu"
+        tabIndex={-1}
+        style={expanded ? undefined : { width }}
+        className={cn(
+          "flex h-full animate-panel-in flex-col bg-card outline-none",
+          expanded ? "fixed inset-0 z-40" : "relative shrink-0 border-l border-line-2",
+        )}
       >
-        <span className="absolute inset-y-0 left-0 w-px bg-transparent transition-colors group-hover:bg-teal/40" />
-      </div>
-      <div className="flex shrink-0 items-center gap-1 border-b border-line-2 py-2 pr-2">
-        <div className="quiet-scroll min-w-0 flex-1 overflow-x-auto px-2">
-          <div className="flex w-max items-center gap-1.5">
-            {cards.map((card) => {
-              const active = card.key === selected?.key;
-              return (
-                <button
-                  key={card.key}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={() => select(card.key)}
-                  title={`${card.badge} · ${card.label}`}
-                  className={cn(
-                    "flex h-7 max-w-[190px] shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11.5px] transition-colors",
-                    active ? "border-ink bg-ink text-paper" : "border-line bg-card text-ink-2 hover:bg-paper",
-                  )}
-                >
-                  <CardIcon card={card} className="size-3.5 shrink-0" />
-                  <span className="truncate">{card.label}</span>
-                </button>
-              );
-            })}
+        {expanded ? null : (
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Atur lebar panel kartu"
+            aria-valuenow={width}
+            aria-valuemin={MIN_WIDTH}
+            aria-valuemax={panelRoom()}
+            title="Tarik untuk mengubah lebar panel"
+            tabIndex={0}
+            onPointerDown={startResize}
+            onKeyDown={(event) => {
+              if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+              event.preventDefault();
+              setWidth((current) => clampWidth(current + (event.key === "ArrowLeft" ? 24 : -24)));
+            }}
+            className="group absolute inset-y-0 left-0 z-10 w-1.5 cursor-col-resize rounded-full"
+          >
+            <span className="absolute inset-y-0 left-0 w-px bg-transparent transition-colors group-hover:bg-teal/40" />
+          </div>
+        )}
+        {expanded ? (
+          /* macOS desktop: the traffic lights keep their corner, and the strip drags the window. */
+          <div className="drag h-[var(--rail-inset,0px)] shrink-0" />
+        ) : null}
+        <div className="flex shrink-0 items-center gap-1 border-b border-line-2 py-2 pr-2">
+          <div className="quiet-scroll min-w-0 flex-1 overflow-x-auto px-2">
+            <div className="flex w-max items-center gap-1.5">
+              {cards.map((card) => {
+                const active = card.key === selected?.key;
+                return (
+                  <button
+                    key={card.key}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => select(card.key)}
+                    title={`${card.badge} · ${card.label}`}
+                    className={cn(
+                      "flex h-7 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11.5px] transition-colors",
+                      expanded ? "max-w-[360px]" : "max-w-[190px]",
+                      active ? "border-ink bg-ink text-paper" : "border-line bg-card text-ink-2 hover:bg-paper",
+                    )}
+                  >
+                    <CardIcon card={card} className="size-3.5 shrink-0" />
+                    <span className="truncate">{card.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-0.5">
+            {selected ? (
+              <TipButton
+                ref={expandButton}
+                label={expanded ? "Keluar dari layar penuh" : "Layar penuh"}
+                shortcut={expanded ? "Esc" : undefined}
+                onClick={() => (expanded ? setExpanded(false) : expand())}
+                className="grid size-7 place-items-center rounded-md text-ink-3 transition-colors hover:bg-paper-2 hover:text-ink"
+              >
+                {expanded ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+              </TipButton>
+            ) : null}
+            <TipButton
+              label="Sembunyikan panel"
+              shortcut="⇧⌘K"
+              onClick={() => {
+                setExpanded(false);
+                setOpen(false);
+              }}
+              className="grid size-7 place-items-center rounded-md text-ink-3 transition-colors hover:bg-paper-2 hover:text-ink"
+            >
+              <PanelRightClose className="size-4" />
+            </TipButton>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-0.5">
-          {selected ? (
-            <TipButton label="Perbesar kartu" onClick={() => setExpanded(true)} className="grid size-7 place-items-center rounded-md text-ink-3 transition-colors hover:bg-paper-2 hover:text-ink">
-              <Maximize2 className="size-3.5" />
-            </TipButton>
-          ) : null}
-          <TipButton
-            label="Sembunyikan panel"
-            shortcut="⇧⌘K"
-            onClick={() => setOpen(false)}
-            className="grid size-7 place-items-center rounded-md text-ink-3 transition-colors hover:bg-paper-2 hover:text-ink"
-          >
-            <PanelRightClose className="size-4" />
-          </TipButton>
-        </div>
-      </div>
 
-      {selected ? (
-        <div className="min-h-0 flex-1">
-          {selected.kind === "document" || selected.kind === "draft" ? (
-            <div className="h-full min-h-0 p-2">
-              <CardBody card={selected} onSaved={onSaved} fill flat />
-            </div>
-          ) : (
-            <div className="quiet-scroll h-full overflow-y-auto p-3" data-testid="cards-panel-body">
-              <CardBody card={selected} onSaved={onSaved} flat />
-            </div>
-          )}
-        </div>
-      ) : null}
-
-      <Dialog open={expanded && selected !== null} onOpenChange={(open) => !open && setExpanded(false)} title={selected?.label ?? "Kartu"} description={selected?.summary} wide>
-        <div className="max-h-[76vh] overflow-y-auto">
-          {selected ? <CardBody card={selected} onSaved={onSaved} documentHeight={640} /> : null}
-        </div>
-      </Dialog>
-    </aside>
+        {selected ? (
+          <div className="min-h-0 flex-1">
+            {selected.kind === "document" || selected.kind === "draft" ? (
+              <div className={cn("mx-auto h-full min-h-0", expanded ? "max-w-[1100px] p-4" : "p-2")}>
+                <CardBody card={selected} onSaved={onSaved} fill flat expanded={expanded} />
+              </div>
+            ) : (
+              <div className={cn("quiet-scroll h-full overflow-y-auto", expanded ? "p-4" : "p-3")} data-testid="cards-panel-body">
+                <CardBody card={selected} onSaved={onSaved} flat expanded={expanded} />
+              </div>
+            )}
+          </div>
+        ) : null}
+      </aside>
+    </>
   );
 };

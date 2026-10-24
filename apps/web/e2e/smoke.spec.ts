@@ -245,6 +245,37 @@ test("asking for a radiology result shows the reading and the images in one card
   await expect(page.getByTestId("radiology-exam")).toContainText("Thorax PA");
 });
 
+test("the card panel fills the window and can be toggled back", async () => {
+  const panel = page.getByRole("complementary", { name: "Panel kartu" });
+  const viewport = page.viewportSize() ?? { width: 1440, height: 900 };
+
+  await panel.getByRole("button", { name: "Layar penuh" }).click();
+  // The window is the panel: no dialog, no backdrop, flush with every edge.
+  const full = await panel.evaluate((el) => {
+    const box = el.getBoundingClientRect();
+    return { left: box.left, top: box.top, width: box.width, height: box.height, position: getComputedStyle(el).position };
+  });
+  expect(full).toEqual({ left: 0, top: 0, width: viewport.width, height: viewport.height, position: "fixed" });
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: "Keluar dari layar penuh" })).toBeVisible();
+
+  // A dialog opened from the card keeps Esc for itself.
+  await panel.getByRole("button", { name: /Seri 2/ }).click();
+  await expect(page.getByTestId("pacs-viewer")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("pacs-viewer")).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: "Keluar dari layar penuh" })).toBeVisible();
+
+  // Esc leaves full screen; focus goes back to the button that opened it.
+  await page.keyboard.press("Escape");
+  await expect(panel.getByRole("button", { name: "Layar penuh" })).toBeFocused();
+  expect((await panel.boundingBox())?.width ?? viewport.width).toBeLessThan(viewport.width);
+
+  await panel.getByRole("button", { name: "Layar penuh" }).click();
+  await panel.getByRole("button", { name: "Keluar dari layar penuh" }).click();
+  await expect(panel.getByRole("button", { name: "Layar penuh" })).toBeVisible();
+});
+
 test("digital files show image previews and a PDF link", async () => {
   await page.getByRole("button", { name: "Percakapan baru" }).first().click();
   await page.getByLabel("Pertanyaan").fill("Tampilkan berkas digital 2026/10/21/000002");

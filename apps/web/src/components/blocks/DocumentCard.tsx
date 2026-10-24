@@ -40,7 +40,7 @@ export const DocumentCard = ({
 }) => {
   const frame = useRef<HTMLIFrameElement>(null);
   const preview = useRef<HTMLDivElement>(null);
-  const [fit, setFit] = useState({ scale: 1, height: height });
+  const [fit, setFit] = useState({ scale: 1, height: height, left: 0 });
   const url = `/api/documents/${document.id}`;
 
   useEffect(() => {
@@ -52,7 +52,8 @@ export const DocumentCard = ({
       const boxHeight = el.clientHeight;
       if (width === 0 || boxHeight === 0) return;
       const scale = Math.min(1, width / DOC_WIDTH);
-      setFit({ scale, height: boxHeight / scale });
+      // A page is narrower than the window: center it instead of leaving the gap on one side.
+      setFit({ scale, height: boxHeight / scale, left: Math.max(0, (width - DOC_WIDTH * scale) / 2) });
     };
     update();
     const observer = new ResizeObserver(update);
@@ -108,7 +109,7 @@ export const DocumentCard = ({
           title={`${document.judul} – ${document.subjek}`}
           sandbox="allow-same-origin allow-modals"
           className={cn("block bg-paper-2", fill ? "absolute top-0 left-0 origin-top-left" : "w-full")}
-          style={fill ? { width: DOC_WIDTH, height: fit.height, transform: `scale(${fit.scale})` } : { height }}
+          style={fill ? { width: DOC_WIDTH, height: fit.height, left: fit.left, transform: `scale(${fit.scale})` } : { height }}
         />
       </div>
       <p className="shrink-0 border-t border-line-2 bg-paper/40 px-3.5 py-1.5 text-[10.5px] leading-snug text-ink-3">

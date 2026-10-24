@@ -1,6 +1,6 @@
 /** A small dark tooltip with an optional keyboard shortcut, for icon buttons. */
 import { Tooltip } from "@base-ui/react/tooltip";
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import type { ComponentProps, ReactNode, Ref } from "react";
 
 export const TipProvider = ({ children }: { readonly children: ReactNode }) => (
   <Tooltip.Provider delay={400} closeDelay={0}>
@@ -13,16 +13,18 @@ export const TipButton = ({
   label,
   shortcut,
   side = "bottom",
+  ref,
   children,
   ...props
-}: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "aria-label"> & {
+}: Omit<ComponentProps<"button">, "aria-label" | "ref"> & {
   readonly label: string;
-  readonly shortcut?: string;
+  readonly shortcut?: string | undefined;
   readonly side?: "top" | "bottom" | "left" | "right";
+  readonly ref?: Ref<HTMLButtonElement> | undefined;
   readonly children: ReactNode;
 }) => (
   <Tooltip.Root>
-    <Tooltip.Trigger type="button" aria-label={label} {...props}>
+    <Tooltip.Trigger ref={ref} type="button" aria-label={label} {...props}>
       {children}
     </Tooltip.Trigger>
     <Tooltip.Portal>
