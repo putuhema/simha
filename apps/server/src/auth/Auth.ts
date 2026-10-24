@@ -48,6 +48,9 @@ interface UserRow {
   readonly source: string;
   readonly rights_json: string | null;
   readonly khanza_admin: number;
+  readonly employee_name: string | null;
+  readonly doctor_name: string | null;
+  readonly staff_name: string | null;
 }
 
 /** Old rows (and malformed JSON) grant nothing. */
@@ -64,6 +67,7 @@ const parseRights = (json: string | null): Readonly<Record<string, boolean>> => 
 
 const toUser = (r: UserRow): User => {
   const khanzaAdmin = r.khanza_admin === 1;
+  const rights = parseRights(r.rights_json);
   return {
     id: r.id,
     username: r.username,
@@ -72,7 +76,11 @@ const toUser = (r: UserRow): User => {
     active: r.active === 1,
     createdAt: r.created_at,
     khanzaAdmin,
-    permissions: derivePermissions(parseRights(r.rights_json), khanzaAdmin),
+    permissions: derivePermissions(rights, khanzaAdmin),
+    rights: Object.keys(rights).toSorted(),
+    employeeName: r.employee_name,
+    doctorName: r.doctor_name,
+    staffName: r.staff_name,
   };
 };
 
@@ -118,6 +126,9 @@ const make = Effect.gen(function* () {
           password_hash: "",
           rights_json: rightsJson,
           khanza_admin: khanzaAdmin,
+          employee_name: account.employeeName,
+          doctor_name: account.doctorName,
+          staff_name: account.staffName,
           rights_updated_at: now(),
           updated_at: now(),
         })} WHERE id = ${existing.id}`.pipe(Effect.orDie);
@@ -136,6 +147,9 @@ const make = Effect.gen(function* () {
         source: "simrs",
         rights_json: rightsJson,
         khanza_admin: khanzaAdmin,
+        employee_name: account.employeeName,
+        doctor_name: account.doctorName,
+        staff_name: account.staffName,
         rights_updated_at: now(),
       })}`.pipe(Effect.orDie);
       return (yield* getUser(id)) as User;
@@ -228,6 +242,9 @@ const make = Effect.gen(function* () {
         active: 1,
         rights_json: JSON.stringify(lookup.account.rights),
         khanza_admin: lookup.account.admin ? 1 : 0,
+        employee_name: lookup.account.employeeName,
+        doctor_name: lookup.account.doctorName,
+        staff_name: lookup.account.staffName,
         rights_updated_at: now(),
         updated_at: now(),
       })} WHERE id = ${user.id}`.pipe(Effect.orDie);

@@ -38,6 +38,7 @@ const LABELS: Readonly<Record<string, string>> = {
   usulkanPerbaikan: "Usulan perbaikan",
   lihatSkema: "Lihat skema",
   cariAplikasiKhanza: "Cari menu aplikasi",
+  detailAplikasi: "Detail menu aplikasi",
   catatPengetahuan: "Catat pengetahuan",
   jalankanQueryBaca: "Jalankan query",
   tampilkan: "Tampilkan hasil",
@@ -62,6 +63,7 @@ export const stepTarget = (input: unknown): string => {
     i["namaBangsal"] && String(i["namaBangsal"]),
     i["noSep"] && String(i["noSep"]),
     i["kataKunci"] && `"${String(i["kataKunci"])}"`,
+    i["id"] && String(i["id"]),
     i["judul"] && String(i["judul"]),
   ].filter(Boolean);
   return parts.join(" · ");
@@ -126,6 +128,16 @@ export const stepSummary = (step: StepView): string => {
       const forms = count(o["form"]);
       return menus > 0 ? `${menus} menu, ${forms} form` : `${forms} form cocok`;
     }
+    case "detailAplikasi": {
+      if (o["alur"] !== null) return `${count(record(o["alur"])["langkah"])} langkah`;
+      if (o["form"] !== null) {
+        const form = record(o["form"]);
+        return `${count(form["aksi"])} tombol, ${count(form["pintasan"])} aksi klik-kanan`;
+      }
+      if (o["menu"] !== null) return "Menu dan haknya";
+      if (o["hak"] !== null) return "Hak dan menu";
+      return o["ditemukan"] === false ? "Tidak ditemukan" : "Selesai";
+    }
     case "catatPengetahuan":
       return String(o["pesan"] ?? "Catatan disimpan");
     case "kartuPasien":
@@ -138,7 +150,7 @@ export const stepSummary = (step: StepView): string => {
 };
 
 /** Keys whose (partial) value is worth showing while a tool call is being written, best first. */
-const DRAFT_KEYS = ["sql", "judul", "kataKunci", "nama", "noRkmMedis", "noRawat", "alasan"];
+const DRAFT_KEYS = ["sql", "judul", "kataKunci", "nama", "noRkmMedis", "noRawat", "alasan", "id", "cari"];
 
 /**
  * The most useful string in half-written JSON arguments, e.g. the SQL typed

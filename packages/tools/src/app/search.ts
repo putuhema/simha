@@ -8,7 +8,7 @@ import type { AppDocsService, AppFlow, AppForm, AppMenu, AppRight, AppSynonym } 
 
 export type AppScope = "semua" | "menu" | "alur" | "form" | "hak" | "tabel";
 
-interface ShortcutHit {
+export interface ShortcutHit {
   readonly kind: "toolbar" | "klik-kanan";
   /** The item itself: "Billing/Pembayaran Pasien" or "Input Resep Pulang". */
   readonly label: string;

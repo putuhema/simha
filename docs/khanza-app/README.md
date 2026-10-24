@@ -3,7 +3,7 @@
 Sumber: `~/work/simrsmt`, commit `2e695e7`, dibuat 2026-10-23.
 Dibuat ulang oleh `pnpm extract-khanza-app`; jangan diedit tangan.
 
-Berkas ini yang dipakai agent lewat tool `cariAplikasiKhanza`.
+Berkas ini yang dipakai agent lewat dua tool: `cariAplikasiKhanza` (mencari menu/form/alur/hak) dan `detailAplikasi` (satu rekaman penuh: semua langkah alur beserta isinya, semua tombol dan klik-kanan form).
 
 ## Isi
 

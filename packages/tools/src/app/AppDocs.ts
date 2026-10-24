@@ -63,6 +63,12 @@ export interface AppFlowStep {
   readonly form: string | null;
   /** Tables the step mentions, as written in the doc. */
   readonly tables: string | null;
+  /** "Who:" — the staff role that performs the step. */
+  readonly who: string | null;
+  /** "Does:" — what the step writes, which buttons to click, and the warnings it can answer. */
+  readonly does: string | null;
+  /** "Hak akses:" — the rights this step needs. */
+  readonly hak: string | null;
 }
 
 export interface AppFlow {
@@ -73,6 +79,8 @@ export interface AppFlow {
   readonly forms: ReadonlyArray<string>;
   /** Path relative to the repository root, e.g. docs/khanza-app/flows/rawat-inap.md. */
   readonly file: string;
+  /** The paragraph(s) between the title and the first step: what the flow is about. */
+  readonly intro: string;
   readonly steps: ReadonlyArray<AppFlowStep>;
   /** Plain text of the doc, used for search. */
   readonly text: string;
@@ -246,10 +254,18 @@ export const parseFlowDoc = (text: string, file: string): AppFlow | null => {
             })(),
       form: field("Form") ?? formInLine,
       tables: field("Tabel"),
+      who: field("Who"),
+      does: field("Does"),
+      hak: field("Hak akses"),
     };
   });
 
   const id = asString(meta?.id) ?? NodePath.basename(file, ".md");
+  // Everything after the H1 and before the first `##` heading: the flow's purpose,
+  // which is where the doc explains the visit and the shared no_rawat, not a step.
+  const body = text.replace(META, "");
+  const heading = /^#\s+(.+)$/m.exec(body);
+  const intro = (heading === null ? "" : body.slice(heading.index + heading[0].length)).split(/^##\s/m)[0]?.trim() ?? "";
   return {
     id,
     title: asString(meta?.title) ?? (text.match(/^#\s+(.+)$/m)?.[1] ?? id),
@@ -257,6 +273,7 @@ export const parseFlowDoc = (text: string, file: string): AppFlow | null => {
     menus: asStringArray(meta?.menus),
     forms: asStringArray(meta?.forms),
     file,
+    intro,
     steps,
     text: text.replace(META, "").slice(0, 20_000),
   };
@@ -324,6 +341,28 @@ export const makeAppDocs = (
 /** Docs from text (tests), as a Layer. */
 export const appDocsLayer = (index: string, flows: ReadonlyArray<{ readonly name: string; readonly text: string }> = [], synonyms: ReadonlyArray<AppSynonym> = []) =>
   Layer.succeed(AppDocs, makeAppDocs(index, flows, synonyms));
+
+/** Whether the app map loaded at all, and which Khanza commit it came from. */
+export interface AppMapStatus {
+  /** False when index.json is missing or unreadable: a missing map is not "not covered". */
+  readonly termuat: boolean;
+  readonly commit: string;
+  /** ISO timestamp of the extract run, when the map has one. */
+  readonly dibuat: string;
+  readonly jumlah: {
+    readonly menu: number;
+    readonly form: number;
+    readonly alur: number;
+    readonly hak: number;
+  };
+}
+
+export const appMapStatus = (docs: AppDocsService): AppMapStatus => ({
+  termuat: docs.menus.length > 0 && docs.forms.length > 0,
+  commit: docs.source.commit,
+  dibuat: docs.source.generatedAt,
+  jumlah: { menu: docs.menus.length, form: docs.forms.length, alur: docs.flows.length, hak: docs.rights.length },
+});
 
 export const AppDocsLive = Layer.effect(
   AppDocs,

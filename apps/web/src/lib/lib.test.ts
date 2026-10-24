@@ -86,6 +86,10 @@ describe("steps", () => {
     expect(stepMark(step("cariPasien", null, "Query ditolak"))).toBe("error");
     expect(stepSummary(step("jalankanQueryBaca", { jumlahBaris: 500, terpotong: true }))).toBe("500 baris (dipotong di 500)");
     expect(stepSummary(step("cariPasien", null, "Query ditolak"))).toBe("Query ditolak");
+    expect(stepSummary(step("detailAplikasi", { alur: { langkah: [{}, {}] }, form: null, menu: null, hak: null }))).toBe("2 langkah");
+    expect(
+      stepSummary(step("detailAplikasi", { alur: null, form: { aksi: ["Simpan"], pintasan: [{}, {}] }, menu: null, hak: null })),
+    ).toBe("1 tombol, 2 aksi klik-kanan");
   });
 });
 

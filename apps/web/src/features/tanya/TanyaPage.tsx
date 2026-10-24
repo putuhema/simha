@@ -144,7 +144,7 @@ const Turn = ({
             Investigasi
           </span>
         ) : null}
-        <div className="max-w-[85%] animate-rise rounded-[20px] rounded-br-md bg-paper-2 px-4 py-2.5 text-[14px] leading-relaxed whitespace-pre-wrap text-ink">
+        <div className="max-w-[85%] animate-rise rounded-[20px] rounded-br-md bg-teal-soft px-4 py-2.5 text-[14px] leading-relaxed whitespace-pre-wrap text-ink">
           {turn.question}
         </div>
       </div>

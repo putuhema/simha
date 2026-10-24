@@ -142,6 +142,8 @@ export interface TestAppOptions {
   readonly pacs?: Layer.Layer<Pacs>;
   /** Digital-file backend. Default: no folder, so files are listed but cannot be opened. */
   readonly berkas?: Layer.Layer<Berkas>;
+  /** app map JSON (docs/khanza-app/index.json); default: empty. */
+  readonly appDocs?: string;
 }
 
 export const makeTestApp = (
@@ -167,7 +169,7 @@ export const makeTestApp = (
         KnowledgeStoreLive,
         ResultStoreLive,
         schemaDocsLayer(docs),
-        appDocsLayer(JSON.stringify({ source: { commit: "test" }, groups: [], forms: {}, rights: {} })),
+        appDocsLayer(options.appDocs ?? JSON.stringify({ source: { commit: "test" }, groups: [], forms: {}, rights: {} })),
         khanzaWriteLayer(connectionAs(db, db.writeUser, db.writePass)),
         auth,
         llm,

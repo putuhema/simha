@@ -46,6 +46,11 @@ INSERT INTO pegawai (nik, nama) VALUES
   ('it-budi', 'Budi Santika'),
   ('it-terbatas', 'Ns. Terbatas Fiktif');
 
+-- The fixture account is also a petugas, so its access answers carry the
+-- nurse/other-staff name as well as the employee name.
+INSERT INTO petugas (nip, nama, jk, status) VALUES
+  ('it-terbatas', 'Ns. Terbatas Fiktif', 'P', '1');
+
 -- Staff account with only the outpatient CPPT right, for the permission tests.
 INSERT INTO user (id_user, password, tindakan_ralan) VALUES
   (AES_ENCRYPT('it-terbatas', 'nur'), AES_ENCRYPT('rahasia-uji-123', 'windi'), 'true');

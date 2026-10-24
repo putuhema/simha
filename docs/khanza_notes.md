@@ -34,6 +34,7 @@ The agent's `lihatSkema` tool reads this file together with `docs/schema.md` bef
 - Pindah kamar dan pulang: menu `A/Rawat Inap` (`DlgKamarInap`), bukan dari form registrasi.
 - Resume medis: `M/Resume Pasien Ranap`; CPPT/SOAP ada di dalam `A/Tindakan Ranap` / `A/Tindakan Ralan`.
 - "Form apa yang mengisi tabel X" dijawab `cariAplikasiKhanza` (`bagian: "tabel"`): `form[].tulis` = tabel yang ditulis form itu, `form[].baca` = hanya dibaca. Ini petunjuk statis dari SQL form, bukan jaminan runtime.
+- Langkah alur, tombol, hak, dan pesan peringatan yang lengkap dibaca dengan `detailAplikasi` (id dari `cariAplikasiKhanza`). Judul langkah saja tidak cukup untuk menjelaskan alur.
 
 ## Local schema changes
 

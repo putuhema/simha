@@ -60,6 +60,28 @@ const respond = (request: ChatRequest): ReturnType<typeof fakeTurn> => {
   const results = toolResults(request);
   const step = results.length;
 
+  // "Siapa saya?" — echo the account block the agent puts in front of the user turn.
+  if (/siapa (saya|aku)|nama saya|nama dokter saya|nama perawat saya/i.test(question)) {
+    const first = request.messages[0];
+    const text = first?.role === "user" ? (first.modelText ?? first.text) : "";
+    const username = /^Username: (.+)$/m.exec(text)?.[1] ?? "?";
+    const displayName = /^Nama tampilan: (.+)$/m.exec(text)?.[1] ?? "?";
+    return fakeTurn(`Akun yang login: ${username} — ${displayName}.`);
+  }
+
+  // "Bisa buka menu X?" — use the real access tool against the real app map.
+  if (/bisa buka menu|hak akses saya|akses saya/i.test(question)) {
+    if (step === 0) return fakeTurn("", [{ name: "aksesSaya", args: { tanya: "kasir" } }]);
+    const result = results.at(-1) as {
+      akun?: { username?: string };
+      cek?: ReadonlyArray<{ jenis: string; nama: string; diizinkan: boolean }>;
+    };
+    const menu = result.cek?.find((item) => item.jenis === "menu");
+    return fakeTurn(
+      `Akun ${result.akun?.username ?? "?"}: menu ${menu?.nama ?? "?"} ${menu?.diizinkan ? "boleh" : "tidak boleh"} dibuka.`,
+    );
+  }
+
   // Digital files (berkas digital) of the visit.
   if (/berkas digital|file pasien|berkas pasien/i.test(question)) {
     if (step === 0) return fakeTurn("", [{ name: "berkasDigital", args: { noRawat: "2026/10/21/000002" } }]);

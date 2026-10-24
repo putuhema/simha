@@ -25,6 +25,12 @@ export interface KhanzaAccount {
   readonly admin: boolean;
   /** Granted rights only, keyed by the Khanza `user` column name. */
   readonly rights: Readonly<Record<string, boolean>>;
+  /** Employee master by NIK (= the username for most accounts). */
+  readonly employeeName: string | null;
+  /** Doctor master by kd_dokter (= the username for doctor accounts). */
+  readonly doctorName: string | null;
+  /** Petugas/nurse master by NIP. */
+  readonly staffName: string | null;
 }
 
 type Row = Record<string, unknown>;
@@ -43,30 +49,55 @@ const rightsOfRow = (row: Row): Readonly<Record<string, boolean>> => {
   return rights;
 };
 
+/** "-" is Khanza's placeholder for an empty doctor name; never show it. */
+const cleanName = (value: string | null | undefined): string | null => {
+  const text = value?.trim();
+  return text === undefined || text === "" || text === "-" ? null : text;
+};
+
 const make = Effect.gen(function* () {
   const read = yield* KhanzaRead;
 
-  /** A readable name from the employee master; the username is a NIP for most users. */
-  const nameOf = (username: string) =>
+  /**
+   * Names linked to the login. The username is a NIP for most staff, so the
+   * same string is a NIK in `pegawai`, a NIP in `petugas`, and — for doctor
+   * accounts that use their NIP — a kd_dokter in `dokter`. Missing tables are
+   * normal on non-standard installs and simply give no name.
+   */
+  const profileOf = (username: string) =>
     Effect.gen(function* () {
       const [pegawai] = yield* read
         .query<{ readonly nama: string | null }>((sql) => sql`SELECT nama FROM pegawai WHERE nik = ${username} LIMIT 1`)
         .pipe(Effect.catch(() => Effect.succeed([] as ReadonlyArray<{ readonly nama: string | null }>)));
-      const pegawaiName = pegawai?.nama?.trim();
-      if (pegawaiName) return pegawaiName;
-
       const [petugas] = yield* read
         .query<{ readonly nama: string | null }>((sql) => sql`SELECT nama FROM petugas WHERE nip = ${username} LIMIT 1`)
         .pipe(Effect.catch(() => Effect.succeed([] as ReadonlyArray<{ readonly nama: string | null }>)));
-      return petugas?.nama?.trim() || null;
+      const [dokter] = yield* read
+        .query<{ readonly nm_dokter: string | null }>(
+          (sql) => sql`SELECT nm_dokter FROM dokter WHERE kd_dokter = ${username} LIMIT 1`,
+        )
+        .pipe(Effect.catch(() => Effect.succeed([] as ReadonlyArray<{ readonly nm_dokter: string | null }>)));
+
+      const employeeName = cleanName(pegawai?.nama);
+      const staffName = cleanName(petugas?.nama);
+      const doctorName = cleanName(dokter?.nm_dokter);
+      return {
+        employeeName,
+        doctorName,
+        staffName,
+        displayName: doctorName ?? employeeName ?? staffName,
+      };
     });
 
   const accountOf = (username: string, admin: boolean, rights: Readonly<Record<string, boolean>>) =>
-    Effect.map(nameOf(username), (name) => ({
+    Effect.map(profileOf(username), (profile) => ({
       username,
-      displayName: admin ? (name ?? "Admin Utama") : (name ?? username),
+      displayName: profile.displayName ?? (admin ? "Admin Utama" : username),
       admin,
       rights,
+      employeeName: profile.employeeName,
+      doctorName: profile.doctorName,
+      staffName: profile.staffName,
     }));
 
   /** The same check as `akses.setData` plus the rights of the matching user row. */

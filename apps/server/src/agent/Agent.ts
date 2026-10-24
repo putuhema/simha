@@ -10,13 +10,14 @@
  * fake test adapter.
  */
 import { LlmClient, type ChatMessage, type LlmEvent, type ToolCall } from "@simha/llm";
-import type { AgentEvent, AgentMode, BerkasDigital, DocumentInfo, FormDraft, Permissions, RadiologyGallery, RenderBlock } from "@simha/shared";
+import type { AgentEvent, AgentMode, BerkasDigital, DocumentInfo, FormDraft, RadiologyGallery, RenderBlock, User } from "@simha/shared";
 import {
   AuditLog,
   defaultRegistry,
   FixStore,
   KhanzaRead,
   KnowledgeStore,
+  makeAksesSaya,
   makeRegistry,
   maskPii,
   maskText,
@@ -28,11 +29,13 @@ import {
   AppDocs,
   Berkas,
   SchemaDocs,
+  type AnyTool,
   type ToolRegistry,
 } from "@simha/tools";
 import { Cause, Context, Effect, Exit, Layer, Queue, Stream } from "effect";
 import { Store } from "../store.ts";
 import { compactHistory, HISTORY_TOKEN_BUDGET } from "./history.ts";
+import { identityPrompt } from "./identity.ts";
 import { knowledgePrompt, userTurn } from "./knowledge.ts";
 import { SystemPrompt } from "./prompt.ts";
 
@@ -42,19 +45,20 @@ export const MAX_STEPS = 8;
 /** After this, the model gets one last turn without tools to answer with what it has. */
 const TIME_BUDGET_MS = 45_000;
 
-/** The tools this SIMRS account may use, in the order the provider receives them. */
-const registryFor = (permissions: Permissions): ToolRegistry =>
-  makeRegistry(defaultRegistry.tools.filter((tool) => toolAllowed(tool, permissions)));
+/** The tools this SIMRS account may use, plus its own identity/access tool. */
+const registryFor = (user: User): ToolRegistry => {
+  const tools = defaultRegistry.tools.filter((tool) => toolAllowed(tool, user.permissions));
+  tools.push(makeAksesSaya(user) as unknown as AnyTool);
+  return makeRegistry(tools);
+};
 
 type AgentInput = {
   readonly question: string;
   /** tanya (Tanya Data) or investigasi (a nurse's complaint). */
   readonly mode: AgentMode;
   readonly conversationId?: string | undefined;
-  /** Username of the IT staff member asking (audit log). */
-  readonly askedBy: string | null;
-  /** Snapshot of the SIMRS account's rights; decides which tools the model may see. */
-  readonly permissions: Permissions;
+  /** The logged-in SIMRS account (identity, rights snapshot, audit actor). */
+  readonly user: User;
 };
 
 /** Appended to an investigation question, so the answer has the sections the UI expects. */
@@ -135,13 +139,7 @@ const make = Effect.gen(function* () {
     return value;
   }).pipe(Effect.catch(() => Effect.succeed(null)));
 
-  const runOneTool = (
-    registry: ToolRegistry,
-    permissions: Permissions,
-    call: ToolCall,
-    runId: string,
-    askedBy: string | null,
-  ) =>
+  const runOneTool = (registry: ToolRegistry, user: User, call: ToolCall, runId: string) =>
     Effect.gen(function* () {
       const tool = registry.get(call.name);
       const started = performance.now();
@@ -149,7 +147,11 @@ const make = Effect.gen(function* () {
         const known = registry.tools.map((t) => t.name).join(", ");
         return { ok: false as const, error: `Tool "${call.name}" tidak ada. Tool yang tersedia: ${known}.`, durationMs: 0 };
       }
-      const exit = yield* runTool(tool, call.args, { sessionId: runId, actor: askedBy, permissions }).pipe(
+      const exit = yield* runTool(tool, call.args, {
+        sessionId: runId,
+        actor: user.username,
+        permissions: user.permissions,
+      }).pipe(
         Effect.provideService(KhanzaRead, read),
         Effect.provideService(AuditLog, audit),
         Effect.provideService(FixStore, fixes),
@@ -182,7 +184,7 @@ const make = Effect.gen(function* () {
     Stream.callback<AgentEvent>((queue) =>
       Effect.gen(function* () {
         const emit = (event: AgentEvent) => Queue.offer(queue, event);
-        const registry = registryFor(input.permissions);
+        const registry = registryFor(input.user);
         const conversationId = yield* store.conversationFor(input.conversationId ? { id: input.conversationId } : {});
         const runId = crypto.randomUUID();
         const { info } = llm;
@@ -193,7 +195,7 @@ const make = Effect.gen(function* () {
           conversationId,
           mode: input.mode,
           question,
-          askedBy: input.askedBy,
+          askedBy: input.user.username,
           provider: info.provider,
           model: info.model,
           maskPii: info.maskPii,
@@ -213,11 +215,14 @@ const make = Effect.gen(function* () {
         // What earlier questions taught us. `text` stays the plain question (it
         // is what the UI shows); the block rides along as `modelText`, so the
         // next question replays exactly what the model saw and the provider's
-        // prompt cache keeps its prefix.
+        // prompt cache keeps its prefix. The account identity is always first,
+        // so "siapa saya?" never becomes "I cannot see who you are".
         const matches = yield* knowledge.relevant(question).pipe(Effect.catchCause(() => Effect.succeed([])));
         const learned = knowledgePrompt(matches);
         const knowledgeBlock = learned === "" ? "" : info.maskPii ? maskText(learned) : learned;
-        yield* append(userTurn(info.maskPii ? maskText(raw) : raw, knowledgeBlock));
+        const identity = identityPrompt(input.user);
+        const contextBlock = knowledgeBlock === "" ? identity : `${identity}\n\n${knowledgeBlock}`;
+        yield* append(userTurn(info.maskPii ? maskText(raw) : raw, contextBlock));
 
         let steps = 0;
         let finalText = "";
@@ -332,7 +337,7 @@ const make = Effect.gen(function* () {
             for (const [n, call] of calls.entries()) {
               const draftId = drafts.toSorted((a, b) => a.index - b.index)[n]?.draftId;
               yield* emit({ _tag: "tool_started", callId: call.id, name: call.name, args: call.args, ...(draftId ? { draftId } : {}) });
-              const outcome = yield* runOneTool(registry, input.permissions, call, runId, input.askedBy);
+              const outcome = yield* runOneTool(registry, input.user, call, runId);
               yield* emit(
                 outcome.ok
                   ? { _tag: "tool_finished", callId: call.id, name: call.name, ok: true, result: outcome.result, durationMs: outcome.durationMs }
@@ -377,7 +382,7 @@ const make = Effect.gen(function* () {
             verified: false,
             blockId: block.id,
             runId,
-            createdBy: input.askedBy,
+            createdBy: input.user.username,
           });
         }).pipe(Effect.catchCause(() => Effect.void));
 

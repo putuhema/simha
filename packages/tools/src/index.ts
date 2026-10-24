@@ -1,14 +1,18 @@
 /**
  * @simha/tools: provider-neutral tools, Khanza database access and the audit log.
  */
-export { AppDocs, AppDocsLive, appDocsLayer, loadAppDocs, parseAppIndex, parseFlowDoc, parseSynonyms } from "./app/AppDocs.ts";
-export type { AppDocsService, AppFlow, AppFlowStep, AppForm, AppMenu, AppRight, AppSynonym } from "./app/AppDocs.ts";
+export { AppDocs, AppDocsLive, appDocsLayer, appMapStatus, loadAppDocs, parseAppIndex, parseFlowDoc, parseSynonyms } from "./app/AppDocs.ts";
+export type { AppDocsService, AppFlow, AppFlowStep, AppForm, AppMapStatus, AppMenu, AppRight, AppSynonym } from "./app/AppDocs.ts";
+export { makeAksesSaya } from "./access/aksesSaya.ts";
 export { cariAplikasiKhanza } from "./app/cariAplikasiKhanza.ts";
+export { detailAplikasi } from "./app/detailAplikasi.ts";
+export { makeAppPaths } from "./app/paths.ts";
+export type { AppPaths, AppShortcutSteps } from "./app/paths.ts";
 export { Berkas, BerkasError, BerkasLive, berkasContentType, berkasKindOf, makeBerkas, safeRelativePath } from "./berkas/Berkas.ts";
 export type { BerkasContent, BerkasInfo, BerkasOptions, BerkasService } from "./berkas/Berkas.ts";
 export { berkasDigital } from "./berkas/berkasDigital.ts";
 export { searchApp } from "./app/search.ts";
-export type { AppScope, AppSearchResult } from "./app/search.ts";
+export type { AppScope, AppSearchResult, ShortcutHit } from "./app/search.ts";
 export { AuditLog, AuditLogLive, AuditLogMemory, auditLogLayerFile } from "./audit/AuditLog.ts";
 export type { AuditLogService, QueryRecord, ToolCallEnd, ToolCallStart } from "./audit/AuditLog.ts";
 export * from "./config.ts";

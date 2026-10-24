@@ -39,7 +39,11 @@ describe.skipIf(testDb === null)("login", () => {
         displayName: "Budi Santika",
         role: "admin",
         khanzaAdmin: true,
+        employeeName: "Budi Santika",
+        doctorName: null,
+        staffName: null,
       });
+      expect(admin.rights).toEqual([]);
       expect(admin.permissions).toMatchObject({
         cpptRalan: true,
         cpptRanap: true,

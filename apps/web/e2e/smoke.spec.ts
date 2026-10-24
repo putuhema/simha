@@ -50,6 +50,17 @@ test("logs in with a SIMRS Khanza account", async () => {
   await expect(page.getByTestId("user-menu")).toContainText("Admin SIMRS");
 });
 
+test("the assistant knows the logged-in account and can check a menu", async () => {
+  await page.getByRole("button", { name: "Percakapan baru" }).first().click();
+  await page.getByLabel("Pertanyaan").fill("Siapa saya?");
+  await page.getByLabel("Pertanyaan").press("Enter");
+  await expect(page.getByText("Akun yang login: it-budi — Budi Santika.")).toBeVisible();
+
+  await page.getByLabel("Pertanyaan").fill("Apakah saya bisa buka menu kasir?");
+  await page.getByLabel("Pertanyaan").press("Enter");
+  await expect(page.getByText(/Akun it-budi: menu .* boleh dibuka\./)).toBeVisible();
+});
+
 test("the sidebar collapses to an icon rail without moving the toggle", async () => {
   const sidebar = page.getByRole("complementary", { name: "Sidebar" }).first();
   const toggle = page.getByRole("button", { name: "Tutup sidebar" });

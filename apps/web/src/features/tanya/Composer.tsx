@@ -154,7 +154,7 @@ export const Composer = ({
                 e.stopPropagation();
                 onStop();
               }}
-              className="relative grid size-8 shrink-0 place-items-center rounded-full bg-teal-2 text-paper transition-transform active:scale-95"
+              className="relative grid size-8 shrink-0 place-items-center rounded-full bg-teal text-white transition-transform active:scale-95"
             >
               <span className="absolute inset-0.5 animate-spin rounded-full border-2 border-paper/25 border-t-paper" />
               <Square className="size-3 fill-current" />
@@ -164,7 +164,7 @@ export const Composer = ({
               type="submit"
               aria-label="Kirim"
               disabled={!value.trim()}
-              className="grid size-8 shrink-0 place-items-center rounded-full bg-teal-2 text-paper transition-[background-color,transform] hover:bg-teal active:scale-95 disabled:bg-paper-2 disabled:text-ink-3"
+              className="grid size-8 shrink-0 place-items-center rounded-full bg-teal text-white transition-[background-color,transform] hover:bg-teal-2 active:scale-95 disabled:bg-paper-2 disabled:text-ink-3"
             >
               <ArrowUp className="size-4" strokeWidth={2.4} />
             </button>

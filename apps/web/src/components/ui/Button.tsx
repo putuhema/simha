@@ -7,7 +7,7 @@ const button = cva(
   {
     variants: {
       variant: {
-        primary: "bg-teal-2 text-paper shadow-[inset_0_-2px_0_rgb(0_0_0/0.25)] hover:bg-teal",
+        primary: "bg-teal text-white shadow-[inset_0_-2px_0_rgb(0_0_0/0.12)] hover:bg-teal-2",
         approve: "bg-ok text-white shadow-[inset_0_-2px_0_rgb(0_0_0/0.2)] hover:brightness-110",
         danger: "bg-red text-white shadow-[inset_0_-2px_0_rgb(0_0_0/0.2)] hover:brightness-110",
         outline: "border border-line bg-card text-ink hover:border-ink-3 hover:bg-paper",

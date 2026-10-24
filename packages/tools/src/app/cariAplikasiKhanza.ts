@@ -6,7 +6,8 @@
  * snapshot of one Khanza commit — not the live database and not the webapps.
  */
 import { Effect, Schema } from "effect";
-import { AppDocs } from "./AppDocs.ts";
+import { AppDocs, appMapStatus } from "./AppDocs.ts";
+import { makeAppPaths } from "./paths.ts";
 import { asksAboutTables, searchApp, tablesInQuery } from "./search.ts";
 import { defineTool } from "../tool.ts";
 
@@ -106,32 +107,31 @@ export const cariAplikasiKhanza = defineTool({
       }),
     ),
     hak: Schema.Array(Schema.Struct({ hak: Schema.String, menu: Schema.Array(Schema.String) })),
+    /** Whether the map loaded, so "not covered" is never claimed when the map is missing. */
+    peta: Schema.Struct({
+      termuat: Schema.Boolean,
+      commit: Schema.String,
+      dibuat: Schema.String,
+      jumlah: Schema.Struct({
+        menu: Schema.Number,
+        form: Schema.Number,
+        alur: Schema.Number,
+        hak: Schema.Number,
+      }),
+    }),
     catatan: Schema.Array(Schema.String),
     petunjuk: Schema.String,
     sumber: Schema.String,
   }),
   handler: Effect.fn("cariAplikasiKhanza")(function* ({ kataKunci, bagian }) {
     const docs = yield* AppDocs;
+    const peta = appMapStatus(docs);
     const found = searchApp(docs, kataKunci, bagian ?? "semua", docs.synonyms);
     // The menu's form is authoritative; free-text form search can match a distant form by a
     // shared word ("surat" in a permission name). Fall back to form search only without a menu.
-    const groupName = new Map(docs.menus.map((menu) => [menu.groupLetter, menu.groupName]));
-    const humanPath = (path: string) => {
-      const [letter, ...rest] = path.split("/");
-      const name = letter === undefined ? undefined : groupName.get(letter);
-      return name === undefined ? path : `${name} → ${rest.join("/")}`;
-    };
-    // Some Khanza forms leave NetBeans' "About Program" header and set the real
-    // title from the caller; the menu label is what the user sees in that case.
-    const titleFor = (name: string | null | undefined) => {
-      if (name === null || name === undefined) return null;
-      const form = docs.forms.find((candidate) => candidate.name === name);
-      if (form === undefined) return name;
-      if (form.title.trim() === "" || /^(?:::\[\s*)?about program(?:\s*\]::)?$/i.test(form.title)) {
-        return docs.menus.find((menu) => menu.form === name)?.label ?? form.title;
-      }
-      return form.title;
-    };
+    const paths = makeAppPaths(docs);
+    const humanPath = paths.humanPath;
+    const titleFor = paths.formTitle;
     const menuForms = found.menus
       .map((menu) => (menu.form === null ? undefined : docs.forms.find((form) => form.name === menu.form)))
       .filter((form): form is NonNullable<typeof form> => form !== undefined);
@@ -191,7 +191,14 @@ export const cariAplikasiKhanza = defineTool({
     const explanatory = found.synonyms.some((s) => s.menus.length === 0 && s.forms.length === 0);
     const catatan = wantsDetail || explanatory ? found.synonyms.map((s) => s.note) : [];
     const empty = found.menus.length === 0 && found.flows.length === 0 && found.forms.length === 0 && found.rights.length === 0;
-    if (empty && found.synonyms.length === 0) {
+    if (!peta.termuat) {
+      // A missing map is not an answer: without this, an empty index looks exactly like
+      // "that menu does not exist" and the model tells the user it does not exist.
+      catatan.push(
+        "Peta aplikasi tidak termuat di server ini (docs/khanza-app/index.json kosong atau tidak ada). " +
+          "Jangan menyimpulkan menu, form, atau hak tidak ada; sampaikan bahwa peta aplikasi tidak termuat.",
+      );
+    } else if (empty && found.synonyms.length === 0) {
       catatan.push(
         "Tidak ada di peta aplikasi. Coba kata lain (nama menu, form, tabel, atau hak), atau lihat docs/khanza-app/.",
       );
@@ -232,33 +239,8 @@ export const cariAplikasiKhanza = defineTool({
       hak: found.rights.map((right) => ({ hak: right.name, menu: [...right.menus] })),
       tombol: cut(tombol),
       tombolCocok,
-      pintasan: found.shortcuts.map((shortcut) => {
-        // How the user reaches the dialog: the toolbar button if there is one, else the menu.
-        const toolbarEntry = shortcut.form === null ? undefined : docs.toolbar.find((entry) => entry.form === shortcut.form?.name);
-        const openPath = toolbarEntry?.label ?? (shortcut.form?.menus[0] === undefined ? null : humanPath(shortcut.form.menus[0]));
-        const segments = shortcut.path.split(" → ");
-        const openSteps =
-          openPath === null
-            ? [`Buka ${titleFor(shortcut.form?.name) ?? "daftar pasien"}`]
-            : toolbarEntry !== undefined
-              ? [`Buka **${toolbarEntry.label}**`]
-              : (() => {
-                  const [group, ...rest] = openPath.split(" → ");
-                  return ["Klik **Menu**", `Pilih grup **${group}**`, ...rest.map((item) => `Klik **${item}**`)];
-                })();
-        const clickSteps =
-          shortcut.kind === "toolbar" ? [] : ["Klik kanan baris pasien", ...segments.map((segment) => `Pilih **${segment}**`)];
-        return {
-          jenis: shortcut.kind,
-          jalur:
-            shortcut.kind === "toolbar"
-              ? shortcut.path
-              : `${openPath ?? titleFor(shortcut.form?.name) ?? "dialog"} → klik kanan → ${shortcut.path}`,
-          aksi: shortcut.label,
-          dialog: titleFor(shortcut.form?.name) ?? null,
-          langkah: [...openSteps, ...clickSteps],
-        };
-      }),
+      pintasan: found.shortcuts.map(paths.shortcut),
+      peta,
       catatan,
       petunjuk:
         "Jawab ringkas. Kalau jalurnya lebih dari dua langkah, tulis daftar bernomor satu aksi per baris " +
@@ -272,7 +254,9 @@ export const cariAplikasiKhanza = defineTool({
           ? `User menyebut tabel ${matchedTables.join(", ")}: jawab form yang menulis tabel itu (field tabel[].tulis), bukan semua form yang membacanya. `
           : "") +
         "Sebut hak akses hanya kalau menu tidak muncul atau user bertanya hak. Jangan daftar isi tool.",
-      sumber: `Peta aplikasi dari source Khanza commit ${docs.source.commit} (desktop, bukan webapps).`,
+      sumber: `Peta aplikasi dari source Khanza commit ${docs.source.commit}${
+        peta.dibuat === "" ? "" : `, dibuat ${peta.dibuat.slice(0, 10)}`
+      } (desktop, bukan webapps).`,
     };
   }),
 });

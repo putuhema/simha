@@ -341,6 +341,16 @@ const simrsLogin = Effect.gen(function* () {
   yield* sql`DELETE FROM sessions`;
 });
 
+const userProfile = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  // The SIMRS username is usually a NIP; these are the employee, doctor and
+  // nurse/other-staff rows linked to it. They let "siapa saya?" answer with a
+  // real name, not just the login name.
+  yield* sql`ALTER TABLE users ADD COLUMN employee_name TEXT`;
+  yield* sql`ALTER TABLE users ADD COLUMN doctor_name TEXT`;
+  yield* sql`ALTER TABLE users ADD COLUMN staff_name TEXT`;
+});
+
 export const auditMigrations = {
   "0001_init": init,
   "0002_agent": agent,
@@ -354,4 +364,5 @@ export const auditMigrations = {
   "0010_thread_actions": threadActions,
   "0011_investigate_mode": investigateMode,
   "0012_simrs_login": simrsLogin,
+  "0013_user_profile": userProfile,
 };

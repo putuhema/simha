@@ -4,6 +4,7 @@
 import { Schema } from "effect";
 import { AppDocs } from "./app/AppDocs.ts";
 import { cariAplikasiKhanza } from "./app/cariAplikasiKhanza.ts";
+import { detailAplikasi } from "./app/detailAplikasi.ts";
 import type { Berkas } from "./berkas/Berkas.ts";
 import { berkasDigital } from "./berkas/berkasDigital.ts";
 import { diagnosaPindahKamar } from "./diagnose/diagnosaPindahKamar.ts";
@@ -75,6 +76,7 @@ export const defaultRegistry: ToolRegistry = makeRegistry([
   usulkanPerbaikan,
   lihatSkema,
   cariAplikasiKhanza,
+  detailAplikasi,
   catatPengetahuan,
   jalankanQueryBaca,
   tampilkan,

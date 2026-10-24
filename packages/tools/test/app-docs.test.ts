@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { AppDocs, makeAppDocs, parseAppIndex, parseFlowDoc, parseSynonyms } from "../src/app/AppDocs.ts";
 import { cariAplikasiKhanza } from "../src/app/cariAplikasiKhanza.ts";
+import { detailAplikasi } from "../src/app/detailAplikasi.ts";
 import { searchApp } from "../src/app/search.ts";
 import { defaultRegistry } from "../src/registry.ts";
 import { Effect } from "effect";
@@ -101,6 +102,9 @@ Pasien masuk ranap dan pulang.
 ### 5. Resume medis
 - **Menu:** M/Resume Pasien Ranap
 - **Form:** RMDataResumePasienRanap
+- **Who:** DPJP
+- **Does:** **Simpan** menulis satu baris \`resume_pasien_ranap\`; dokter penanggung jawab wajib diisi.
+- **Hak akses:** \`data_resume_pasien\`
 - **Tabel:** resume_pasien_ranap
 
 ### 6. Pulang
@@ -147,6 +151,15 @@ describe("parseFlowDoc", () => {
     expect(parsed?.steps[0]?.title).toBe("Resume medis");
     expect(parsed?.steps[0]?.menu).toBe("M/Resume Pasien Ranap");
     expect(parsed?.steps[0]?.tables).toBe("resume_pasien_ranap");
+  });
+
+  it("keeps what a step does, who does it and the rights it needs", () => {
+    const parsed = parseFlowDoc(flow, "docs/khanza-app/flows/rawat-inap.md");
+    expect(parsed?.intro).toBe("Pasien masuk ranap dan pulang.");
+    expect(parsed?.steps[0]?.who).toBe("DPJP");
+    expect(parsed?.steps[0]?.does).toContain("resume_pasien_ranap");
+    expect(parsed?.steps[0]?.hak).toBe("`data_resume_pasien`");
+    expect(parsed?.steps[1]?.does).toBeNull();
   });
 
   it("parses the synonym file and drops entries without terms", () => {
@@ -301,6 +314,108 @@ describe("cariAplikasiKhanza", () => {
         .pipe(Effect.provideService(AppDocs, docs)),
     );
     expect(result.menu).toHaveLength(0);
+    expect(result.peta.termuat).toBe(true);
     expect(result.catatan.join(" ")).toContain("Tidak ada di peta aplikasi");
+  });
+
+  it("does not claim a menu is missing when the map itself failed to load", async () => {
+    const result = await Effect.runPromise(
+      cariAplikasiKhanza
+        .handler({ kataKunci: "pindah kamar" })
+        .pipe(Effect.provideService(AppDocs, makeAppDocs("{}"))),
+    );
+    expect(result.peta.termuat).toBe(false);
+    expect(result.catatan.join(" ")).toContain("tidak termuat");
+    expect(result.catatan.join(" ")).not.toContain("Tidak ada di peta aplikasi");
+  });
+});
+
+/** Runs detailAplikasi against the fixture map. */
+const detail = (jenis: "alur" | "form" | "menu" | "hak", id: string, cari?: string) =>
+  Effect.runPromise(
+    detailAplikasi.handler({ jenis, id, ...(cari === undefined ? {} : { cari }) }).pipe(Effect.provideService(AppDocs, docs)),
+  );
+
+describe("detailAplikasi", () => {
+  it("is registered next to the search tool", () => {
+    expect(defaultRegistry.get("detailAplikasi")).toBe(detailAplikasi);
+  });
+
+  it("returns every step of a flow with what it does", async () => {
+    const result = await detail("alur", "rawat-inap");
+    expect(result.ditemukan).toBe(true);
+    expect(result.alur?.ringkasan).toBe("Pasien masuk ranap dan pulang.");
+    expect(result.alur?.langkah).toHaveLength(2);
+    const resume = result.alur?.langkah[0];
+    expect(resume?.judul).toBe("Resume medis");
+    expect(resume?.menu).toBe("Rekam Medis → Resume Pasien Ranap");
+    expect(resume?.siapa).toBe("DPJP");
+    expect(resume?.tujuan).toContain("resume_pasien_ranap");
+    expect(resume?.hak).toBe("`data_resume_pasien`");
+    expect(resume?.tabel).toBe("resume_pasien_ranap");
+    expect(result.alur?.langkah[1]?.tujuan).toBeNull();
+  });
+
+  it("returns every button and right-click action of a form", async () => {
+    const result = await detail("form", "DlgKamarInap");
+    expect(result.form?.judul).toBe("Daftar Pasien Rawat Inap");
+    expect(result.form?.aksi).toEqual(["Masuk", "Pindah", "Pulang"]);
+    expect(result.form?.jalur).toEqual(["Registrasi & Billing → Rawat Inap"]);
+    expect(result.form?.tulis).toEqual(["kamar_inap"]);
+    // The toolbar button that opens it, then the dialog's own right-click entries.
+    expect(result.form?.pintasan.map((item) => item.jenis)).toEqual(["toolbar", "klik-kanan", "klik-kanan"]);
+    expect(result.form?.pintasan[0]?.langkah).toEqual(["Buka **Rawat Inap**"]);
+    expect(result.form?.pintasan[1]?.langkah).toEqual([
+      "Buka **Rawat Inap**",
+      "Klik kanan baris pasien",
+      "Pilih **Billing/Pembayaran Pasien**",
+    ]);
+  });
+
+  it("filters a dialog's actions by a word from the task", async () => {
+    const result = await detail("form", "DlgKamarInap", "billing");
+    expect(result.form?.pintasan).toHaveLength(1);
+    expect(result.form?.pintasan[0]?.aksi).toBe("Billing/Pembayaran Pasien");
+    const none = await detail("form", "DlgKamarInap", "zzz");
+    expect(none.form?.pintasan).toEqual([]);
+    expect(none.catatan.join(" ")).toContain("Tidak ada aksi atau tabel");
+  });
+
+  it("returns a menu with its rights, dialog and buttons", async () => {
+    const result = await detail("menu", "a / rawat inap");
+    expect(result.menu?.path).toBe("A/Rawat Inap");
+    expect(result.menu?.jalur).toBe("Registrasi & Billing → Rawat Inap");
+    expect(result.menu?.hak).toEqual(["kamar_inap", "billing_ranap"]);
+    expect(result.menu?.dialog).toBe("Daftar Pasien Rawat Inap");
+    expect(result.menu?.aksi).toContain("Pindah");
+  });
+
+  it("returns an access right with the menus and forms it gates", async () => {
+    const result = await detail("hak", "kamar_inap");
+    expect(result.hak?.menu).toEqual(["Registrasi & Billing → Rawat Inap"]);
+    expect(result.hak?.form).toEqual(["Daftar Pasien Rawat Inap"]);
+  });
+
+  it("says when an id is unknown", async () => {
+    const result = await detail("form", "zzzqqq");
+    expect(result.ditemukan).toBe(false);
+    expect(result.form).toBeNull();
+    expect(result.catatan.join(" ")).toContain('Tidak ada form dengan id "zzzqqq"');
+  });
+
+  it("suggests a close id instead of guessing", async () => {
+    const result = await detail("menu", "rawat");
+    expect(result.ditemukan).toBe(false);
+    expect(result.catatan.join(" ")).toContain("Mirip: A/Rawat Inap");
+  });
+
+  it("refuses to answer from a map that did not load", async () => {
+    const error = await Effect.runPromise(
+      detailAplikasi
+        .handler({ jenis: "form", id: "DlgKamarInap" })
+        .pipe(Effect.provideService(AppDocs, makeAppDocs("{}")), Effect.flip),
+    );
+    expect(error.message).toContain("tidak termuat");
+    expect(error.message).toContain("Jangan menyimpulkan");
   });
 });

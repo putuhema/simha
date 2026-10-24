@@ -257,8 +257,7 @@ const ChatRoutes = Layer.mergeAll(
               question: input.question,
               mode: input.mode ?? "tanya",
               conversationId: input.conversationId,
-              askedBy: user.username,
-              permissions: user.permissions,
+              user,
             }),
           );
         }),

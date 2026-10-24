@@ -62,7 +62,7 @@ export const useNewChat = () => {
 
 const rowClass =
   "group flex h-8 w-full items-center gap-2.5 rounded-lg px-2 text-left text-[13px] text-ink-2 transition-colors hover:bg-paper-2 hover:text-ink";
-const activeClass = "bg-paper-2 font-medium text-ink";
+const activeClass = "bg-teal-soft font-medium text-teal-2";
 const iconButton = "grid size-7 place-items-center rounded-md text-ink-3 transition-colors hover:bg-paper-2 hover:text-ink";
 const menuPopup =
   "min-w-52 origin-[var(--transform-origin)] rounded-xl border border-line bg-card p-1.5 text-[13px] text-ink shadow-[0_18px_44px_-20px_rgb(26_31_30/0.35)] transition-[opacity,transform] duration-150 outline-none data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0";
@@ -227,7 +227,6 @@ const ConversationRow = ({ conversation, active, running, onNavigate, onDeleted,
       >
         {conversation.pinned ? <Pin className="size-3 shrink-0 text-amber" aria-hidden /> : null}
         <span className="truncate">{conversation.firstQuestion}</span>
-        {active ? <span className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-teal" aria-hidden /> : null}
         <span className="ml-auto shrink-0 font-mono text-[10px] text-ink-3 tabular-nums transition-opacity group-hover/item:opacity-0">
           {running ? <span className="inline-block size-1.5 animate-pulse rounded-full bg-teal" aria-label="Berjalan" /> : formatAgo(conversation.lastAt)}
         </span>
@@ -313,19 +312,19 @@ export const SidebarPanel = ({ health, onNavigate, onClose, closeLabel }: PanelP
   };
 
   return (
-    <div className="flex h-full w-full flex-col bg-paper">
-      {/* The window controls live on their own strip. Below it, the toggle sits exactly
-          where the rail's toggle sits, so collapsing the sidebar does not move it. */}
-      <div className="drag h-[var(--rail-inset,0px)] w-full shrink-0" />
-      <div className="drag flex shrink-0 items-center gap-1 pt-0.5 pr-2.5 pb-3 pl-[var(--sidebar-toggle-inset)]">
+    <div className="flex h-full w-full flex-col bg-card">
+      {/* The toggle shares the traffic-light strip, so its position survives collapse. */}
+      <div className="drag relative h-[var(--rail-inset,0px)] w-full shrink-0">
         <TipButton
           label={closeLabel}
           shortcut={shortcutLabel("S")}
           onClick={onClose}
-          className={cn(iconButton, "no-drag size-9")}
+          className={cn(iconButton, "no-drag absolute top-[var(--sidebar-toggle-top,0px)] left-[var(--sidebar-toggle-inset)] size-8")}
         >
           <PanelLeftClose className="size-4" />
         </TipButton>
+      </div>
+      <div className="drag flex shrink-0 items-center gap-1 pt-0.5 pr-2.5 pb-3 pl-2.5">
         <Link to="/tanya" onClick={onNavigate} className="no-drag flex w-fit min-w-0 items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-paper-2">
           <img src="/favicon.svg" alt="" className="size-7" />
           <span className="truncate font-display text-[20px] leading-none font-semibold tracking-[-0.03em]">simha</span>
@@ -477,23 +476,31 @@ export const SidebarRail = ({ health }: { readonly health: Health | undefined })
   const newChat = useNewChat();
   const icon = "relative grid size-9 place-items-center rounded-lg text-ink-2 transition-colors hover:bg-paper-2 hover:text-ink";
   return (
-    <div className="flex h-full w-full flex-col items-center gap-0.5 bg-paper py-2">
-      <div className="drag -mt-2 h-[var(--rail-inset,0px)] w-full shrink-0" />
-      {/* Keep the toggle at the top, where the close button sits when the sidebar is open. */}
-      <TipButton label="Buka sidebar" shortcut={shortcutLabel("S")} side="right" onClick={toggle} className={cn(icon, "mb-1")}>
-        <PanelLeftOpen className="size-[17px]" />
-      </TipButton>
-      <Link to="/tanya" aria-label="Simha" className="mb-1 grid size-9 place-items-center rounded-lg hover:bg-paper-2">
-        <img src="/favicon.svg" alt="" className="size-[22px]" />
-      </Link>
-      <TipButton label="Percakapan baru" shortcut={shortcutLabel("O")} side="right" onClick={newChat} className={icon}>
-        <SquarePen className="size-[17px]" />
-      </TipButton>
-      <TipButton label="Cari" side="right" onClick={startSearch} className={icon}>
-        <Search className="size-[17px]" />
-      </TipButton>
-      <div className="mt-auto">
-        <UserMenu compact health={health} onNavigate={() => undefined} />
+    <div className="flex h-full w-full flex-col bg-card py-2">
+      <div className="drag relative -mt-2 h-[var(--rail-inset,0px)] w-full shrink-0">
+        <TipButton
+          label="Buka sidebar"
+          shortcut={shortcutLabel("S")}
+          side="right"
+          onClick={toggle}
+          className={cn(iconButton, "no-drag absolute top-[var(--sidebar-toggle-top,0px)] left-[var(--sidebar-toggle-inset)] size-8")}
+        >
+          <PanelLeftOpen className="size-4" />
+        </TipButton>
+      </div>
+      <div className="ml-[var(--sidebar-toggle-inset)] flex min-h-0 flex-1 flex-col items-center gap-0.5">
+        <Link to="/tanya" aria-label="Simha" className="mb-1 grid size-9 place-items-center rounded-lg hover:bg-paper-2">
+          <img src="/favicon.svg" alt="" className="size-[22px]" />
+        </Link>
+        <TipButton label="Percakapan baru" shortcut={shortcutLabel("O")} side="right" onClick={newChat} className={icon}>
+          <SquarePen className="size-4" />
+        </TipButton>
+        <TipButton label="Cari" side="right" onClick={startSearch} className={icon}>
+          <Search className="size-4" />
+        </TipButton>
+        <div className="mt-auto">
+          <UserMenu compact health={health} onNavigate={() => undefined} />
+        </div>
       </div>
     </div>
   );

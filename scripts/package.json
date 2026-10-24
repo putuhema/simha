@@ -7,7 +7,8 @@
     "inspect-schema": "node --env-file-if-exists=../.env inspect-schema.ts",
     "typecheck": "tsc -p .",
     "dump-test-schema": "node --env-file-if-exists=../.env dump-test-schema.ts",
-    "extract-khanza-app": "node extract-khanza-app.ts"
+    "extract-khanza-app": "node extract-khanza-app.ts",
+    "check-app-map": "node --disable-warning=ExperimentalWarning check-app-map.ts"
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",

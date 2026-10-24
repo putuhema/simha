@@ -19,6 +19,8 @@
     "knip": "knip",
     "test": "vitest run",
     "test:watch": "vitest",
+    "check:app-map": "pnpm --filter @simha/scripts check-app-map",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test && pnpm check:app-map",
     "extract-khanza-app": "pnpm --filter @simha/scripts extract-khanza-app"
   },
   "devDependencies": {

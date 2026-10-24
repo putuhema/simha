@@ -10,7 +10,7 @@
 /*
  * "Instrument panel on chart paper", laid out like a modern AI workspace:
  * a quiet gray rail, a white desk in the middle and one panel for cards.
- * Warm paper, dark ink, one teal accent. Amber means "waiting for a person",
+ * Warm paper, dark ink, one green accent. Amber means "waiting for a person",
  * red means "undo / failed".
  */
 @theme {
@@ -27,9 +27,9 @@
   --color-line: #e3e0d8;
   --color-line-2: #efede7;
 
-  --color-teal: #0f6b61;
-  --color-teal-2: #16342f;
-  --color-teal-soft: #dcebe7;
+  --color-teal: #59b89f;
+  --color-teal-2: #163f35;
+  --color-teal-soft: #e2f3ed;
   --color-led: #22c55e;
 
   --color-amber: #b45309;
@@ -116,14 +116,16 @@
 
 @layer base {
   :root {
-    /* The sidebar toggle is centered in the icon rail. When the sidebar is open,
-       keep it at that same x so collapsing never makes it jump sideways. */
+    /* Keep the toggle centered on the rail's icon column in both sidebar states. */
     --sidebar-toggle-inset: calc((var(--rail-width, 64px) - 36px) / 2);
   }
   /* macOS desktop app has no title bar: room for the red/yellow/green buttons. */
   :root[data-desktop="darwin"] {
     --rail-inset: 32px;
-    --rail-width: 80px;
+    /* Reserve the traffic-light row and keep the toggle beside it in both states. */
+    --rail-width: 112px;
+    --sidebar-toggle-inset: 68px;
+    --sidebar-toggle-top: 6px;
   }
   html,
   body,

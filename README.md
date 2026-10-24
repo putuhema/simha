@@ -5,7 +5,7 @@
 - **Investigasi keluhan:** switch the chat to **Investigasi** and paste a nurse's complaint. The agent reads the real patient data through safe, read-only tools, explains each check, gives a diagnosis and proposes a fix as SQL. The fix only runs after a person clicks **Approve**, and it can be rolled back.
 - **Tanya Data mode:** ask questions about hospital data in plain Indonesian ("10 obat paling banyak dipakai minggu ini"). The agent writes a guarded `SELECT` and shows the answer as a table, chart or number.
 
-> Status: **M6.7 done**: SIMRS Khanza login and rights (one account, same permissions), web UI (Tanya Data with an investigate mode, Pengetahuan AI, Pengaturan), desktop app with Khanza bridge, resume drafts, app map and AI learning (examples, notes, feedback). See [docs/PLAN.md](docs/PLAN.md). Name, tagline and identifiers: [docs/BRAND.md](docs/BRAND.md).
+> Status: **M6.8 done**: SIMRS Khanza login and rights (one account, same permissions), identity/access questions, web UI (Tanya Data with an investigate mode, Pengetahuan AI, Pengaturan), desktop app with Khanza bridge, resume drafts, app map and AI learning (examples, notes, feedback). See [docs/PLAN.md](docs/PLAN.md). Name, tagline and identifiers: [docs/BRAND.md](docs/BRAND.md).
 
 ## Safety model (short version)
 
@@ -169,6 +169,8 @@ Open http://127.0.0.1:8787. Log in with a **SIMRS Khanza account**: the same use
 | AI settings and knowledge review | Admin Utama |
 
 Riwayat pasien, Tanya Data and patient search have no Khanza menu of their own, so every SIMRS login can use them — the same rule the Khanza bridge uses for **Riwayat Perawatan**. Buttons and cards the account may not use are hidden or replaced with an explanation, and the API returns 403 if one is called directly.
+
+**Identity and access questions.** Every question carries the logged-in account: username, display name, and the linked employee / doctor / petugas name from Khanza. The assistant answers *"siapa saya?"*, *"nama dokter saya siapa?"* and *"apa hak akses saya?"* from that block, and calls the `aksesSaya` tool for *"bisa buka menu kasir?"*, *"punya hak tindakan_ranap?"* or any menu/form/right. The tool checks the account's rights snapshot against the generated desktop app map and returns `diizinkan` plus the exact Khanza right. **Pengaturan → Akun** shows the same identity, the mapped features, the workflow tables the account may approve, and the full list of granted Khanza rights.
 
 - **Investigasi keluhan.** In the composer, switch the mode from **Tanya data** to **Investigasi** and paste the nurse's complaint. It is the same chat as Tanya Data, so follow-up questions keep the context. The answer shows:
   - "Yang dicek AI" (✓ fine, ! problem found, ✕ failed; click a step for its details);

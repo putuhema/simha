@@ -530,6 +530,12 @@ export const User = Schema.Struct({
   /** True when the username matches a row in Khanza's `admin` table. */
   khanzaAdmin: Schema.Boolean,
   permissions: Permissions,
+  /** The granted Khanza right columns. Empty for an Admin Utama, who has every right. */
+  rights: Schema.Array(Schema.String),
+  /** Names linked to the SIMRS username; null when that master table has no matching row. */
+  employeeName: Schema.NullOr(Schema.String),
+  doctorName: Schema.NullOr(Schema.String),
+  staffName: Schema.NullOr(Schema.String),
 });
 export type User = typeof User.Type;
 

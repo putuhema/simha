@@ -4,7 +4,7 @@
  */
 import type { RenderBlock } from "@simha/shared";
 
-const SERIES_COLORS = ["#0f6b61", "#b45309", "#3f5c8a", "#9a3b5f", "#5b6b2f"];
+const SERIES_COLORS = ["#59b89f", "#b45309", "#3f5c8a", "#9a3b5f", "#5b6b2f"];
 
 const INK = "#1a1f1e";
 const MUTED = "#878d8a";
