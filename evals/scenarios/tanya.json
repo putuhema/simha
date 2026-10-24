@@ -1,0 +1,93 @@
+[
+  {
+    "id": "tanya-chart-poli",
+    "question": "Buatkan grafik batang jumlah kunjungan per poli untuk 1–31 Oktober 2026, urutkan dari yang terbanyak.",
+    "mode": "tanya",
+    "user": "admin",
+    "notes": "Tanya Data chart path: schema lookup, one guarded SELECT, then tampilkan as a bar chart. The test DB has 3 Poli Umum and 2 Poli Gigi visits in October 2026.",
+    "expect": {
+      "toolsAny": [
+        "jalankanQueryBaca"
+      ],
+      "block": "bar",
+      "rows": 2,
+      "numbers": [
+        3,
+        2
+      ],
+      "answer": [
+        "poli"
+      ]
+    }
+  },
+  {
+    "id": "tanya-stat-rawat-inap",
+    "question": "Berapa pasien rawat inap yang masih dirawat saat ini? Tampilkan sebagai satu angka.",
+    "mode": "tanya",
+    "user": "admin",
+    "notes": "A stat answer: 2026/10/20/000001, 2026/10/21/000002 and 2026/10/23/000006 have an active kamar_inap row.",
+    "expect": {
+      "toolsAny": [
+        "jalankanQueryBaca"
+      ],
+      "block": "stat",
+      "numbers": [
+        3
+      ],
+      "answer": [
+        "3"
+      ]
+    }
+  },
+  {
+    "id": "tanya-table-penjab",
+    "question": "Tampilkan sebagai tabel (bukan grafik): jumlah kunjungan BPJS dan umum pada 1–31 Oktober 2026.",
+    "mode": "tanya",
+    "user": "admin",
+    "notes": "Table answer grouped by penjab: three BPJS visits and two umum visits in October 2026.",
+    "expect": {
+      "toolsAny": [
+        "jalankanQueryBaca"
+      ],
+      "block": "table",
+      "rows": 2,
+      "numbers": [
+        3,
+        2
+      ],
+      "answer": [
+        "bpj|umum"
+      ]
+    }
+  },
+  {
+    "id": "tanya-menu-pindah-kamar",
+    "question": "Di menu mana saya bisa pindah kamar pasien rawat inap?",
+    "mode": "tanya",
+    "user": "admin",
+    "notes": "The app-map path: the agent must search the generated Khanza map instead of guessing a menu.",
+    "expect": {
+      "toolsAny": [
+        "cariAplikasiKhanza",
+        "detailAplikasi"
+      ],
+      "answer": [
+        "rawat inap|pindah|kamar"
+      ],
+      "block": "none"
+    }
+  },
+  {
+    "id": "tanya-siapa-saya",
+    "question": "Siapa saya?",
+    "mode": "tanya",
+    "user": "admin",
+    "notes": "The identity block is in every turn; the answer must name the logged-in SIMRS account, not ask the user.",
+    "expect": {
+      "answer": [
+        "it-budi|budi santika"
+      ],
+      "block": "none"
+    }
+  }
+]

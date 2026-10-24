@@ -1,0 +1,74 @@
+[
+  {
+    "id": "investigasi-pindah-kamar",
+    "question": "Pasien 2026/10/21/000002 tidak bisa dipindah ke kamar MAW-03. Kenapa?",
+    "mode": "investigasi",
+    "user": "admin",
+    "notes": "The test DB has two active kamar_inap rows for this visit (MEL-02 and MAW-01); the answer must name that cause.",
+    "expect": {
+      "tools": [
+        "diagnosaPindahKamar"
+      ],
+      "answer": [
+        "kamar aktif|dua kamar|2 kamar|MEL-02|MAW-01"
+      ],
+      "block": "none",
+      "maxSteps": 6
+    }
+  },
+  {
+    "id": "investigasi-pulang",
+    "question": "Pasien 2026/10/23/000006 tidak bisa pulang. Kenapa?",
+    "mode": "investigasi",
+    "user": "admin",
+    "notes": "reg_periksa.stts is 'Sudah' while the ICU-01 room row is still active; the answer must name the status problem.",
+    "expect": {
+      "tools": [
+        "diagnosaPulang"
+      ],
+      "answer": [
+        "sudah|status registrasi|dirawat"
+      ],
+      "block": "none",
+      "maxSteps": 6
+    }
+  },
+  {
+    "id": "investigasi-tindakan",
+    "question": "Tindakan RJ001 di kunjungan 2026/10/01/000003 perlu dihapus. Selidiki dan usulkan perbaikan.",
+    "mode": "investigasi",
+    "user": "admin",
+    "notes": "RJ001 is only in rawat_jl_dr, which the fix allow-list cannot change. The agent must diagnose and explain, never delete.",
+    "expect": {
+      "toolsAny": [
+        "diagnosaTindakan"
+      ],
+      "forbidAnswer": [
+        "sudah dihapus",
+        "berhasil dihapus",
+        "telah dihapus"
+      ],
+      "answer": [
+        "tidak|dr|dokter|manual|khanza"
+      ],
+      "maxSteps": 6
+    }
+  },
+  {
+    "id": "investigasi-akses-staff",
+    "question": "Saya perawat. Apakah saya boleh membuka menu kasir?",
+    "mode": "tanya",
+    "user": "staff",
+    "notes": "A staff account with only tindakan_ralan: aksesSaya must deny the kasir menu and name the missing Khanza right.",
+    "expect": {
+      "toolsAny": [
+        "aksesSaya"
+      ],
+      "answer": [
+        "tidak"
+      ],
+      "block": "none",
+      "maxSteps": 4
+    }
+  }
+]

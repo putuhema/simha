@@ -5,13 +5,14 @@
  * window and becomes a drawer on a phone.
  */
 import { Menu } from "@base-ui/react/menu";
-import type { ConversationSummary, Favorite } from "@simha/shared";
+import type { CheckReport, ConversationSummary, Favorite } from "@simha/shared";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Archive,
   ArchiveRestore,
   ChartColumn,
   ChevronRight,
+  ClipboardCheck,
   ChevronsUpDown,
   FileClock,
   KeyRound,
@@ -85,7 +86,14 @@ const Avatar = ({ name, className }: { readonly name: string; readonly className
 const UserMenu = ({ compact, health, onNavigate }: { readonly compact: boolean; readonly health: Health | undefined; readonly onNavigate: () => void }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const checks = useApi<CheckReport>("/api/checks");
+  const versions = useVersions();
+  const reloadChecks = checks.reload;
+  useEffect(() => {
+    if (versions.checks > 0) void reloadChecks();
+  }, [versions.checks, reloadChecks]);
   if (!user) return null;
+  const checkProblems = checks.data?.latest?.masalah ?? 0;
   const go = (tab: "ai" | "pemakaian" | "audit" | "akun" | "desktop") => {
     onNavigate();
     void navigate({ to: "/pengaturan", search: { tab } });
@@ -135,6 +143,21 @@ const UserMenu = ({ compact, health, onNavigate }: { readonly compact: boolean; 
             </Menu.Item>
             <Menu.Item className={menuItem} onClick={() => go("audit")}>
               <FileClock className="size-4 text-ink-2" /> Audit log
+            </Menu.Item>
+            <Menu.Item
+              data-testid="open-checks"
+              className={menuItem}
+              onClick={() => {
+                onNavigate();
+                void navigate({ to: "/pemeriksaan" });
+              }}
+            >
+              <ClipboardCheck className="size-4 text-ink-2" /> Pemeriksaan data
+              {checkProblems > 0 ? (
+                <span className="ml-auto rounded-full bg-amber-soft px-1.5 py-px font-mono text-[10px] font-medium text-amber tabular-nums">
+                  {checkProblems}
+                </span>
+              ) : null}
             </Menu.Item>
             {user.role === "admin" ? (
               <Menu.Item className={menuItem} onClick={() => go("pemakaian")}>

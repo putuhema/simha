@@ -53,6 +53,7 @@ const page = (load: () => Promise<ComponentType>) => {
 };
 const TanyaPage = page(() => import("./features/tanya/TanyaPage.tsx").then((m) => m.TanyaPage));
 const PengaturanPage = page(() => import("./features/pengaturan/PengaturanPage.tsx").then((m) => m.PengaturanPage));
+const PemeriksaanPage = page(() => import("./features/pemeriksaan/PemeriksaanPage.tsx").then((m) => m.PemeriksaanPage));
 
 const rootRoute = createRootRoute({ component: Root });
 const shellRoute = createRoute({ getParentRoute: () => rootRoute, id: "shell", component: AppShell });
@@ -70,9 +71,15 @@ const text = (value: unknown) => (typeof value === "string" && value !== "" ? va
 const tanyaRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/tanya",
-  validateSearch: (search: Record<string, unknown>): { c?: string } => {
+  validateSearch: (search: Record<string, unknown>): { c?: string; q?: string; mode?: "investigasi" } => {
     const c = text(search["c"]);
-    return c ? { c } : {};
+    const q = text(search["q"]);
+    const mode = search["mode"] === "investigasi" ? ("investigasi" as const) : undefined;
+    return {
+      ...(c ? { c } : {}),
+      ...(q ? { q } : {}),
+      ...(mode ? { mode } : {}),
+    };
   },
   component: TanyaPage,
 });
@@ -84,6 +91,12 @@ const pengetahuanRoute = createRoute({
   beforeLoad: () => {
     throw redirect({ to: "/pengaturan", search: { tab: "pengetahuan" } });
   },
+});
+
+const pemeriksaanRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/pemeriksaan",
+  component: PemeriksaanPage,
 });
 
 const TABS: ReadonlyArray<SettingsTab> = ["ai", "pemakaian", "audit", "akun", "desktop", "pengetahuan"];
@@ -107,7 +120,7 @@ const notFoundRoute = createRoute({
 
 export const router = createRouter({
   routeTree: rootRoute.addChildren([
-    shellRoute.addChildren([indexRoute, tanyaRoute, pengetahuanRoute, pengaturanRoute, notFoundRoute]),
+    shellRoute.addChildren([indexRoute, tanyaRoute, pengetahuanRoute, pemeriksaanRoute, pengaturanRoute, notFoundRoute]),
   ]),
   defaultPreload: false,
 });

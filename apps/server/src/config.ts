@@ -32,3 +32,29 @@ export const HttpSettingsLive = Layer.effect(
     return yield* HttpConfig;
   }),
 );
+
+/**
+ * Routine data checks (M5.2). They run once shortly after boot and then every
+ * interval. 0 pauses the schedule; `Jalankan sekarang` on the Pemeriksaan page
+ * still works.
+ */
+export const ChecksConfig = Config.all({
+  intervalMinutes: Config.Number("CHECKS_INTERVAL_MINUTES").pipe(
+    Config.withDefault(360),
+    Config.map((minutes) => Math.max(0, Math.min(10_080, Math.round(minutes)))),
+  ),
+  startupDelaySeconds: Config.Number("CHECKS_STARTUP_DELAY_SECONDS").pipe(
+    Config.withDefault(60),
+    Config.map((seconds) => Math.max(0, Math.min(3_600, Math.round(seconds)))),
+  ),
+});
+export class ChecksSettings extends Context.Service<ChecksSettings, Config.Success<typeof ChecksConfig>>()(
+  "simha/ChecksSettings",
+) {}
+
+export const ChecksSettingsLive = Layer.effect(
+  ChecksSettings,
+  Effect.gen(function* () {
+    return yield* ChecksConfig;
+  }),
+);

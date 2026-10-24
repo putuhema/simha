@@ -11,6 +11,10 @@ So this is not a "fix the basics" review. It is a list of gaps between a very go
 prototype and something a hospital can run for years, plus the places where the UI
 does more work than it needs to.
 
+> Update 2026-10-24: item 8 (M5.2 — routine checks and the agent test set) is
+> implemented. See `docs/PLAN.md` (M5.2 notes) and `evals/README.md`. The
+> performance items in section B remain open unless noted in PLAN.md.
+
 ---
 
 ## A. What to add

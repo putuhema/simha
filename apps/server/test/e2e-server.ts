@@ -21,7 +21,7 @@
  */
 import { NodeFileSystem, NodeHttpServer, NodeRuntime } from "@effect/platform-node";
 import { fakeTurn, makeFakeClient, type ChatRequest, type FakeTurn } from "@simha/llm";
-import { AppDocsLive, AuditLogMemory, Berkas, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, makeBerkas, pacsLayer, KnowledgeStoreLive, ResultStoreLive, SchemaDocsLive } from "@simha/tools";
+import { AppDocsLive, AuditLogMemory, Berkas, CheckStoreLive, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, makeBerkas, pacsLayer, KnowledgeStoreLive, ResultStoreLive, SchemaDocsLive } from "@simha/tools";
 import { startTestDb } from "@simha/tools/testing/db";
 import { Duration, Effect, Layer, Redacted } from "effect";
 import { HttpRouter } from "effect/http";
@@ -39,6 +39,7 @@ import { FAKE_ORTHANC, makeFakeOrthanc } from "./fake-orthanc.ts";
 import { StoreLive } from "../src/store.ts";
 import { UsageLive } from "../src/usage.ts";
 import { ViewsLive } from "../src/views.ts";
+import { ChecksLive } from "../src/checks/Checks.ts";
 
 /** The fixture files pointed at by berkas_digital_perawatan in the test seed. */
 const BERKAS_DIR = NodePath.resolve(import.meta.dirname, "..", "..", "..", "packages", "tools", "test", "fixtures", "berkas");
@@ -247,10 +248,11 @@ const main = Effect.gen(function* () {
 
   const read = khanzaReadLayer({ connection: connection(info.readUser, info.readPass), timeout: Duration.seconds(5) });
   const auth = AuthLive.pipe(Layer.provideMerge(KhanzaAccountsLive.pipe(Layer.provideMerge(read))));
-  const app = Layer.mergeAll(AgentLive, FixExecutorLive, ViewsLive, UsageLive).pipe(
+  const app = Layer.mergeAll(AgentLive, FixExecutorLive, ViewsLive, UsageLive, ChecksLive).pipe(
     Layer.provideMerge(
       Layer.mergeAll(
         StoreLive,
+        CheckStoreLive,
         FixStoreLive,
         KnowledgeStoreLive,
         ResultStoreLive,

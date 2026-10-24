@@ -9,6 +9,8 @@
  *   POST   /api/auth/login | logout
  *   POST   /api/auth/refresh             re-read this account's rights from SIMRS
  *   GET    /api/stats                    registrations today, inpatients, pending fixes
+ *   GET    /api/checks                   latest routine data check and run history
+ *   POST   /api/checks/run               run the routine checks now (admin)
  *   POST   /api/ask                      a Tanya Data question or an investigation (SSE)
  *   GET    /api/conversations            recent Tanya Data threads (?mine=1)
  *   GET    /api/conversations/:id        one thread with its answers and blocks
@@ -91,6 +93,7 @@ import { Effect, Layer, Option, Schema } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { Agent } from "../agent/Agent.ts";
 import { Auth, AuthError, CurrentUser, SESSION_COOKIE, SESSION_HOURS } from "../auth/Auth.ts";
+import { Checks } from "../checks/Checks.ts";
 import { HttpSettings } from "../config.ts";
 import { favoriteFromBlock, runFavorite } from "../favorites.ts";
 import { FixActionError, FixExecutor } from "../fixes/FixExecutor.ts";
@@ -989,6 +992,24 @@ const KnowledgeRoutes = Layer.mergeAll(
   ),
 );
 
+const CheckRoutes = Layer.mergeAll(
+  route("GET", "/api/checks", authed(Effect.gen(function* () {
+      return json(yield* (yield* Checks).report);
+    }))),
+
+  route(
+    "POST",
+    "/api/checks/run",
+    authed(
+      Effect.gen(function* () {
+        const user = yield* CurrentUser;
+        return json(yield* (yield* Checks).run("manual", user.username), 201);
+      }),
+      { admin: true },
+    ),
+  ),
+);
+
 const DataRoutes = Layer.mergeAll(
   route("GET", "/api/favorites", authed(Effect.gen(function* () {
       return json(yield* (yield* ResultStore).listFavorites);
@@ -1169,4 +1190,4 @@ const WebRoutes = route(
   }),
 );
 
-export const Routes = Layer.mergeAll(AuthRoutes, ChatRoutes, FixRoutes, DocumentRoutes, PacsRoutes, BerkasRoutes, DraftRoutes, DataRoutes, KnowledgeRoutes, WebRoutes);
+export const Routes = Layer.mergeAll(AuthRoutes, ChatRoutes, FixRoutes, DocumentRoutes, PacsRoutes, BerkasRoutes, DraftRoutes, CheckRoutes, DataRoutes, KnowledgeRoutes, WebRoutes);

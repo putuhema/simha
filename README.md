@@ -5,7 +5,7 @@
 - **Investigasi keluhan:** switch the chat to **Investigasi** and paste a nurse's complaint. The agent reads the real patient data through safe, read-only tools, explains each check, gives a diagnosis and proposes a fix as SQL. The fix only runs after a person clicks **Approve**, and it can be rolled back.
 - **Tanya Data mode:** ask questions about hospital data in plain Indonesian ("10 obat paling banyak dipakai minggu ini"). The agent writes a guarded `SELECT` and shows the answer as a table, chart or number.
 
-> Status: **M6.9 done**: SIMRS Khanza login and rights (one account, same permissions), identity/access questions, AI usage & cost, web UI (Tanya Data with an investigate mode, Pengetahuan AI, Pengaturan), desktop app with Khanza bridge, resume drafts, app map and AI learning (examples, notes, feedback). See [docs/PLAN.md](docs/PLAN.md). Name, tagline and identifiers: [docs/BRAND.md](docs/BRAND.md).
+> Status: **M5.2 done**: routine data checks (Pemeriksaan data) and the agent test set (`pnpm eval`), on top of SIMRS Khanza login and rights (one account, same permissions), identity/access questions, AI usage & cost, web UI (Tanya Data with an investigate mode, Pengetahuan AI, Pengaturan), desktop app with Khanza bridge, resume drafts, app map and AI learning (examples, notes, feedback). See [docs/PLAN.md](docs/PLAN.md). Name, tagline and identifiers: [docs/BRAND.md](docs/BRAND.md).
 
 ## Safety model (short version)
 
@@ -187,6 +187,7 @@ Riwayat pasien, Tanya Data and patient search have no Khanza menu of their own, 
   You can also ask the AI, e.g. *"hasil radiologi 2026/10/22/000012"* or *"foto thorax RM 037423"*. The `hasilRadiologi` tool shows one card per question: each exam from Khanza (`periksa_radiologi`, name, radiologist) with its reading (`hasil_radiologi`, the *Kesan* highlighted) and the PACS images of that exam (same day or the next, closest in time). For a visit, images are looked up from registration until discharge plus a day. When PACS is not set up, the readings are still shown. The AI does not repeat the card in its answer unless you ask for a summary, and it never sees or interprets the images. Try it from the terminal with `pnpm tool hasilRadiologi '{"noRawat":"2026/10/22/000012"}'`.
 
   The HTML is filled from a fixed template by the server, never written by the AI, and every value is escaped. It is served with a CSP that allows no scripts. Generated documents are kept in the audit DB, and downloads are logged.
+- **Pemeriksaan data.** Seven read-only checks for known Khanza data problems run at startup and every 6 hours (or on demand): two active rooms for one visit, a finished registration still in a room, room status that disagrees with its occupants, an active inpatient without DPJP or diagnosis, a SEP still open after the visit closed, and a Ranap registration without a room. **Pemeriksaan data** in the account menu shows the findings with the visit and patient, what to do, and the run history. **Selidiki** opens Investigasi with the finding as the complaint, so the next step is the same agent and approval flow.
 - **Tanya Data.** Ask in plain Indonesian. Answers show tables (sortable, CSV export), charts and numbers, each with an assumption line and "Query yang dipakai". The **card panel** on the right is closed by default (a new chat, starting the app, or opening a stored thread), so the chat stays uncluttered. While a live answer runs, the panel opens by itself as soon as it produces a result. Every result — table, chart, numbers, document, form draft, radiology or digital file — goes there: the chat keeps a one-line door to it, a strip of tabs switches between cards, the panel can be dragged wider, and the expand icon fills the window with the card (the same icon or Esc goes back to the panel). Earlier cards reopen with the small card button at the top right (or ⇧⌘K). On a narrow window the cards stay inline in the chat. **Simpan ke favorit** saves the question and SQL; favorites re-run without the AI.
 - **Pengaturan.** The tabs are:
   - **AI:** provider, model, base URL, API key, "samarkan data" and **Tes koneksi**. Saving switches the AI without a restart and overrides `.env`; admins only.
@@ -306,6 +307,8 @@ Send the `conversationId` with the next `/api/ask` for a follow-up. Add `"mode":
 | `POST /api/auth/login`, `POST /api/auth/logout` | SIMRS username and password; logout |
 | `POST /api/auth/refresh` | re-read this account's rights from Khanza (`403`/`401` as appropriate) |
 | `GET /api/stats` | registrations today, inpatients, fixes waiting |
+| `GET /api/checks` | latest routine data check (findings, samples, advice) and the run history |
+| `POST /api/checks/run` | run the routine checks now (admin); stores the report |
 | `POST /api/ask` | `{ question, conversationId?, mode?: "tanya" \| "investigasi" }` (SSE) |
 | `GET /api/conversations`, `GET /api/conversations/:id` | chat threads (`?mine=1`), active first and pinned on top; each run carries its mode |
 | `PATCH /api/conversations/:id` | `{ pinned?, archived? }`: pin, unpin, archive or unarchive (owner or admin) |
@@ -386,6 +389,36 @@ The agent answers data questions with three tools:
 
 Favorites store the question, the SQL and the chart settings, and re-run through the same guard and audit log.
 
+## Routine checks and the agent test set (M5.2)
+
+**Pemeriksaan data** (`/pemeriksaan`) answers "is there a data problem we already know about?" without asking the AI. The checks are fixed read-only SQL in `packages/tools/src/checks/definitions.ts`, run sequentially through the SELECT-only user, and stored in the audit DB (`check_runs`, `check_results`). The newest 30 runs are kept.
+
+| Check | Severity | What it finds |
+|---|---|---|
+| `kamar-ganda` | kritis | One visit with more than one active `kamar_inap` row (the usual cause of "tidak bisa pindah kamar"). |
+| `pulang-kamar-aktif` | kritis | `reg_periksa.stts` already Sudah/Batal/Meninggal/Dirujuk while a room is still active. |
+| `ranap-tanpa-kamar` | kritis | A Ranap registration still open with no active room. |
+| `kamar-status-salah` | peringatan | `kamar.status` ISI with no patient, or KOSONG with a patient. |
+| `ranap-tanpa-diagnosa` | peringatan | Active inpatient with no `diagnosa_pasien` status Ranap. |
+| `sep-belum-ditutup` | peringatan | A SEP still open for a visit whose registration has finished. |
+| `ranap-tanpa-dpjp` | info | Active inpatient without a `dpjp_ranap` row. |
+
+- **Schedule.** `CHECKS_INTERVAL_MINUTES` (default `360`) and `CHECKS_STARTUP_DELAY_SECONDS` (default `60`). Set the interval to `0` to pause the timer; **Jalankan sekarang** still works (admin only).
+- **API.** `GET /api/checks` returns the newest report and history; `POST /api/checks/run` runs now. A failed check is reported as `gagal` with its error and never stops the others.
+- **From a finding to a fix.** **Selidiki** goes to `/tanya?q=…&mode=investigasi`: a fresh thread, Investigasi mode, the complaint pre-filled. From there it is the normal diagnose → propose → approve → rollback flow. Nothing on this page writes to Khanza.
+
+**Agent test set.** `pnpm eval` runs the fixed scenarios in `evals/scenarios/*.json` through the real agent loop and scores them, so a provider, model or prompt change can be compared before staff see it:
+
+```bash
+pnpm eval                                # synthetic test DB, provider from .env
+pnpm eval -- --live                      # the Khanza DB from .env, read-only user
+pnpm eval -- --scenario=safety-nik       # one scenario
+pnpm eval -- --list                      # ids and questions, no AI call
+pnpm eval -- --json                      # machine-readable report
+```
+
+A scenario names the tools it expects (`diagnosaPindahKamar`, `jalankanQueryBaca`, `aksesSaya`), the block type/rows/numbers, answer regexes and forbidden tools or values (for example a NIK, a password column or a destructive `hapus`). It does not compare prose word for word. The default DB is the synthetic one, so no patient data leaves the hospital. Results are written to `data/eval-results/`; the exit code is 1 when any scenario fails or when the audit DB shows a write query or an approved/applied fix, so CI can gate a release. The fake provider is refused because it cannot score answer quality.
+
 ## AI learning (what the AI remembers)
 
 The AI improves across questions without fine-tuning. A successful Tanya Data answer that showed a result
@@ -445,6 +478,7 @@ pnpm start       # start the HTTP server (apps/server)
 pnpm dev:web     # UI with hot reload on :5173, /api forwarded to :8787 (run pnpm start too)
 pnpm build       # build the UI into apps/web/dist
 pnpm e2e         # build the UI and run the Playwright smoke tests
+pnpm eval        # agent test set against a real provider (see above)
 ```
 
 **End-to-end tests and UI demos.** `node apps/server/test/e2e-server.ts` starts a server on :8799 with:
@@ -484,4 +518,6 @@ scripts/
   run-tool.ts           run one read or Tanya Data tool from the terminal (pnpm tool)
 docs/
   schema.md, khanza_notes.md, PLAN.md
+evals/
+  scenarios/  agent test set: fixed questions, expected tools and facts
 ```

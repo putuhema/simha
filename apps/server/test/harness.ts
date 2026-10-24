@@ -5,7 +5,7 @@
 import { NodeFileSystem } from "@effect/platform-node";
 import { makeFakeClient, type FakeTurn, type LlmInfo } from "@simha/llm";
 import type { AgentEvent } from "@simha/shared";
-import { appDocsLayer, AuditLogMemory, Berkas, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, makeBerkas, pacsLayer, KnowledgeStoreLive, ResultStoreLive, schemaDocsLayer, type Pacs } from "@simha/tools";
+import { appDocsLayer, AuditLogMemory, Berkas, CheckStoreLive, FixStoreLive, khanzaReadLayer, khanzaWriteLayer, makeBerkas, pacsLayer, KnowledgeStoreLive, ResultStoreLive, schemaDocsLayer, type Pacs } from "@simha/tools";
 import { connectionAs, testDb } from "@simha/tools/testing";
 import { Duration, Effect, Layer, ManagedRuntime, Redacted } from "effect";
 import { SqlClient } from "effect/sql";
@@ -22,6 +22,7 @@ import { llmSettingsLayer } from "../src/llm/LlmSettings.ts";
 import { StoreLive } from "../src/store.ts";
 import { UsageLive } from "../src/usage.ts";
 import { ViewsLive } from "../src/views.ts";
+import { ChecksLive } from "../src/checks/Checks.ts";
 
 export { testDb };
 
@@ -162,10 +163,11 @@ export const makeTestApp = (
   });
   const read = khanzaReadLayer({ connection: connectionAs(db, db.readUser, db.readPass), timeout: Duration.seconds(5) });
   const auth = AuthLive.pipe(Layer.provideMerge(KhanzaAccountsLive.pipe(Layer.provideMerge(read))));
-  const app = Layer.mergeAll(AgentLive, FixExecutorLive, ViewsLive, UsageLive).pipe(
+  const app = Layer.mergeAll(AgentLive, FixExecutorLive, ViewsLive, UsageLive, ChecksLive).pipe(
     Layer.provideMerge(
       Layer.mergeAll(
         StoreLive,
+        CheckStoreLive,
         FixStoreLive,
         KnowledgeStoreLive,
         ResultStoreLive,

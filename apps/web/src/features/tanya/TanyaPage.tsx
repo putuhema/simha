@@ -309,7 +309,7 @@ const EmptyState = ({
 );
 
 export const TanyaPage = () => {
-  const { c } = useSearch({ from: "/shell/tanya" });
+  const { c, q: prefillQuestion, mode: searchMode } = useSearch({ from: "/shell/tanya" });
   const navigate = useNavigate();
   // Selectors, not the whole store: a text token updates `live` only, so the
   // page and every turn stay put while the answer is written.
@@ -322,6 +322,7 @@ export const TanyaPage = () => {
   const ask = useTanya((s) => s.ask);
   const stop = useTanya((s) => s.stop);
   const open = useTanya((s) => s.open);
+  const reset = useTanya((s) => s.reset);
   const conversationId = useTanya((s) => s.conversationId);
   const health = useApi<Health>("/api/health");
   const [question, setQuestion] = useState("");
@@ -344,8 +345,24 @@ export const TanyaPage = () => {
   const lastAuto = useRef<string | null>(null);
 
   useEffect(() => {
-    if (c && c !== conversationId) void open(c);
-  }, [c, conversationId, open]);
+    if (!prefillQuestion && c && c !== conversationId) void open(c);
+  }, [c, prefillQuestion, conversationId, open]);
+
+  // Pemeriksaan data links here with ?q=…&mode=investigasi. Start a fresh
+  // investigation with the finding as the complaint, then drop the query
+  // string so a reload does not resurrect it.
+  const prefilled = useRef<string | null>(null);
+  useEffect(() => {
+    if (prefillQuestion === undefined) prefilled.current = null;
+  }, [prefillQuestion]);
+  useEffect(() => {
+    if (!prefillQuestion || prefilled.current === prefillQuestion) return;
+    prefilled.current = prefillQuestion;
+    reset();
+    setMode(searchMode === "investigasi" ? "investigasi" : "tanya");
+    setQuestion(prefillQuestion);
+    void navigate({ to: "/tanya", search: {}, replace: true });
+  }, [prefillQuestion, searchMode, reset, setMode, navigate]);
 
   // A card from a live answer opens the panel on its own. Cards restored from a
   // stored conversation do not: the panel starts closed and waits to be opened.

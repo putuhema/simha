@@ -50,6 +50,29 @@ test("logs in with a SIMRS Khanza account", async () => {
   await expect(page.getByTestId("user-menu")).toContainText("Admin SIMRS");
 });
 
+test("routine checks find the planted problems and open an investigation", async () => {
+  await page.getByTestId("user-menu").first().click();
+  await page.getByTestId("open-checks").click();
+  await expect(page).toHaveURL(/\/pemeriksaan$/);
+  await expect(page.getByRole("heading", { name: "Pemeriksaan data" })).toBeVisible();
+  await expect(page.getByText("Belum ada pemeriksaan.")).toBeVisible();
+
+  await page.getByRole("button", { name: /Jalankan sekarang/ }).click();
+  const duplicate = page.getByTestId("check-block").filter({ hasText: "Dua kamar aktif untuk satu kunjungan" });
+  await expect(duplicate).toBeVisible();
+  await expect(duplicate).toContainText("2026/10/21/000002");
+  await expect(duplicate).toContainText("SITI AMINAH");
+  await expect(page.getByText(/Registrasi sudah selesai, kamar masih aktif/)).toBeVisible();
+  await expect(page.getByText(/Status kamar tidak sesuai penghuni/)).toBeVisible();
+
+  // One click opens Investigasi with the finding already typed in.
+  await duplicate.getByRole("button", { name: "Selidiki" }).first().click();
+  await expect(page).toHaveURL(/\/tanya$/);
+  await expect(page.getByRole("heading", { name: "Keluhan apa yang mau diselidiki?" })).toBeVisible();
+  await expect(page.getByLabel("Pertanyaan")).toHaveValue(/Pemeriksaan "Dua kamar aktif untuk satu kunjungan" menemukan/);
+  await expect(page.getByLabel("Pertanyaan")).toHaveValue(/2026\/10\/21\/000002/);
+});
+
 test("the assistant knows the logged-in account and can check a menu", async () => {
   await page.getByRole("button", { name: "Percakapan baru" }).first().click();
   await page.getByLabel("Pertanyaan").fill("Siapa saya?");

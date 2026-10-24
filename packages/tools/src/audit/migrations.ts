@@ -351,6 +351,43 @@ const userProfile = Effect.gen(function* () {
   yield* sql`ALTER TABLE users ADD COLUMN staff_name TEXT`;
 });
 
+const routineChecks = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient;
+  // Scheduled read-only checks for known Khanza data problems (M5.2). The
+  // definition of each check is copied into its result, so an old report still
+  // explains itself after the check's title or advice changes.
+  yield* sql`
+    CREATE TABLE check_runs (
+      id           TEXT PRIMARY KEY,
+      started_at   TEXT NOT NULL,
+      finished_at  TEXT NOT NULL,
+      trigger      TEXT NOT NULL CHECK (trigger IN ('schedule', 'manual', 'startup')),
+      actor        TEXT,
+      status       TEXT NOT NULL CHECK (status IN ('ok', 'gagal')),
+      error        TEXT,
+      duration_ms  INTEGER NOT NULL,
+      masalah      INTEGER NOT NULL,
+      gagal        INTEGER NOT NULL
+    )`;
+  yield* sql`CREATE INDEX check_runs_started ON check_runs (started_at)`;
+  yield* sql`
+    CREATE TABLE check_results (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      run_id       TEXT NOT NULL REFERENCES check_runs (id),
+      check_id     TEXT NOT NULL,
+      title        TEXT NOT NULL,
+      severity     TEXT NOT NULL,
+      description  TEXT NOT NULL,
+      advice       TEXT NOT NULL,
+      status       TEXT NOT NULL CHECK (status IN ('ok', 'masalah', 'gagal')),
+      count        INTEGER NOT NULL,
+      sample_json  TEXT NOT NULL,
+      error        TEXT,
+      duration_ms  INTEGER NOT NULL
+    )`;
+  yield* sql`CREATE INDEX check_results_run ON check_results (run_id)`;
+});
+
 export const auditMigrations = {
   "0001_init": init,
   "0002_agent": agent,
@@ -365,4 +402,5 @@ export const auditMigrations = {
   "0011_investigate_mode": investigateMode,
   "0012_simrs_login": simrsLogin,
   "0013_user_profile": userProfile,
+  "0014_routine_checks": routineChecks,
 };
