@@ -285,7 +285,9 @@ export const SidebarPanel = ({ health, onNavigate, onClose, closeLabel }: PanelP
   const versions = useVersions();
   const conversations = useApi<ReadonlyArray<ConversationSummary>>("/api/conversations?mine=1");
   const favorites = useApi<ReadonlyArray<Favorite>>("/api/favorites");
-  const { conversationId, runFavorite, running } = useTanya();
+  const conversationId = useTanya((s) => s.conversationId);
+  const running = useTanya((s) => s.running);
+  const runFavorite = useTanya((s) => s.runFavorite);
   const { searching, startSearch, stopSearch } = useSidebar();
   const [query, setQuery] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);

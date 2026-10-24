@@ -4,6 +4,12 @@ import { useEffect, useRef, useState } from "react";
 const CATCH_UP_SECONDS = 0.35;
 /** Slowest reveal, so a trickle of tokens still looks like typing. */
 const MIN_CHARS_PER_SECOND = 60;
+/**
+ * Reveal at most this often. The answer is markdown; reparsing it 60 times a
+ * second is what makes a long answer stutter on a slow PC. 30 fps still looks
+ * like typing.
+ */
+const FRAME_MS = 1000 / 30;
 
 /**
  * Reveals `target` at a steady pace while it streams in. Providers often
@@ -17,6 +23,10 @@ export const useSmoothText = (target: string, streaming: boolean): { readonly te
   const streamed = useRef(streaming);
   if (streaming) streamed.current = true;
   const shownLength = useRef(streaming ? 0 : target.length);
+  // `target` changes on every token; the trickle loop reads it from a ref
+  // instead of restarting on each change.
+  const latestTarget = useRef(target);
+  latestTarget.current = target;
   const [, setFrame] = useState(0);
 
   // A different answer (not a continuation of what is shown) is shown whole.
@@ -28,18 +38,19 @@ export const useSmoothText = (target: string, streaming: boolean): { readonly te
     let frame = 0;
     let last = performance.now();
     const tick = (now: number) => {
+      frame = requestAnimationFrame(tick);
+      if (now - last < FRAME_MS) return;
       const seconds = Math.min(0.1, (now - last) / 1000);
       last = now;
-      const remaining = target.length - shownLength.current;
+      const remaining = latestTarget.current.length - shownLength.current;
       if (remaining <= 0) return;
       const rate = Math.max(MIN_CHARS_PER_SECOND, remaining / CATCH_UP_SECONDS);
-      shownLength.current = Math.min(target.length, shownLength.current + Math.max(1, Math.round(rate * seconds)));
+      shownLength.current = Math.min(latestTarget.current.length, shownLength.current + Math.max(1, Math.round(rate * seconds)));
       setFrame((n) => n + 1);
-      frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [animate, target]);
+  }, [animate]);
 
   if (!streamed.current) return { text: target, typing: false };
   return { text: target.slice(0, shownLength.current), typing: streaming || shownLength.current < target.length };

@@ -8,7 +8,7 @@
 import { Collapsible } from "@base-ui/react/collapsible";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { ArrowRight, Check, ChevronRight, Copy, FolderClosed, PanelRightOpen, ShieldCheck, UserRound } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnswerFeedback } from "../../components/agent/AnswerFeedback.tsx";
 import { StreamingMarkdown } from "../../components/agent/Markdown.tsx";
 import { PendingLine, pendingStep, StepList } from "../../components/agent/StepList.tsx";
@@ -19,7 +19,7 @@ import { Dialog } from "../../components/ui/Dialog.tsx";
 import { ErrorText } from "../../components/ui/Field.tsx";
 import { Spinner } from "../../components/ui/Spinner.tsx";
 import { rmFromSteps, rmFromText, splitAnswer } from "../../lib/answer.ts";
-import { cardsFromTurns, cardsOfTurn, type AnswerCard } from "../../lib/cards.ts";
+import { cardsByTurn, cardsFromTurns, type AnswerCard } from "../../lib/cards.ts";
 import { cn } from "../../lib/cn.ts";
 import { formMentioned, noRawatIn, noRmIn, type KhanzaForm } from "../../lib/desktop.ts";
 import type { RunView } from "../../lib/run.ts";
@@ -115,17 +115,27 @@ const khanzaButtonFor = (turn: RunView): { form: KhanzaForm; noRawat: string | n
   return { form, noRawat, noRm };
 };
 
-const Turn = ({
-  turn,
-  cards,
-  wide,
-  selectedKey,
-}: {
+/** No cards is a stable empty array, so a memoized turn is not re-rendered by it. */
+const NO_CARDS: ReadonlyArray<AnswerCard> = [];
+
+/**
+ * The answer text is the only thing that changes per token. Keeping it in this
+ * leaf (fed by the store's `live` slice) means the thread, the turn and every
+ * other answer in the conversation do not re-render while it streams.
+ */
+const TurnAnswer = ({ turnKey, text, streaming }: { readonly turnKey: string; readonly text: string; readonly streaming: boolean }) => {
+  const live = useTanya((s) => (s.live?.key === turnKey ? s.live.text : text));
+  return <StreamingMarkdown text={live} streaming={streaming} className="text-[14px]" />;
+};
+
+interface TurnProps {
   readonly turn: RunView;
   readonly cards: ReadonlyArray<AnswerCard>;
   readonly wide: boolean;
   readonly selectedKey: string | null;
-}) => {
+}
+
+const Turn = memo(({ turn, cards, wide, selectedKey }: TurnProps) => {
   const khanza = turn.status === "done" ? khanzaButtonFor(turn) : null;
   const running = turn.status === "running";
   // Text answers have no card to rate, so give them their own 👍/👎.
@@ -133,6 +143,11 @@ const Turn = ({
   // An investigation shows its checks; Tanya Data keeps them folded away.
   const [stepsOpen, setStepsOpen] = useState(turn.mode === "investigasi");
   const [patientOpen, setPatientOpen] = useState(false);
+  // These two fields also stream per token, but they change far less often than
+  // the text (writing flips once, thinking streams before the answer).
+  const writing = useTanya((s) => (s.live?.key === turn.key ? s.live.writing : turn.writing));
+  const reasoning = useTanya((s) => (s.live?.key === turn.key ? s.live.reasoning : turn.reasoning));
+  const pending = pendingStep({ status: turn.status, steps: turn.steps, writing, waitingSince: turn.waitingSince, reasoning });
   const rm = rmFromSteps(turn.steps) ?? rmFromText(turn.question) ?? rmFromText(turn.text);
   const diagnosis = splitAnswer(turn.text).diagnosis;
 
@@ -158,16 +173,16 @@ const Turn = ({
             </span>
           </Collapsible.Trigger>
           <Collapsible.Panel className="mt-2 px-0.5 pt-1 transition-opacity duration-150 ease-out data-[ending-style]:opacity-0 data-[ending-style]:duration-[100ms] data-[starting-style]:opacity-0">
-            <StepList steps={turn.steps} pending={pendingStep(turn)} />
+            <StepList steps={turn.steps} pending={pending} />
           </Collapsible.Panel>
         </Collapsible.Root>
       ) : running ? (
         <p className="text-[12.5px] text-ink-3">
-          <PendingLine pending={{ label: "Memahami pertanyaan…", since: turn.waitingSince, reasoning: turn.reasoning }} />
+          <PendingLine pending={{ label: "Memahami pertanyaan…", since: turn.waitingSince, reasoning }} />
         </p>
       ) : null}
 
-      <StreamingMarkdown text={turn.text} streaming={running} className="text-[14px]" />
+      <TurnAnswer turnKey={turn.key} text={turn.text} streaming={running} />
 
       {cards.length > 0 ? (
         wide ? (
@@ -232,7 +247,7 @@ const Turn = ({
       </Dialog>
     </article>
   );
-};
+});
 
 const EmptyState = ({
   composer,
@@ -296,14 +311,30 @@ const EmptyState = ({
 export const TanyaPage = () => {
   const { c } = useSearch({ from: "/shell/tanya" });
   const navigate = useNavigate();
-  const { turns, running, loading, error, mode, setMode, ask, stop, open, conversationId } = useTanya();
+  // Selectors, not the whole store: a text token updates `live` only, so the
+  // page and every turn stay put while the answer is written.
+  const turns = useTanya((s) => s.turns);
+  const running = useTanya((s) => s.running);
+  const loading = useTanya((s) => s.loading);
+  const error = useTanya((s) => s.error);
+  const mode = useTanya((s) => s.mode);
+  const setMode = useTanya((s) => s.setMode);
+  const ask = useTanya((s) => s.ask);
+  const stop = useTanya((s) => s.stop);
+  const open = useTanya((s) => s.open);
+  const conversationId = useTanya((s) => s.conversationId);
   const health = useApi<Health>("/api/health");
   const [question, setQuestion] = useState("");
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
   const follow = useRef(true);
 
-  const cards = useMemo(() => cardsFromTurns(turns), [turns]);
+  const { cards, cardsForTurn } = useMemo(() => {
+    // Per-turn arrays keep their identity, so a memoized Turn skips the rest of
+    // the thread when one turn changes.
+    const byTurn = cardsByTurn(turns);
+    return { cards: cardsFromTurns(turns), cardsForTurn: byTurn };
+  }, [turns]);
   const wide = useWideLayout();
   const panelOpen = useCardsPanel((s) => s.open);
   const selectedId = useCardsPanel((s) => s.selectedId);
@@ -407,7 +438,13 @@ export const TanyaPage = () => {
               <div className="mx-auto w-full max-w-[800px] space-y-9 px-4 pt-12 pb-10 sm:px-8">
                 {loading ? <Spinner className="text-ink-3" /> : null}
                 {turns.map((turn) => (
-                  <Turn key={turn.key} turn={turn} cards={cardsOfTurn(cards, turn.key)} wide={wide} selectedKey={selectedKey} />
+                  <Turn
+                    key={turn.key}
+                    turn={turn}
+                    cards={cardsForTurn.get(turn.key) ?? NO_CARDS}
+                    wide={wide}
+                    selectedKey={selectedKey}
+                  />
                 ))}
               </div>
             )}

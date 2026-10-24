@@ -174,6 +174,16 @@ export const fromTranscript = (run: RunTranscript): RunView => ({
 });
 
 /**
+ * How an update changes a run. `token` only moves the answer text or the
+ * model's thinking; `structure` changes steps, cards, status or identity;
+ * `final` is the last update, sent even after an abort or a dropped stream.
+ */
+export type RunChange = "token" | "structure" | "final";
+
+const changeOf = (event: AgentEvent): RunChange =>
+  event._tag === "text_delta" || event._tag === "reasoning_delta" ? "token" : "structure";
+
+/**
  * POSTs to a streaming endpoint and reports every update. Resolves with the
  * final view; an abort marks the run as stopped.
  */
@@ -181,7 +191,7 @@ export const streamRun = async (
   path: string,
   body: unknown,
   initial: RunView,
-  onUpdate: (run: RunView) => void,
+  onUpdate: (run: RunView, change: RunChange) => void,
   signal: AbortSignal,
 ): Promise<RunView> => {
   let run = initial;
@@ -189,7 +199,7 @@ export const streamRun = async (
     const response = await request("POST", path, body, signal);
     await readEventStream(response, (event) => {
       run = applyEvent(run, event);
-      onUpdate(run);
+      onUpdate(run, changeOf(event));
     });
     if (run.status === "running") run = { ...run, status: "error", error: "Koneksi terputus sebelum jawaban selesai." };
   } catch (error) {
@@ -198,6 +208,6 @@ export const streamRun = async (
         ? { ...run, status: "stopped", steps: run.steps.filter((s) => s.draft === null).map((s) => ({ ...s, running: false })) }
         : { ...run, status: "error", error: error instanceof Error ? error.message : String(error) };
   }
-  onUpdate(run);
+  onUpdate(run, "final");
   return run;
 };

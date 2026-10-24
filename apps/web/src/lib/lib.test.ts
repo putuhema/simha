@@ -5,7 +5,7 @@ import { rmFromSteps, rmFromText, splitAnswer } from "./answer.ts";
 import { fileNameFor, toCsv } from "./csv.ts";
 import { formMentioned, noRawatIn, noRmIn } from "./desktop.ts";
 import { formatAgo, formatRelative } from "./format.ts";
-import { cardsFromTurns } from "./cards.ts";
+import { cardsByTurn, cardsFromTurns } from "./cards.ts";
 import { applyEvent, emptyRun } from "./run.ts";
 import { parseSseChunk } from "./sse.ts";
 import { draftPreview, stepMark, stepSummary, type StepView } from "./steps.ts";
@@ -280,6 +280,35 @@ describe("cardsFromTurns", () => {
       ["radiology", "Radiologi", "RM 000002"],
     ]);
     expect(cards[0]?.key).not.toBe(cards[1]?.key);
+  });
+});
+
+describe("cardsByTurn", () => {
+  it("keeps a turn's card array stable while another turn changes", () => {
+    const first = { ...emptyRun("Kunjungan", "tanya", "t1"), status: "done" as const, blocks: [block({ id: "b1" })] };
+    const second = emptyRun("Pasien", "tanya", "t2");
+    const before = cardsByTurn([first, second]);
+    // A step or token on the running turn gives it a new object; the finished
+    // turn keeps its identity, so its reference-stable cards skip a re-render.
+    const after = cardsByTurn([first, { ...second, text: "Halo" }]);
+    expect(after.get("t1")).toBe(before.get("t1"));
+    expect(after.get("t2")).not.toBe(before.get("t2"));
+  });
+
+  it("moves a later edit of a draft onto the turn that introduced it", () => {
+    const first = { ...emptyRun("Kunjungan", "tanya", "t1"), status: "done" as const, drafts: [draftFixture({})] };
+    const second = {
+      ...emptyRun("Catatan", "tanya", "t2"),
+      status: "done" as const,
+      drafts: [draftFixture({ fields: { jalannya_penyakit: "Membaik" }, updatedAt: "2026-10-22T01:00:00Z" })],
+    };
+    const before = cardsByTurn([first]).get("t1")?.[0];
+    const after = cardsByTurn([first, second]);
+    const card = after.get("t1")?.[0];
+    expect(after.get("t2")).toEqual([]);
+    // The draft card is owned by the first turn, but shows the latest state.
+    expect(card).not.toBe(before);
+    expect(card?.kind === "draft" ? card.draft.fields : null).toEqual({ jalannya_penyakit: "Membaik" });
   });
 });
 

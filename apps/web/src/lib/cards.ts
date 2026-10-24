@@ -52,21 +52,42 @@ const renderSummary = (block: RenderBlock) => {
 const radiologySummary = (gallery: RadiologyGallery) =>
   `RM ${gallery.noRkmMedis}${gallery.noRawat ? ` · ${gallery.noRawat}` : ""}`;
 
-/**
- * Every card of a conversation in reading order, with one entry per card:
- * a draft edited by a later turn keeps its first position but shows its
- * latest state (the same rule the chat uses for drafts).
- */
-export const cardsFromTurns = (turns: ReadonlyArray<RunView>): ReadonlyArray<AnswerCard> => {
-  const latestDraft = new Map<string, FormDraft>();
-  const draftTurn = new Map<string, string>();
-  for (const turn of turns) {
-    for (const draft of turn.drafts) {
-      latestDraft.set(draft.id, draft);
-      if (!draftTurn.has(draft.id)) draftTurn.set(draft.id, turn.key);
-    }
-  }
+interface DraftOwner {
+  /** The first turn that showed the draft; later turns only update it. */
+  readonly turnKey: string;
+  readonly latest: FormDraft;
+}
 
+/** Each draft's first turn and latest state, which is what a draft card shows. */
+const draftOwners = (turns: ReadonlyArray<RunView>): ReadonlyMap<string, DraftOwner> => {
+  const owners = new Map<string, DraftOwner>();
+  for (const turn of turns) {
+    for (const draft of turn.drafts) owners.set(draft.id, { turnKey: owners.get(draft.id)?.turnKey ?? turn.key, latest: draft });
+  }
+  return owners;
+};
+
+/** The latest state of the drafts this turn introduced, in the turn's own order. */
+const ownedDrafts = (turn: RunView, owners: ReadonlyMap<string, DraftOwner>): ReadonlyArray<FormDraft> => {
+  const drafts: Array<FormDraft> = [];
+  for (const draft of turn.drafts) {
+    const owner = owners.get(draft.id);
+    if (owner?.turnKey === turn.key) drafts.push(owner.latest);
+  }
+  return drafts;
+};
+
+const sameDrafts = (left: ReadonlyArray<FormDraft>, right: ReadonlyArray<FormDraft>) =>
+  left.length === right.length && left.every((draft, index) => draft === right[index]);
+
+/**
+ * A turn's cards only change when that turn changes, or when a later turn updates
+ * one of its drafts. Cached by turn object so a memoized `Turn` keeps the same
+ * `cards` array (and skips re-rendering) while another turn streams.
+ */
+const turnCards = new WeakMap<RunView, { readonly drafts: ReadonlyArray<FormDraft>; readonly cards: ReadonlyArray<AnswerCard> }>();
+
+const buildTurnCards = (turn: RunView, drafts: ReadonlyArray<FormDraft>): ReadonlyArray<AnswerCard> => {
   const cards: Array<AnswerCard> = [];
   const seen = new Set<string>();
   const add = (card: AnswerCard) => {
@@ -75,84 +96,117 @@ export const cardsFromTurns = (turns: ReadonlyArray<RunView>): ReadonlyArray<Ans
     cards.push(card);
   };
 
-  for (const turn of turns) {
-    for (const block of turn.blocks) {
-      add({
-        kind: "render",
-        key: cardKey("render", block.id),
-        id: block.id,
-        turnKey: turn.key,
-        question: turn.question,
-        at: turn.at,
-        label: block.judul,
-        badge: RENDER_TYPE_LABEL[block.tipe],
-        summary: renderSummary(block),
-        block,
-      });
-    }
-    for (const draft of turn.drafts) {
-      if (draftTurn.get(draft.id) !== turn.key) continue;
-      const latest = latestDraft.get(draft.id) ?? draft;
-      add({
-        kind: "draft",
-        key: cardKey("draft", draft.id),
-        id: draft.id,
-        turnKey: turn.key,
-        question: turn.question,
-        at: turn.at,
-        label: FORM_TITLES[latest.form],
-        badge: "Draf",
-        summary: latest.subjek,
-        draft: latest,
-      });
-    }
-    for (const document of turn.documents) {
-      add({
-        kind: "document",
-        key: cardKey("document", document.id),
-        id: document.id,
-        turnKey: turn.key,
-        question: turn.question,
-        at: turn.at,
-        label: document.judul,
-        badge: DOCUMENT_KIND_LABEL[document.jenis],
-        summary: document.ringkas,
-        document,
-      });
-    }
-    turn.radiology.forEach((gallery, index) => {
-      const id = `${turn.key}:radiologi:${index}`;
-      add({
-        kind: "radiology",
-        key: cardKey("radiology", id),
-        id,
-        turnKey: turn.key,
-        question: turn.question,
-        at: turn.at,
-        label: "Hasil radiologi",
-        badge: "Radiologi",
-        summary: radiologySummary(gallery),
-        radiology: gallery,
-      });
+  for (const block of turn.blocks) {
+    add({
+      kind: "render",
+      key: cardKey("render", block.id),
+      id: block.id,
+      turnKey: turn.key,
+      question: turn.question,
+      at: turn.at,
+      label: block.judul,
+      badge: RENDER_TYPE_LABEL[block.tipe],
+      summary: renderSummary(block),
+      block,
     });
-    turn.berkas.forEach((berkas, index) => {
-      const id = `${turn.key}:berkas:${index}`;
-      add({
-        kind: "berkas",
-        key: cardKey("berkas", id),
-        id,
-        turnKey: turn.key,
-        question: turn.question,
-        at: turn.at,
-        label: "Berkas digital",
-        badge: "Berkas",
-        summary: `${berkas.berkas.length} berkas · ${berkas.subjek}`,
-        berkas,
-      });
+  }
+  for (const draft of drafts) {
+    add({
+      kind: "draft",
+      key: cardKey("draft", draft.id),
+      id: draft.id,
+      turnKey: turn.key,
+      question: turn.question,
+      at: turn.at,
+      label: FORM_TITLES[draft.form],
+      badge: "Draf",
+      summary: draft.subjek,
+      draft,
+    });
+  }
+  for (const document of turn.documents) {
+    add({
+      kind: "document",
+      key: cardKey("document", document.id),
+      id: document.id,
+      turnKey: turn.key,
+      question: turn.question,
+      at: turn.at,
+      label: document.judul,
+      badge: DOCUMENT_KIND_LABEL[document.jenis],
+      summary: document.ringkas,
+      document,
+    });
+  }
+  for (const [index, gallery] of turn.radiology.entries()) {
+    const id = `${turn.key}:radiologi:${index}`;
+    add({
+      kind: "radiology",
+      key: cardKey("radiology", id),
+      id,
+      turnKey: turn.key,
+      question: turn.question,
+      at: turn.at,
+      label: "Hasil radiologi",
+      badge: "Radiologi",
+      summary: radiologySummary(gallery),
+      radiology: gallery,
+    });
+  }
+  for (const [index, berkas] of turn.berkas.entries()) {
+    const id = `${turn.key}:berkas:${index}`;
+    add({
+      kind: "berkas",
+      key: cardKey("berkas", id),
+      id,
+      turnKey: turn.key,
+      question: turn.question,
+      at: turn.at,
+      label: "Berkas digital",
+      badge: "Berkas",
+      summary: `${berkas.berkas.length} berkas · ${berkas.subjek}`,
+      berkas,
     });
   }
   return cards;
 };
 
-/** The cards made by one turn, in order. */
-export const cardsOfTurn = (cards: ReadonlyArray<AnswerCard>, turnKey: string) => cards.filter((card) => card.turnKey === turnKey);
+/**
+ * The cards made by one turn, in order. The returned array keeps its identity
+ * while the turn and its drafts are unchanged.
+ */
+const cardsOfTurn = (turn: RunView, owners: ReadonlyMap<string, DraftOwner>): ReadonlyArray<AnswerCard> => {
+  const drafts = ownedDrafts(turn, owners);
+  const cached = turnCards.get(turn);
+  if (cached && sameDrafts(cached.drafts, drafts)) return cached.cards;
+  const cards = buildTurnCards(turn, drafts);
+  turnCards.set(turn, { drafts, cards });
+  return cards;
+};
+
+/** Each turn's own cards, so the chat can pass a stable array to every `Turn`. */
+export const cardsByTurn = (turns: ReadonlyArray<RunView>): ReadonlyMap<string, ReadonlyArray<AnswerCard>> => {
+  const owners = draftOwners(turns);
+  const byTurn = new Map<string, ReadonlyArray<AnswerCard>>();
+  for (const turn of turns) byTurn.set(turn.key, cardsOfTurn(turn, owners));
+  return byTurn;
+};
+
+/**
+ * Every card of a conversation in reading order, with one entry per card:
+ * a draft edited by a later turn keeps its first position but shows its
+ * latest state (the same rule the chat uses for drafts).
+ */
+export const cardsFromTurns = (turns: ReadonlyArray<RunView>): ReadonlyArray<AnswerCard> => {
+  const owners = draftOwners(turns);
+  const cards: Array<AnswerCard> = [];
+  const seen = new Set<string>();
+  for (const turn of turns) {
+    for (const card of cardsOfTurn(turn, owners)) {
+      if (seen.has(card.key)) continue;
+      seen.add(card.key);
+      cards.push(card);
+    }
+  }
+  return cards;
+};
