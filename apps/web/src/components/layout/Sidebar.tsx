@@ -1,8 +1,8 @@
 /**
- * The left sidebar: brand, one prominent "new chat" button, the main
- * destinations, and the conversation workspace with its threads (newest
- * first, pinned on top), then favorites and the archive. It collapses to an
- * icon rail on a wide window and becomes a drawer on a phone.
+ * The left sidebar: brand, one prominent "new chat" button, and the
+ * conversation workspace with its threads (newest first, pinned on top),
+ * then favorites and the archive. It collapses to an icon rail on a wide
+ * window and becomes a drawer on a phone.
  */
 import { Menu } from "@base-ui/react/menu";
 import type { ConversationSummary, Favorite } from "@simha/shared";
@@ -10,11 +10,9 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Archive,
   ArchiveRestore,
-  BookOpen,
   ChevronRight,
   ChevronsUpDown,
   FileClock,
-  FolderClosed,
   KeyRound,
   LogOut,
   MonitorCog,
@@ -80,15 +78,6 @@ const initials = (name: string) =>
 
 const Avatar = ({ name, className }: { readonly name: string; readonly className?: string }) => (
   <span className={cn("grid size-7 shrink-0 place-items-center rounded-full bg-teal-2 text-[10.5px] font-semibold text-paper", className)}>{initials(name)}</span>
-);
-
-const ConnectionLine = ({ health, error }: { readonly health: Health | undefined; readonly error: string | null }) => (
-  <div className="flex items-center gap-2 px-1.5 pb-1 text-[11.5px] text-ink-3" title={health?.khanza.server.version}>
-    <span className={cn("size-1.5 shrink-0 rounded-full", error ? "bg-red" : health ? "animate-pulse-led bg-led" : "bg-line")} />
-    <span className="truncate">
-      {error ? "Server tidak terhubung" : health ? `Khanza DB terhubung · ${health.khanza.readOnly ? "read-only" : "BISA MENULIS"}` : "Memeriksa…"}
-    </span>
-  </div>
 );
 
 /** Avatar button at the bottom of the sidebar: account, settings, log out. */
@@ -275,7 +264,6 @@ const ConversationRow = ({ conversation, active, running, onNavigate, onDeleted,
 
 interface PanelProps {
   readonly health: Health | undefined;
-  readonly healthError: string | null;
   /** Called after any navigation (closes the phone drawer). */
   readonly onNavigate: () => void;
   /** The close button: collapse to the rail, or close the drawer. */
@@ -284,7 +272,7 @@ interface PanelProps {
 }
 
 /** The full sidebar. */
-export const SidebarPanel = ({ health, healthError, onNavigate, onClose, closeLabel }: PanelProps) => {
+export const SidebarPanel = ({ health, onNavigate, onClose, closeLabel }: PanelProps) => {
   const navigate = useNavigate();
   const newChat = useNewChat();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -326,21 +314,23 @@ export const SidebarPanel = ({ health, healthError, onNavigate, onClose, closeLa
 
   return (
     <div className="flex h-full w-full flex-col bg-paper">
-      {/* The window controls live on their own strip; the wordmark sits below them. */}
-      <div className="drag flex h-11 shrink-0 items-center pr-2 pl-[var(--titlebar-inset,12px)]">
+      {/* The window controls live on their own strip. Below it, the toggle sits exactly
+          where the rail's toggle sits, so collapsing the sidebar does not move it. */}
+      <div className="drag h-[var(--rail-inset,0px)] w-full shrink-0" />
+      <div className="drag flex shrink-0 items-center gap-1 pt-0.5 pr-2.5 pb-3 pl-[var(--sidebar-toggle-inset)]">
         <TipButton
           label={closeLabel}
           shortcut={shortcutLabel("S")}
           onClick={onClose}
-          className={cn(iconButton, "no-drag ml-auto")}
+          className={cn(iconButton, "no-drag size-9")}
         >
           <PanelLeftClose className="size-4" />
         </TipButton>
+        <Link to="/tanya" onClick={onNavigate} className="no-drag flex w-fit min-w-0 items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-paper-2">
+          <img src="/favicon.svg" alt="" className="size-7" />
+          <span className="truncate font-display text-[20px] leading-none font-semibold tracking-[-0.03em]">simha</span>
+        </Link>
       </div>
-      <Link to="/tanya" onClick={onNavigate} className="no-drag mx-2.5 mb-3 flex w-fit min-w-0 items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-paper-2">
-        <img src="/favicon.svg" alt="" className="size-7" />
-        <span className="truncate font-display text-[20px] font-semibold tracking-[-0.03em]">simha</span>
-      </Link>
 
       <div className="shrink-0 px-2.5">
         <button
@@ -358,60 +348,50 @@ export const SidebarPanel = ({ health, healthError, onNavigate, onClose, closeLa
         </button>
       </div>
 
-      <nav className="mt-3 shrink-0 space-y-0.5 px-2.5">
-        <Link to="/pengetahuan" onClick={onNavigate} className={rowClass} activeProps={{ className: activeClass }}>
-          <BookOpen className="size-4" /> Pengetahuan AI
-        </Link>
-        <Link to="/pengaturan" onClick={onNavigate} className={rowClass} activeProps={{ className: activeClass }}>
-          <Settings className="size-4" /> Pengaturan
-        </Link>
-      </nav>
-
       <div className="quiet-scroll mt-4 min-h-0 flex-1 overflow-y-auto px-2.5 pb-3">
-        <div className="flex items-center justify-between pb-0.5">
-          <button
-            type="button"
-            onClick={() => setSessionsOpen(!sessionsOpen)}
-            aria-expanded={sessionsOpen}
-            className="group flex items-center gap-1 px-1.5 py-0.5 text-[11.5px] font-medium text-ink-3 transition-colors hover:text-ink-2"
-          >
-            Percakapan
-            <ChevronRight className={cn("size-3 opacity-0 transition-[transform,opacity] group-hover:opacity-100", sessionsOpen && "rotate-90")} />
-          </button>
-          {searching ? null : (
-            <TipButton label="Cari percakapan" onClick={startSearch} className={cn(iconButton, "size-6")}>
-              <Search className="size-3.5" />
-            </TipButton>
-          )}
+        {/* The section label stays put while the list scrolls under it. */}
+        <div className="sticky top-0 z-10 -mx-2.5 bg-paper px-2.5 pb-1">
+          <div className="flex items-center justify-between pb-0.5">
+            <button
+              type="button"
+              onClick={() => setSessionsOpen(!sessionsOpen)}
+              aria-expanded={sessionsOpen}
+              className="group flex items-center gap-1 px-1.5 py-0.5 text-[11.5px] font-medium text-ink-3 transition-colors hover:text-ink-2"
+            >
+              Percakapan
+              <span className="font-mono text-[10px] font-normal text-ink-3 tabular-nums">{chatList.length}</span>
+              <ChevronRight className={cn("size-3 opacity-0 transition-[transform,opacity] group-hover:opacity-100", sessionsOpen && "rotate-90")} />
+            </button>
+            {searching ? null : (
+              <TipButton label="Cari percakapan" onClick={startSearch} className={cn(iconButton, "size-6")}>
+                <Search className="size-3.5" />
+              </TipButton>
+            )}
+          </div>
+
+          {searching ? (
+            <div className="mt-1 flex h-8 items-center gap-2 rounded-lg border border-line bg-card px-2">
+              <Search className="size-3.5 shrink-0 text-ink-3" />
+              <input
+                ref={searchBox}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") closeSearch();
+                }}
+                placeholder="Cari percakapan…"
+                aria-label="Cari percakapan"
+                className="min-w-0 flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-ink-3"
+              />
+              <button type="button" aria-label="Tutup pencarian" onClick={closeSearch} className="text-ink-3 hover:text-ink">
+                <X className="size-3.5" />
+              </button>
+            </div>
+          ) : null}
         </div>
 
-        {searching ? (
-          <div className="mt-1 flex h-8 items-center gap-2 rounded-lg border border-line bg-card px-2">
-            <Search className="size-3.5 shrink-0 text-ink-3" />
-            <input
-              ref={searchBox}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") closeSearch();
-              }}
-              placeholder="Cari percakapan…"
-              aria-label="Cari percakapan"
-              className="min-w-0 flex-1 bg-transparent text-[12.5px] outline-none placeholder:text-ink-3"
-            />
-            <button type="button" aria-label="Tutup pencarian" onClick={closeSearch} className="text-ink-3 hover:text-ink">
-              <X className="size-3.5" />
-            </button>
-          </div>
-        ) : null}
-
         {sessionsOpen ? (
-          <div className="mt-1">
-            <div className="flex h-8 items-center gap-2 px-1.5 text-[12.5px] font-medium text-ink-2">
-              <FolderClosed className="size-3.5 shrink-0 text-ink-3" />
-              <span className="truncate">Tanya Data</span>
-              <span className="ml-auto font-mono text-[10px] font-normal text-ink-3">{chatList.length}</span>
-            </div>
+          <>
             <ul data-testid="conversations" className="space-y-px">
               {chatList.map((c) => (
                 <ConversationRow
@@ -428,7 +408,7 @@ export const SidebarPanel = ({ health, healthError, onNavigate, onClose, closeLa
             {conversations.data && chatList.length === 0 ? (
               <p className="px-1.5 py-1 text-[12px] text-ink-3">{query ? "Tidak ada yang cocok." : "Belum ada percakapan."}</p>
             ) : null}
-          </div>
+          </>
         ) : null}
 
         <Section
@@ -485,7 +465,6 @@ export const SidebarPanel = ({ health, healthError, onNavigate, onClose, closeLa
       </div>
 
       <div className="shrink-0 border-t border-line-2 p-2">
-        <ConnectionLine health={health} error={healthError} />
         <UserMenu compact={false} health={health} onNavigate={onNavigate} />
       </div>
     </div>
@@ -493,48 +472,27 @@ export const SidebarPanel = ({ health, healthError, onNavigate, onClose, closeLa
 };
 
 /** The collapsed sidebar: icons only. */
-export const SidebarRail = ({ health, healthError }: Pick<PanelProps, "health" | "healthError">) => {
+export const SidebarRail = ({ health }: { readonly health: Health | undefined }) => {
   const { toggle, startSearch } = useSidebar();
   const newChat = useNewChat();
-  const navigate = useNavigate();
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const icon = "relative grid size-9 place-items-center rounded-lg text-ink-2 transition-colors hover:bg-paper-2 hover:text-ink";
   return (
     <div className="flex h-full w-full flex-col items-center gap-0.5 bg-paper py-2">
       <div className="drag -mt-2 h-[var(--rail-inset,0px)] w-full shrink-0" />
+      {/* Keep the toggle at the top, where the close button sits when the sidebar is open. */}
+      <TipButton label="Buka sidebar" shortcut={shortcutLabel("S")} side="right" onClick={toggle} className={cn(icon, "mb-1")}>
+        <PanelLeftOpen className="size-[17px]" />
+      </TipButton>
       <Link to="/tanya" aria-label="Simha" className="mb-1 grid size-9 place-items-center rounded-lg hover:bg-paper-2">
         <img src="/favicon.svg" alt="" className="size-[22px]" />
       </Link>
-      <TipButton label="Buka sidebar" shortcut={shortcutLabel("S")} side="right" onClick={toggle} className={icon}>
-        <PanelLeftOpen className="size-[17px]" />
-      </TipButton>
       <TipButton label="Percakapan baru" shortcut={shortcutLabel("O")} side="right" onClick={newChat} className={icon}>
         <SquarePen className="size-[17px]" />
       </TipButton>
       <TipButton label="Cari" side="right" onClick={startSearch} className={icon}>
         <Search className="size-[17px]" />
       </TipButton>
-      <TipButton
-        label="Pengetahuan AI"
-        side="right"
-        onClick={() => void navigate({ to: "/pengetahuan" })}
-        className={cn(icon, pathname === "/pengetahuan" && "bg-paper-2 text-ink")}
-      >
-        <BookOpen className="size-[17px]" />
-      </TipButton>
-      <TipButton
-        label="Pengaturan"
-        side="right"
-        onClick={() => void navigate({ to: "/pengaturan" })}
-        className={cn(icon, pathname === "/pengaturan" && "bg-paper-2 text-ink")}
-      >
-        <Settings className="size-[17px]" />
-      </TipButton>
-      <div className="mt-auto flex flex-col items-center gap-2">
-        <span
-          title={healthError ? "Server tidak terhubung" : health ? "Khanza DB terhubung" : "Memeriksa…"}
-          className={cn("size-1.5 rounded-full", healthError ? "bg-red" : health ? "animate-pulse-led bg-led" : "bg-line")}
-        />
+      <div className="mt-auto">
         <UserMenu compact health={health} onNavigate={() => undefined} />
       </div>
     </div>

@@ -314,13 +314,13 @@ const day = (iso: string, add: number) => {
  * Radiology in the chat (from the AI's `hasilRadiologi` tool): each Khanza
  * exam with its reading and the PACS images of that exam, in one card.
  */
-export const RadiologyCard = ({ gallery }: { readonly gallery: RadiologyGallery }) => {
+export const RadiologyCard = ({ gallery, flat = false }: { readonly gallery: RadiologyGallery; readonly flat?: boolean | undefined }) => {
   const [viewing, setViewing] = useState<{ readonly study: PacsStudy; readonly index: number } | null>(null);
   const { byExam, rest } = matchStudies(gallery.pemeriksaan, gallery.studies);
   const open = (study: PacsStudy) => (index: number) => setViewing({ study, index });
   const empty = gallery.pemeriksaan.length === 0 && gallery.studies.length === 0;
   return (
-    <figure className="animate-rise @container overflow-hidden rounded-xl border border-line bg-card" data-testid="radiology-card">
+    <figure className={cn("animate-rise @container overflow-hidden", !flat && "rounded-xl border border-line bg-card")} data-testid="radiology-card">
       <figcaption className="flex items-center gap-2.5 border-b border-line-2 px-3.5 py-3">
         <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-teal-soft text-teal">
           <ScanLine className="size-4" />

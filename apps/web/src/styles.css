@@ -115,9 +115,13 @@
 }
 
 @layer base {
+  :root {
+    /* The sidebar toggle is centered in the icon rail. When the sidebar is open,
+       keep it at that same x so collapsing never makes it jump sideways. */
+    --sidebar-toggle-inset: calc((var(--rail-width, 64px) - 36px) / 2);
+  }
   /* macOS desktop app has no title bar: room for the red/yellow/green buttons. */
   :root[data-desktop="darwin"] {
-    --titlebar-inset: 84px;
     --rail-inset: 32px;
     --rail-width: 80px;
   }

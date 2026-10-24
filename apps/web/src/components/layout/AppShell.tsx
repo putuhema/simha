@@ -44,7 +44,7 @@ export const AppShell = () => {
     return () => window.removeEventListener("keydown", onKey);
   }, [toggle, setDrawer, newChat, navigate]);
 
-  const shared = { health: health.data, healthError: health.error };
+  const shared = { health: health.data };
 
   return (
     <TipProvider>
@@ -53,8 +53,8 @@ export const AppShell = () => {
         <aside
           aria-label="Sidebar"
           className={cn(
-            "hidden h-full shrink-0 overflow-hidden border-r border-line-2 bg-paper transition-[width] duration-200 ease-out md:block",
-            open ? "w-[286px]" : "w-[var(--rail-width,64px)]",
+            "hidden h-full shrink-0 overflow-hidden bg-paper transition-[width] duration-200 ease-out md:block",
+            open ? "w-[286px] border-r border-line-2" : "w-[var(--rail-width,64px)] border-r border-transparent",
           )}
         >
           {open ? (
@@ -63,7 +63,7 @@ export const AppShell = () => {
             </div>
           ) : (
             <div key="rail" className="h-full w-[var(--rail-width,64px)] animate-fade-in">
-              <SidebarRail {...shared} />
+              <SidebarRail health={health.data} />
             </div>
           )}
         </aside>

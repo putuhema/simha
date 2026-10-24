@@ -80,7 +80,7 @@ const EditKnowledgeDialog = ({
   );
 };
 
-export const PengetahuanPage = () => {
+export const PengetahuanPanel = () => {
   const me = useAuth((s) => s.user);
   const isAdmin = me?.role === "admin";
   const list = useApi<ReadonlyArray<Knowledge>>("/api/knowledge");
@@ -139,16 +139,12 @@ export const PengetahuanPage = () => {
   };
 
   return (
-    <div className="quiet-scroll h-full overflow-y-auto">
-      <div className="mx-auto max-w-5xl px-4 pt-6 pb-10 sm:px-8">
-        <header className="mb-5">
-          <h1 className="font-display text-[24px] font-semibold tracking-tight">Pengetahuan AI</h1>
-          <p className="mt-1 max-w-3xl text-[13.5px] text-ink-2">
-            Contoh pertanyaan + SQL dan catatan yang dipakai AI untuk pertanyaan berikutnya. Contoh otomatis disimpan
-            setelah hasil tampil; 👍 menaikkannya menjadi terverifikasi, 👎 mematikan contoh itu dan menyimpan koreksi
-            sebagai catatan. Semua ini hanya konteks untuk AI — tidak pernah mengubah data Khanza.
-          </p>
-        </header>
+    <div>
+      <p className="mb-5 max-w-3xl text-[13.5px] text-ink-2">
+        Contoh pertanyaan + SQL dan catatan yang dipakai AI untuk pertanyaan berikutnya. Contoh otomatis disimpan
+        setelah hasil tampil; 👍 menaikkannya menjadi terverifikasi, 👎 mematikan contoh itu dan menyimpan koreksi
+        sebagai catatan. Semua ini hanya konteks untuk AI — tidak pernah mengubah data Khanza.
+      </p>
 
         <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
           <div className="space-y-4">
@@ -294,7 +290,6 @@ export const PengetahuanPage = () => {
             </Panel>
           </aside>
         </div>
-      </div>
       {editing ? <EditKnowledgeDialog item={editing} onClose={() => setEditing(null)} onSaved={() => void list.reload()} /> : null}
     </div>
   );

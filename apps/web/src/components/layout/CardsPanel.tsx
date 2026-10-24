@@ -4,7 +4,7 @@
  * draft or radiology card stays here, one at a time, with a strip of tabs.
  * With no cards yet it is the "start" panel, like a quiet desk.
  */
-import { ChartColumn, FilePenLine, FileText, FolderOpen, LayoutGrid, Maximize2, PanelRightClose, ScanLine, Table2 } from "lucide-react";
+import { ChartColumn, FilePenLine, FileText, FolderOpen, Maximize2, PanelRightClose, ScanLine, Table2 } from "lucide-react";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { AnswerCard } from "../../lib/cards.ts";
 import { cn } from "../../lib/cn.ts";
@@ -57,23 +57,26 @@ export const CardBody = ({
   onSaved,
   fill,
   documentHeight,
+  flat,
 }: {
   readonly card: AnswerCard;
   readonly onSaved?: (() => void) | undefined;
   readonly fill?: boolean | undefined;
   readonly documentHeight?: number | undefined;
+  /** No card chrome: the panel's own background shows through (used in the cards panel). */
+  readonly flat?: boolean | undefined;
 }) => {
   switch (card.kind) {
     case "render":
-      return <RenderBlockView block={card.block} compact onSaved={onSaved} />;
+      return <RenderBlockView block={card.block} compact onSaved={onSaved} flat={flat} />;
     case "document":
-      return <DocumentCard document={card.document} fill={fill} height={documentHeight ?? 520} />;
+      return <DocumentCard document={card.document} fill={fill} height={documentHeight ?? 520} flat={flat} />;
     case "draft":
-      return <DraftCard draft={card.draft} fill={fill} />;
+      return <DraftCard draft={card.draft} fill={fill} flat={flat} />;
     case "radiology":
-      return <RadiologyCard gallery={card.radiology} />;
+      return <RadiologyCard gallery={card.radiology} flat={flat} />;
     case "berkas":
-      return <BerkasDigitalCard berkas={card.berkas} />;
+      return <BerkasDigitalCard berkas={card.berkas} flat={flat} />;
   }
 };
 
@@ -154,15 +157,31 @@ export const CardsPanel = ({ cards, onSaved }: { readonly cards: ReadonlyArray<A
       >
         <span className="absolute inset-y-0 left-0 w-px bg-transparent transition-colors group-hover:bg-teal/40" />
       </div>
-      <header className="flex h-12 shrink-0 items-center gap-2 px-3">
-        <span className="grid size-6 place-items-center rounded-md bg-paper text-ink-2">
-          <LayoutGrid className="size-3.5" />
-        </span>
-        <h2 className="text-[13.5px] font-medium text-ink">Kartu</h2>
-        <span className="rounded-full bg-paper px-1.5 py-px font-mono text-[10px] text-ink-3" aria-label={`${cards.length} kartu`}>
-          {cards.length}
-        </span>
-        <div className="ml-auto flex items-center gap-0.5">
+      <div className="flex shrink-0 items-center gap-1 border-b border-line-2 py-2 pr-2">
+        <div className="quiet-scroll min-w-0 flex-1 overflow-x-auto px-2">
+          <div className="flex w-max items-center gap-1.5">
+            {cards.map((card) => {
+              const active = card.key === selected?.key;
+              return (
+                <button
+                  key={card.key}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => select(card.key)}
+                  title={`${card.badge} · ${card.label}`}
+                  className={cn(
+                    "flex h-7 max-w-[190px] shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11.5px] transition-colors",
+                    active ? "border-ink bg-ink text-paper" : "border-line bg-card text-ink-2 hover:bg-paper",
+                  )}
+                >
+                  <CardIcon card={card} className="size-3.5 shrink-0" />
+                  <span className="truncate">{card.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-0.5">
           {selected ? (
             <TipButton label="Perbesar kartu" onClick={() => setExpanded(true)} className="grid size-7 place-items-center rounded-md text-ink-3 transition-colors hover:bg-paper-2 hover:text-ink">
               <Maximize2 className="size-3.5" />
@@ -177,41 +196,17 @@ export const CardsPanel = ({ cards, onSaved }: { readonly cards: ReadonlyArray<A
             <PanelRightClose className="size-4" />
           </TipButton>
         </div>
-      </header>
-
-      <div className="quiet-scroll shrink-0 overflow-x-auto border-b border-line-2 px-2 py-2">
-        <div className="flex w-max items-center gap-1.5">
-          {cards.map((card) => {
-            const active = card.key === selected?.key;
-            return (
-              <button
-                key={card.key}
-                type="button"
-                aria-pressed={active}
-                onClick={() => select(card.key)}
-                title={`${card.badge} · ${card.label}`}
-                className={cn(
-                  "flex h-7 max-w-[190px] shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11.5px] transition-colors",
-                  active ? "border-ink bg-ink text-paper" : "border-line bg-card text-ink-2 hover:bg-paper",
-                )}
-              >
-                <CardIcon card={card} className="size-3.5 shrink-0" />
-                <span className="truncate">{card.label}</span>
-              </button>
-            );
-          })}
-        </div>
       </div>
 
       {selected ? (
         <div className="min-h-0 flex-1">
           {selected.kind === "document" || selected.kind === "draft" ? (
             <div className="h-full min-h-0 p-2">
-              <CardBody card={selected} onSaved={onSaved} fill />
+              <CardBody card={selected} onSaved={onSaved} fill flat />
             </div>
           ) : (
             <div className="quiet-scroll h-full overflow-y-auto p-3" data-testid="cards-panel-body">
-              <CardBody card={selected} onSaved={onSaved} />
+              <CardBody card={selected} onSaved={onSaved} flat />
             </div>
           )}
         </div>

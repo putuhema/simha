@@ -114,10 +114,13 @@ const Field = ({
 export const DraftCard = ({
   draft: initial,
   fill = false,
+  flat = false,
 }: {
   readonly draft: FormDraft;
   /** Fill the card panel: fields scroll, the action footer stays visible. */
   readonly fill?: boolean | undefined;
+  /** No card chrome: the panel's own background shows through. */
+  readonly flat?: boolean | undefined;
 }) => {
   const [draft, setDraft] = useState(initial);
   const [values, setValues] = useState<Record<string, string>>(initial.fields);
@@ -169,7 +172,7 @@ export const DraftCard = ({
 
   return (
     <section
-      className={cn("animate-rise @container overflow-hidden rounded-xl border border-line bg-card", fill && "flex h-full min-h-0 flex-col")}
+      className={cn("animate-rise @container overflow-hidden", !flat && "rounded-xl border border-line bg-card", fill && "flex h-full min-h-0 flex-col")}
       data-testid="draft-card"
     >
       <header className="flex shrink-0 flex-wrap items-start gap-3 border-b border-line-2 px-3.5 py-3">

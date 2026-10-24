@@ -29,11 +29,14 @@ export const DocumentCard = ({
   document,
   height = 520,
   fill = false,
+  flat = false,
 }: {
   readonly document: DocumentInfo;
   readonly height?: number | undefined;
   /** Fill the parent (the card panel) instead of using a fixed preview height. */
   readonly fill?: boolean | undefined;
+  /** No card chrome: the panel's own background shows through. */
+  readonly flat?: boolean | undefined;
 }) => {
   const frame = useRef<HTMLIFrameElement>(null);
   const preview = useRef<HTMLDivElement>(null);
@@ -58,7 +61,7 @@ export const DocumentCard = ({
   }, [fill]);
 
   return (
-    <figure className={cn("animate-rise overflow-hidden rounded-xl border border-line bg-card", fill && "flex h-full min-h-0 flex-col")} data-testid="document-card">
+    <figure className={cn("animate-rise overflow-hidden", !flat && "rounded-xl border border-line bg-card", fill && "flex h-full min-h-0 flex-col")} data-testid="document-card">
       <figcaption className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b border-line-2 px-3.5 py-3">
         <div className="flex min-w-0 items-start gap-2.5">
           <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-teal-soft text-teal">

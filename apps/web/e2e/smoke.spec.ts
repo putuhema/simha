@@ -40,15 +40,36 @@ test("first run asks for an admin account and logs in", async () => {
 
   await expect(page).toHaveURL(/\/tanya$/);
   await expect(page.getByRole("heading", { name: "Mau cek data apa hari ini?" })).toBeVisible();
-  await expect(page.getByText("Khanza DB terhubung · read-only")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Percakapan \d+$/ })).toBeVisible();
+  const sidebar = page.getByRole("complementary", { name: "Sidebar" }).first();
+  await expect(sidebar.getByText("Tanya Data")).toHaveCount(0);
+  await expect(sidebar.getByText("Khanza DB terhubung")).toHaveCount(0);
+  // Only "Percakapan baru" lives at the top; settings is in the account menu.
+  await expect(sidebar.getByRole("link", { name: "Pengetahuan AI" })).toHaveCount(0);
+  await expect(sidebar.getByRole("link", { name: "Pengaturan" })).toHaveCount(0);
   await expect(page.getByTestId("user-menu")).toContainText(ADMIN.name);
 });
 
-test("the sidebar collapses to an icon rail and back", async () => {
+test("the sidebar collapses to an icon rail without moving the toggle", async () => {
   const sidebar = page.getByRole("complementary", { name: "Sidebar" }).first();
-  await page.getByRole("button", { name: "Tutup sidebar" }).click();
-  await expect(page.getByRole("button", { name: "Buka sidebar" })).toBeVisible();
+  const toggle = page.getByRole("button", { name: "Tutup sidebar" });
+  const before = await toggle.boundingBox();
+  await toggle.click();
+  const open = page.getByRole("button", { name: "Buka sidebar" });
+  await expect(open).toBeVisible();
   await expect(sidebar.getByText("Percakapan", { exact: true })).toHaveCount(0);
+  await expect(sidebar).toHaveCSS("border-right-color", "rgba(0, 0, 0, 0)");
+
+  // Same control, same spot: no jump sideways or down the rail.
+  await page.waitForTimeout(250);
+  const after = await open.boundingBox();
+  expect(before).not.toBeNull();
+  expect(after).not.toBeNull();
+  if (before && after) {
+    expect(Math.abs(after.x - before.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(after.y - before.y)).toBeLessThanOrEqual(1);
+  }
+
   await page.keyboard.press("ControlOrMeta+Shift+S");
   await expect(sidebar.getByRole("button", { name: "Percakapan baru" })).toBeVisible();
 });
@@ -145,9 +166,13 @@ test("a thread can be pinned, archived and removed from the sidebar", async () =
   await expect(page.getByTestId("archived-conversations")).toHaveCount(0);
 });
 
-test("the knowledge page shows what the AI learned and accepts a note", async () => {
-  await page.getByRole("link", { name: /Pengetahuan AI/ }).click();
-  await expect(page.getByRole("heading", { name: "Pengetahuan AI" })).toBeVisible();
+test("the knowledge tab shows what the AI learned and accepts a note", async () => {
+  await page.getByTestId("user-menu").first().click();
+  await page.getByRole("menuitem", { name: /Pengaturan/ }).click();
+  await page.getByRole("tab", { name: "Pengetahuan AI" }).click();
+  await expect(page).toHaveURL(/tab=pengetahuan/);
+  await expect(page.getByRole("heading", { name: "Pengaturan" })).toBeVisible();
+  await expect(page.getByText("Cara kerja")).toBeVisible();
   // The chart result was saved automatically and verified with the thumbs-up.
   await expect(page.getByText("Terverifikasi").first()).toBeVisible();
   await page.getByLabel("Aturan atau fakta umum").fill("Kode uji: poli gigi memakai U0010.");

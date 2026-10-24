@@ -1,6 +1,6 @@
 /**
- * Routes: /tanya?c=… (home), /pengaturan?tab=…. The root shows the login or
- * first-run setup page until someone is logged in.
+ * Routes: /tanya?c=… (home), /pengaturan?tab=… (/pengetahuan redirects there).
+ * The root shows the login or first-run setup page until someone is logged in.
  */
 import { createRootRoute, createRoute, createRouter, Outlet, redirect } from "@tanstack/react-router";
 import { RefreshCw } from "lucide-react";
@@ -54,7 +54,6 @@ const page = (load: () => Promise<ComponentType>) => {
   );
 };
 const TanyaPage = page(() => import("./features/tanya/TanyaPage.tsx").then((m) => m.TanyaPage));
-const PengetahuanPage = page(() => import("./features/pengetahuan/PengetahuanPage.tsx").then((m) => m.PengetahuanPage));
 const PengaturanPage = page(() => import("./features/pengaturan/PengaturanPage.tsx").then((m) => m.PengaturanPage));
 
 const rootRoute = createRootRoute({ component: Root });
@@ -80,13 +79,16 @@ const tanyaRoute = createRoute({
   component: TanyaPage,
 });
 
+/** Old bookmark: the knowledge list now lives in Pengaturan. */
 const pengetahuanRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/pengetahuan",
-  component: PengetahuanPage,
+  beforeLoad: () => {
+    throw redirect({ to: "/pengaturan", search: { tab: "pengetahuan" } });
+  },
 });
 
-const TABS: ReadonlyArray<SettingsTab> = ["ai", "audit", "pengguna", "akun", "desktop"];
+const TABS: ReadonlyArray<SettingsTab> = ["ai", "audit", "pengguna", "akun", "desktop", "pengetahuan"];
 const pengaturanRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/pengaturan",

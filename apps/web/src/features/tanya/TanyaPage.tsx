@@ -7,7 +7,7 @@
  */
 import { Collapsible } from "@base-ui/react/collapsible";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { Check, ChevronRight, Copy, FolderClosed, PanelRightOpen, ShieldCheck, UserRound } from "lucide-react";
+import { ArrowRight, Check, ChevronRight, Copy, FolderClosed, PanelRightOpen, ShieldCheck, UserRound } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnswerFeedback } from "../../components/agent/AnswerFeedback.tsx";
 import { StreamingMarkdown } from "../../components/agent/Markdown.tsx";
@@ -94,7 +94,7 @@ const CardReference = ({ card, active }: { readonly card: AnswerCard; readonly a
         <span className="mt-0.5 block truncate text-[11.5px] text-ink-3">{card.summary}</span>
       </span>
       <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-ink-3 transition-colors group-hover:text-ink">
-        Buka <PanelRightOpen className="size-3.5" />
+        Buka <ArrowRight className="size-3.5" />
       </span>
     </button>
   );

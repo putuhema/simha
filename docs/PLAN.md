@@ -159,7 +159,7 @@ Each one ends with tests passing and a stop for you to test.
   - 👎: deactivates the example and, with a comment, saves a note; no approval needed;
   - `catatPengetahuan`: AI note, active immediately but unverified; admin review on the page.
 - **Privacy**: `personalReason()` refuses no_rawat, RM/NIK/SEP/phone numbers and emails in notes, examples, feedback and auto-saves. Knowledge never changes Khanza.
-- **UI**: thumbs under every render block; **Pengetahuan AI** page (`/pengetahuan`) lists/filters/searches, adds staff notes, and lets admins verify, edit, deactivate or delete.
+- **UI**: thumbs under every render block; the **Pengetahuan AI** tab in **Pengaturan** (`/pengaturan?tab=pengetahuan`; `/pengetahuan` redirects) lists/filters/searches, adds staff notes, and lets admins verify, edit, deactivate or delete.
 - **Tests**: store/search/tool unit tests and server end-to-end tests cover auto-save, 👍/👎, moderation, privacy rejection, prompt injection and `catatPengetahuan`.
 
 ## Caching, streaming and token budget notes

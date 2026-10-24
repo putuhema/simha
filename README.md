@@ -154,12 +154,12 @@ Open http://127.0.0.1:8787. The first visit asks for the **first admin account**
 
   The HTML is filled from a fixed template by the server, never written by the AI, and every value is escaped. It is served with a CSP that allows no scripts. Generated documents are kept in the audit DB, and downloads are logged.
 - **Tanya Data.** Ask in plain Indonesian. Answers show tables (sortable, CSV export), charts and numbers, each with an assumption line and "Query yang dipakai". The **card panel** on the right is closed by default (a new chat, starting the app, or opening a stored thread), so the chat stays uncluttered. While a live answer runs, the panel opens by itself as soon as it produces a result. Every result — table, chart, numbers, document, form draft, radiology or digital file — goes there: the chat keeps a one-line door to it, a strip of tabs switches between cards, the panel can be dragged wider, and the expand icon opens the card full size. Earlier cards reopen with the small card button at the top right (or ⇧⌘K). On a narrow window the cards stay inline in the chat. **Simpan ke favorit** saves the question and SQL; favorites re-run without the AI.
-- **Pengetahuan AI.** See what the AI learned: examples saved automatically, AI/staff notes and 👎 corrections. 👍 verifies an example; admins can verify, edit, deactivate or delete items.
 - **Pengaturan.** The tabs are:
   - **AI:** provider, model, base URL, API key, "samarkan data" and **Tes koneksi**. Saving switches the AI without a restart and overrides `.env`; admins only.
   - **Audit log:** questions, tool calls, queries, fix approvals, logins, filterable.
   - **Pengguna:** admins only.
   - **Akun:** change your own password.
+  - **Pengetahuan AI:** what the AI learned — examples saved automatically, AI/staff notes and 👎 corrections. 👍 verifies an example; admins can verify, edit, deactivate or delete items.
 
 To serve the hospital network, set `SERVER_HOST=0.0.0.0`. Behind HTTPS (e.g. a reverse proxy), also set `COOKIE_SECURE=true`.
 
@@ -354,7 +354,7 @@ Favorites store the question, the SQL and the chart settings, and re-run through
 
 The AI improves across questions without fine-tuning. A successful Tanya Data answer that showed a result
 is saved automatically as an **example** (question + SQL, unverified). The AI's own
-**`catatPengetahuan`** tool, a 👍, and the **Pengetahuan AI** page add notes and verified examples. Before
+**`catatPengetahuan`** tool, a 👍, and the **Pengetahuan AI** tab under **Pengaturan** add notes and verified examples. Before
 each question the server searches this store (keyword + IDF, no embeddings), takes at most five matching
 items, and injects them into the *current user turn* as `[Pengetahuan dari pertanyaan sebelumnya]`. The
 block is kept as the turn's `modelText`, so the question stored and shown to the user stays plain while a
@@ -364,7 +364,7 @@ follow-up replays exactly what the model saw.
   the example and 👎 turns the automatic example off; on a text answer, 👍 saves the question + answer as
   a verified note and 👎 saves the correction.
 - **Moderation.** AI/staff notes are active immediately but unverified. Admins can verify, edit,
-  deactivate or delete anything on **Pengetahuan AI**; everyone can add a note. Nothing here can change
+  deactivate or delete anything on **Pengaturan → Pengetahuan AI**; everyone can add a note. Nothing here can change
   Khanza.
 - **Privacy.** Examples/notes with a no. rawat, RM, NIK, SEP or phone number are refused. Verified items
   rank above automatic ones, and auto examples rank slightly below staff/AI notes.
