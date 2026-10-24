@@ -112,7 +112,7 @@ export const Composer = ({
             </Menu.Trigger>
             <Menu.Portal>
               <Menu.Positioner side="top" align="start" sideOffset={8} className="z-50">
-                <Menu.Popup className="min-w-64 origin-[var(--transform-origin)] rounded-xl border border-line bg-card p-1.5 text-[13px] shadow-[0_18px_44px_-20px_rgb(26_31_30/0.35)] transition-[opacity,transform] duration-150 outline-none data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+                <Menu.Popup className="min-w-64 origin-[var(--transform-origin)] rounded-xl border border-line bg-card p-1.5 text-[13px] shadow-[0_18px_44px_-20px_rgb(26_31_30/0.35)] transition-[opacity,transform] duration-150 ease-out outline-none data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[ending-style]:duration-[100ms] data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
                   <p className="px-2.5 pt-1 pb-1.5 font-display text-[11px] font-semibold tracking-[0.1em] text-ink-3 uppercase">Contoh pertanyaan</p>
                   {examples.map((example) => (
                     <Menu.Item
@@ -154,7 +154,7 @@ export const Composer = ({
                 e.stopPropagation();
                 onStop();
               }}
-              className="relative grid size-8 shrink-0 place-items-center rounded-full bg-teal text-white transition-transform active:scale-95"
+              className="relative grid size-8 shrink-0 place-items-center rounded-full bg-teal text-white transition-transform duration-150 ease-out active:scale-[0.97]"
             >
               <span className="absolute inset-0.5 animate-spin rounded-full border-2 border-paper/25 border-t-paper" />
               <Square className="size-3 fill-current" />
@@ -164,7 +164,7 @@ export const Composer = ({
               type="submit"
               aria-label="Kirim"
               disabled={!value.trim()}
-              className="grid size-8 shrink-0 place-items-center rounded-full bg-teal text-white transition-[background-color,transform] hover:bg-teal-2 active:scale-95 disabled:bg-paper-2 disabled:text-ink-3"
+              className="grid size-8 shrink-0 place-items-center rounded-full bg-teal text-white transition-[background-color,transform] duration-150 ease-out hover:bg-teal-2 active:scale-[0.97] disabled:bg-paper-2 disabled:text-ink-3"
             >
               <ArrowUp className="size-4" strokeWidth={2.4} />
             </button>

@@ -89,7 +89,7 @@ const Viewer = ({
     <BaseDialog.Root open={study !== null} onOpenChange={(open) => !open && onClose()}>
       <BaseDialog.Portal>
         <BaseDialog.Popup
-          className="fixed inset-0 z-50 flex flex-col bg-[#0b0f0f] text-white outline-none transition-opacity duration-150 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0"
+          className="fixed inset-0 z-50 flex flex-col bg-[#0b0f0f] text-white outline-none transition-opacity duration-200 ease-out data-[ending-style]:opacity-0 data-[ending-style]:duration-[120ms] data-[starting-style]:opacity-0"
           data-testid="pacs-viewer"
         >
           <header className="flex h-12 shrink-0 items-center gap-3 px-4 text-[13px]">

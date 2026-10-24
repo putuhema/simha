@@ -65,7 +65,7 @@ const rowClass =
 const activeClass = "bg-teal-soft font-medium text-teal-2";
 const iconButton = "grid size-7 place-items-center rounded-md text-ink-3 transition-colors hover:bg-paper-2 hover:text-ink";
 const menuPopup =
-  "min-w-52 origin-[var(--transform-origin)] rounded-xl border border-line bg-card p-1.5 text-[13px] text-ink shadow-[0_18px_44px_-20px_rgb(26_31_30/0.35)] transition-[opacity,transform] duration-150 outline-none data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0";
+  "min-w-52 origin-[var(--transform-origin)] rounded-xl border border-line bg-card p-1.5 text-[13px] text-ink shadow-[0_18px_44px_-20px_rgb(26_31_30/0.35)] transition-[opacity,transform] duration-150 ease-out outline-none data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[ending-style]:duration-[100ms] data-[starting-style]:scale-95 data-[starting-style]:opacity-0";
 const menuItem = "flex cursor-default items-center gap-2.5 rounded-lg px-2.5 py-1.5 outline-none data-[highlighted]:bg-paper-2";
 
 const initials = (name: string) =>
@@ -339,7 +339,7 @@ export const SidebarPanel = ({ health, onNavigate, onClose, closeLabel }: PanelP
             onNavigate();
             newChat();
           }}
-          className="group relative flex h-9 w-full items-center justify-center gap-2 rounded-[10px] border border-line bg-card text-[13px] font-medium text-ink transition-[background-color,border-color] hover:border-ink-3/40 active:translate-y-px"
+          className="group relative flex h-9 w-full items-center justify-center gap-2 rounded-[10px] border border-line bg-card text-[13px] font-medium text-ink transition-[background-color,border-color,transform] duration-150 ease-out hover:border-ink-3/40 active:scale-[0.99]"
         >
           <Plus className="size-4 text-ink-2" />
           Percakapan baru

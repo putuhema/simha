@@ -27,7 +27,7 @@ export const TipButton = ({
     </Tooltip.Trigger>
     <Tooltip.Portal>
       <Tooltip.Positioner side={side} sideOffset={6} className="z-50">
-        <Tooltip.Popup className="flex origin-[var(--transform-origin)] items-center gap-2 rounded-md bg-teal-2 px-2 py-1 text-[12px] text-paper shadow-lg transition-[opacity,transform] duration-150 data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+        <Tooltip.Popup className="flex origin-[var(--transform-origin)] items-center gap-2 rounded-md bg-teal-2 px-2 py-1 text-[12px] text-paper shadow-lg transition-[opacity,transform] duration-[125ms] ease-out data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[ending-style]:duration-[80ms] data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
           {label}
           {shortcut ? <kbd className="rounded bg-white/15 px-1 font-sans text-[11px] text-paper/85">{shortcut}</kbd> : null}
         </Tooltip.Popup>

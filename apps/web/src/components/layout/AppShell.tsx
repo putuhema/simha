@@ -53,7 +53,7 @@ export const AppShell = () => {
         <aside
           aria-label="Sidebar"
           className={cn(
-            "hidden h-full shrink-0 overflow-hidden bg-paper transition-[width] duration-200 ease-out md:block",
+            "hidden h-full shrink-0 overflow-hidden bg-paper transition-[width] duration-[240ms] ease-out md:block",
             open ? "w-[286px] border-r border-line-2" : "w-[var(--rail-width,64px)] border-r border-transparent",
           )}
         >
@@ -71,14 +71,17 @@ export const AppShell = () => {
         {/* Phone: drawer over the page. */}
         <div className={cn("fixed inset-0 z-40 md:hidden", drawer ? "" : "pointer-events-none")} aria-hidden={!drawer}>
           <div
-            className={cn("absolute inset-0 bg-ink/30 backdrop-blur-[1px] transition-opacity duration-200", drawer ? "opacity-100" : "opacity-0")}
+            className={cn(
+              "absolute inset-0 bg-ink/30 backdrop-blur-[1px] transition-opacity ease-out",
+              drawer ? "opacity-100 duration-200" : "opacity-0 duration-150",
+            )}
             onClick={() => setDrawer(false)}
           />
           <aside
             aria-label="Sidebar"
             className={cn(
-              "absolute inset-y-0 left-0 w-[290px] max-w-[86vw] bg-paper shadow-2xl transition-transform duration-200 ease-out",
-              drawer ? "translate-x-0" : "-translate-x-full",
+              "absolute inset-y-0 left-0 w-[290px] max-w-[86vw] bg-paper shadow-2xl transition-transform ease-[var(--ease-drawer)]",
+              drawer ? "translate-x-0 duration-300" : "-translate-x-full duration-200",
             )}
           >
             {drawer ? (

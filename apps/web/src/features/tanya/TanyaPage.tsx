@@ -79,7 +79,7 @@ const CardReference = ({ card, active }: { readonly card: AnswerCard; readonly a
       data-testid="card-reference"
       onClick={() => select(card.key)}
       className={cn(
-        "group flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-[border-color,background-color] duration-150",
+        "group flex w-full items-center gap-2.5 rounded-xl border px-3 py-2.5 text-left transition-[border-color,background-color] duration-150 ease-out",
         active ? "border-teal/40 bg-teal-soft/20" : "border-line bg-card hover:border-ink-3/30 hover:bg-paper/40",
       )}
     >
@@ -152,12 +152,12 @@ const Turn = ({
       {turn.steps.length > 0 ? (
         <Collapsible.Root open={stepsOpen} onOpenChange={setStepsOpen}>
           <Collapsible.Trigger className="group -ml-1 flex h-7 items-center gap-1.5 rounded-md px-1 text-[12px] text-ink-3 transition-colors hover:text-ink">
-            <ChevronRight className="size-3.5 transition-transform group-data-[panel-open]:rotate-90" />
+            <ChevronRight className="size-3.5 transition-transform duration-150 ease-out group-data-[panel-open]:rotate-90" />
             <span className={running ? "shimmer" : ""}>
               {turn.steps.length} langkah{turn.model ? ` · ${turn.model}` : ""}
             </span>
           </Collapsible.Trigger>
-          <Collapsible.Panel className="mt-2 px-0.5 pt-1 transition-opacity duration-150 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0">
+          <Collapsible.Panel className="mt-2 px-0.5 pt-1 transition-opacity duration-150 ease-out data-[ending-style]:opacity-0 data-[ending-style]:duration-[100ms] data-[starting-style]:opacity-0">
             <StepList steps={turn.steps} pending={pendingStep(turn)} />
           </Collapsible.Panel>
         </Collapsible.Root>

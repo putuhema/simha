@@ -40,7 +40,7 @@ export const PengaturanPage = () => {
             <Tabs.Tab value="pengetahuan" className={tabClass}>
               Pengetahuan AI
             </Tabs.Tab>
-            <Tabs.Indicator className="absolute bottom-[-1px] left-[var(--active-tab-left)] h-0.5 w-[var(--active-tab-width)] bg-teal transition-all duration-200" />
+            <Tabs.Indicator className="absolute bottom-[-1px] left-[var(--active-tab-left)] h-0.5 w-[var(--active-tab-width)] bg-teal transition-[left,width] duration-200 ease-out" />
           </Tabs.List>
           <Tabs.Panel value="ai">
             <LlmSettingsForm isAdmin={isAdmin} />

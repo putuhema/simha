@@ -111,7 +111,7 @@ export const OpenInKhanza = ({
           </Menu.Trigger>
           <Menu.Portal>
             <Menu.Positioner sideOffset={6} align="end" className="z-50">
-              <Menu.Popup className="min-w-56 origin-[var(--transform-origin)] rounded-xl border border-line bg-card p-1.5 text-[13px] shadow-[0_16px_40px_-16px_rgb(23_32_30/0.35)] transition-[opacity,transform] duration-150 outline-none data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
+              <Menu.Popup className="min-w-56 origin-[var(--transform-origin)] rounded-xl border border-line bg-card p-1.5 text-[13px] shadow-[0_16px_40px_-16px_rgb(23_32_30/0.35)] transition-[opacity,transform] duration-150 ease-out outline-none data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[ending-style]:duration-[100ms] data-[starting-style]:scale-95 data-[starting-style]:opacity-0">
                 <p className="px-2.5 pt-1 pb-1.5 font-mono text-[11px] text-ink-3">{copy}</p>
                 {forms.map((f) => (
                   <Menu.Item

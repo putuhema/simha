@@ -32,7 +32,7 @@ const ImageTile = ({ file, onOpen }: { readonly file: BerkasDigitalFile; readonl
           src={urlFor(file)}
           alt={file.nama}
           loading="lazy"
-          className="size-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+          className="size-full object-cover transition-transform duration-200 ease-out [@media(hover:hover)_and_(pointer:fine)]:group-hover:scale-[1.02]"
         />
       ) : (
         <span className="grid size-full place-items-center text-ink-3">

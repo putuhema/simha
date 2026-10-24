@@ -39,17 +39,24 @@
   --color-ok: #15803d;
   --color-ok-soft: #dcf3e2;
 
-  --animate-rise: rise 380ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  /* Motion: strong custom curves, short durations. Snappy, not showy. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --animate-rise: rise 240ms var(--ease-out) both;
   --animate-pulse-led: pulse-led 2.4s ease-in-out infinite;
   --animate-shimmer: shimmer 1.8s linear infinite;
   --animate-caret: caret 1s ease-in-out infinite;
-  --animate-fade-in: fade-in 220ms ease-out both;
-  --animate-panel-in: panel-in 260ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-fade-in: fade-in 160ms ease-out both;
+  --animate-panel-in: panel-in 220ms var(--ease-out) both;
+  /* A faster spinner reads as a faster app, even at the same load time. */
+  --animate-spin: spin 0.75s linear infinite;
 
   @keyframes panel-in {
     from {
       opacity: 0;
-      transform: translateX(14px);
+      transform: translateX(10px);
     }
     to {
       opacity: 1;
@@ -148,7 +155,23 @@
     *::before,
     *::after {
       animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
       transition-duration: 1ms !important;
+      scroll-behavior: auto !important;
+    }
+    /* Keep the fade (it explains the change), drop the movement and the pulsing. */
+    .animate-rise,
+    .animate-panel-in,
+    .stagger > * {
+      animation: fade-in 160ms ease-out both !important;
+    }
+    .animate-fade-in {
+      animation: fade-in 160ms ease-out both !important;
+    }
+    .animate-caret,
+    .animate-pulse-led,
+    .shimmer {
+      animation: none !important;
     }
   }
 }
@@ -156,10 +179,10 @@
 @layer components {
   /* Radiology viewer (dark, full screen) */
   .viewer-btn {
-    @apply inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-white/85 transition-[background-color,transform] duration-150 hover:bg-white/10 active:scale-[0.97];
+    @apply inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-white/85 transition-[background-color,transform] duration-150 ease-out hover:bg-white/10 active:scale-[0.97];
   }
   .viewer-nav {
-    @apply absolute top-1/2 -mt-5 grid size-10 place-items-center rounded-full bg-white/10 text-white transition-[background-color,transform] duration-150 hover:bg-white/15 active:scale-[0.94];
+    @apply absolute top-1/2 -mt-5 grid size-10 place-items-center rounded-full bg-white/10 text-white transition-[background-color,transform] duration-150 ease-out hover:bg-white/15 active:scale-[0.96];
   }
   /* Section label: small caps in the condensed face. */
   .eyebrow {
@@ -219,16 +242,16 @@
     @apply animate-rise;
   }
   .stagger > *:nth-child(2) {
-    animation-delay: 40ms;
+    animation-delay: 30ms;
   }
   .stagger > *:nth-child(3) {
-    animation-delay: 80ms;
+    animation-delay: 60ms;
   }
   .stagger > *:nth-child(4) {
-    animation-delay: 120ms;
+    animation-delay: 90ms;
   }
   .stagger > *:nth-child(n + 5) {
-    animation-delay: 160ms;
+    animation-delay: 120ms;
   }
 
   /* Markdown answers from the AI. */

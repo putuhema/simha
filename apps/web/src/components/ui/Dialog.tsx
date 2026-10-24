@@ -21,11 +21,11 @@ export const Dialog = ({
 }) => (
   <BaseDialog.Root open={open} onOpenChange={onOpenChange}>
     <BaseDialog.Portal>
-      <BaseDialog.Backdrop className="fixed inset-0 bg-ink/35 backdrop-blur-[2px] transition-opacity duration-150 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0" />
+      <BaseDialog.Backdrop className="fixed inset-0 bg-ink/35 backdrop-blur-[2px] transition-opacity duration-200 ease-out data-[ending-style]:opacity-0 data-[ending-style]:duration-[120ms] data-[starting-style]:opacity-0" />
       <BaseDialog.Viewport className="fixed inset-0 grid place-items-center overflow-y-auto p-4">
         <BaseDialog.Popup
           className={cn(
-            "w-full rounded-xl border border-line bg-card p-5 shadow-[0_24px_60px_-20px_rgb(23_32_30/0.45)] transition-[opacity,transform] duration-150 data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0",
+            "w-full rounded-xl border border-line bg-card p-5 shadow-[0_24px_60px_-20px_rgb(23_32_30/0.45)] transition-[opacity,transform] duration-200 ease-out data-[ending-style]:scale-[0.98] data-[ending-style]:opacity-0 data-[ending-style]:duration-[120ms] data-[starting-style]:scale-[0.98] data-[starting-style]:opacity-0",
             wide ? "max-w-3xl" : "max-w-lg",
           )}
         >
