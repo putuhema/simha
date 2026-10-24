@@ -11,6 +11,7 @@ import { ArrowRight, Check, ChevronRight, Copy, FolderClosed, PanelRightOpen, Sh
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnswerFeedback } from "../../components/agent/AnswerFeedback.tsx";
 import { StreamingMarkdown } from "../../components/agent/Markdown.tsx";
+import { SimhaBot, type SimhaMood } from "../../components/agent/SimhaBot.tsx";
 import { PendingLine, pendingStep, StepList } from "../../components/agent/StepList.tsx";
 import { CardBody, CardIcon, CardsPanel } from "../../components/layout/CardsPanel.tsx";
 import { OpenInKhanza } from "../../components/desktop/OpenInKhanza.tsx";
@@ -148,6 +149,10 @@ const Turn = memo(({ turn, cards, wide, selectedKey }: TurnProps) => {
   const writing = useTanya((s) => (s.live?.key === turn.key ? s.live.writing : turn.writing));
   const reasoning = useTanya((s) => (s.live?.key === turn.key ? s.live.reasoning : turn.reasoning));
   const pending = pendingStep({ status: turn.status, steps: turn.steps, writing, waitingSince: turn.waitingSince, reasoning });
+  // The face only stands in the gap before an answer exists. Once text arrives
+  // the caret takes over, and the answer column never shifts sideways.
+  const showFace = running && turn.text === "";
+  const mood: SimhaMood = turn.steps.some((s) => s.running) || writing ? "work" : "think";
   const rm = rmFromSteps(turn.steps) ?? rmFromText(turn.question) ?? rmFromText(turn.text);
   const diagnosis = splitAnswer(turn.text).diagnosis;
 
@@ -164,9 +169,17 @@ const Turn = memo(({ turn, cards, wide, selectedKey }: TurnProps) => {
         </div>
       </div>
 
+      {showFace && turn.steps.length === 0 ? (
+        <p className="flex items-center gap-2 text-[12.5px] text-ink-3">
+          <SimhaBot mood={mood} className="size-7" />
+          <PendingLine pending={{ label: "Memahami pertanyaan…", since: turn.waitingSince, reasoning }} />
+        </p>
+      ) : null}
+
       {turn.steps.length > 0 ? (
         <Collapsible.Root open={stepsOpen} onOpenChange={setStepsOpen}>
           <Collapsible.Trigger className="group -ml-1 flex h-7 items-center gap-1.5 rounded-md px-1 text-[12px] text-ink-3 transition-colors hover:text-ink">
+            {showFace ? <SimhaBot mood={mood} className="size-6" /> : null}
             <ChevronRight className="size-3.5 transition-transform duration-150 ease-out group-data-[panel-open]:rotate-90" />
             <span className={running ? "shimmer" : ""}>
               {turn.steps.length} langkah{turn.model ? ` · ${turn.model}` : ""}
@@ -176,10 +189,6 @@ const Turn = memo(({ turn, cards, wide, selectedKey }: TurnProps) => {
             <StepList steps={turn.steps} pending={pending} />
           </Collapsible.Panel>
         </Collapsible.Root>
-      ) : running ? (
-        <p className="text-[12.5px] text-ink-3">
-          <PendingLine pending={{ label: "Memahami pertanyaan…", since: turn.waitingSince, reasoning }} />
-        </p>
       ) : null}
 
       <TurnAnswer turnKey={turn.key} text={turn.text} streaming={running} />
@@ -217,7 +226,14 @@ const Turn = memo(({ turn, cards, wide, selectedKey }: TurnProps) => {
         </section>
       ) : null}
 
-      {turn.status === "error" ? <ErrorText>{turn.error}</ErrorText> : null}
+      {turn.status === "error" ? (
+        <div className="flex items-center gap-2">
+          <SimhaBot mood="alert" className="size-7 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <ErrorText>{turn.error}</ErrorText>
+          </div>
+        </div>
+      ) : null}
       {turn.status === "stopped" ? <p className="text-[12.5px] text-ink-3">Dihentikan.</p> : null}
       {turn.status === "done" && turn.text ? (
         <div className="flex animate-fade-in flex-wrap items-center gap-1.5">
@@ -264,8 +280,8 @@ const EmptyState = ({
 }) => (
   <div className="mx-auto flex w-full max-w-[800px] flex-1 animate-fade-in flex-col justify-center px-4 py-10 sm:px-6">
     <div className="mb-7 flex flex-col items-center text-center">
+      <SimhaBot mood={error ? "alert" : "idle"} className="mb-4 size-16" />
       <div className="flex flex-wrap items-center justify-center gap-2.5">
-        <img src="/favicon.svg" alt="" className="size-8 opacity-95" />
         <h1 className="font-display text-[26px] leading-tight font-semibold tracking-[-0.025em] sm:text-[31px]">
           {mode === "investigasi" ? "Keluhan apa yang mau diselidiki?" : "Mau cek data apa hari ini?"}
         </h1>

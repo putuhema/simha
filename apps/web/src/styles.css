@@ -170,8 +170,13 @@
     }
     .animate-caret,
     .animate-pulse-led,
-    .shimmer {
+    .shimmer,
+    .simha-lid,
+    .simha-look {
       animation: none !important;
+    }
+    .simha-eye {
+      transition: none;
     }
   }
 }
@@ -221,6 +226,66 @@
     .shimmer {
       -webkit-text-fill-color: currentColor;
       background-image: none;
+    }
+  }
+
+  /*
+   * Simha's eyes. The mood is a transform on the eye; the blink and the
+   * thinking drift sit on inner nodes so they don't fight that transform.
+   * Blink and drift are status, dropped under reduced motion. The pose stays.
+   */
+  .simha-eye,
+  .simha-lid,
+  .simha-look {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .simha-eye {
+    transition: transform 180ms var(--ease-out);
+  }
+  .simha[data-mood="idle"] .simha-eye {
+    transform: rotate(-16deg);
+  }
+  .simha[data-mood="think"] .simha-eye {
+    transform: translateY(-18%) rotate(-16deg);
+  }
+  .simha[data-mood="work"] .simha-eye {
+    transform: scaleY(0.62) rotate(-10deg);
+  }
+  .simha[data-mood="wait"] .simha-eye {
+    transform: scaleY(0.22);
+  }
+  .simha[data-mood="done"] .simha-eye {
+    transform: scaleY(0.4) rotate(-24deg);
+  }
+  .simha[data-mood="alert"] .simha-eye {
+    transform: scaleY(1.16);
+  }
+  .simha[data-mood="idle"] .simha-lid {
+    animation: simha-blink 5.2s linear infinite;
+  }
+  .simha[data-mood="think"] .simha-look {
+    animation: simha-look 2.4s var(--ease-in-out) infinite alternate;
+  }
+  @keyframes simha-blink {
+    0%,
+    90%,
+    100% {
+      transform: scaleY(1);
+    }
+    93% {
+      transform: scaleY(0.14);
+    }
+    96% {
+      transform: scaleY(1);
+    }
+  }
+  @keyframes simha-look {
+    from {
+      transform: translateY(0);
+    }
+    to {
+      transform: translateY(-10%);
     }
   }
 
